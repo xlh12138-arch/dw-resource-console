@@ -1,16 +1,15 @@
 import type { Role, UserStatus } from '@dw/shared';
 import { asc, eq } from 'drizzle-orm';
-import { db } from '../../db/index.js';
+import { db, firstRow } from '../../db/index.js';
 import { users, type UserRow } from '../../db/schema.js';
 
 export const userRepository = {
-  /** better-sqlite3 为同步驱动，.get() 直接返回行对象或 undefined */
-  findByUsername(username: string): UserRow | undefined {
-    return db.select().from(users).where(eq(users.username, username)).get();
+  findByUsername(username: string): Promise<UserRow | undefined> {
+    return firstRow<UserRow>(db.select().from(users).where(eq(users.username, username)));
   },
 
-  findById(id: number): UserRow | undefined {
-    return db.select().from(users).where(eq(users.id, id)).get();
+  findById(id: number): Promise<UserRow | undefined> {
+    return firstRow<UserRow>(db.select().from(users).where(eq(users.id, id)));
   },
 
   list(): Promise<UserRow[]> {
@@ -24,7 +23,8 @@ export const userRepository = {
     role: Role;
     status?: UserStatus;
   }): Promise<UserRow> {
-    return db.insert(users).values(values).returning().get();
+    const rows = await db.insert(users).values(values).returning();
+    return rows[0]!;
   },
 
   async update(

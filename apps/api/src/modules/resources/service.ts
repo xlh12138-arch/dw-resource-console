@@ -21,6 +21,7 @@ import { environmentRepository } from '../dict/repository.js';
 import { dictGuard, environmentLabelOf } from '../dict/service.js';
 import { getTypeMeta, type RuntimeField } from '../dict/validator.js';
 import { parseCsv, toCsv } from './csv.js';
+import { withTransaction } from '../../db/index.js';
 import {
   capacityDetailOf,
   extractIps,
@@ -1175,25 +1176,27 @@ export const resourceService = {
 
         const validated = await validateAttrs(input.type, attrs, lineNo);
 
-        // 以「名称 + 环境」作为幂等键，重复导入时按策略跳过或覆盖；
-        // 覆盖场景需把自身排除在 IP 冲突校验之外，否则自己跟自己冲突
-        const existing = (await resourceRepository.listAll({ type: input.type, q: payload.name })).find(
-          (r) => r.name === payload.name && r.environment === payload.environment,
-        );
-        await assertNoIpConflict(input.type, validated, payload.environment, existing?.id);
+        // 每行独立事务：单行数据库失败不会污染整批 PostgreSQL 事务，
+        // 同时保证该行业务写入与审计记录原子提交或回滚。
+        const outcome = await withTransaction(async () => {
+          // 以「名称 + 环境」作为幂等键，重复导入时按策略跳过或覆盖；
+          // 覆盖场景需把自身排除在 IP 冲突校验之外，否则自己跟自己冲突。
+          const existing = (await resourceRepository.listAll({ type: input.type, q: payload.name })).find(
+            (r) => r.name === payload.name && r.environment === payload.environment,
+          );
+          await assertNoIpConflict(input.type, validated, payload.environment, existing?.id);
 
-        if (existing) {
-          if (input.onConflict === 'skip') {
-            result.skipped += 1;
-            continue;
+          if (existing) {
+            if (input.onConflict === 'skip') return 'skipped';
+            await this.update(existing.id, { ...payload, attrs }, actor, requestId);
+            return 'updated';
           }
-          await this.update(existing.id, { ...payload, attrs }, actor, requestId);
-          result.updated += 1;
-          continue;
-        }
-
-        await this.create({ ...payload, attrs: validated }, actor, requestId);
-        result.created += 1;
+          await this.create({ ...payload, attrs: validated }, actor, requestId);
+          return 'created';
+        });
+        if (outcome === 'skipped') result.skipped += 1;
+        if (outcome === 'updated') result.updated += 1;
+        if (outcome === 'created') result.created += 1;
       } catch (err) {
         result.errors.push({ row: lineNo, message: err instanceof Error ? err.message : String(err) });
       }

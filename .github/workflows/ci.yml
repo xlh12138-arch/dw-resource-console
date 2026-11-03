@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+
+  sqlite-integration:
+    runs-on: ubuntu-latest
+    env:
+      DB_DRIVER: sqlite
+      DATABASE_URL: ./data/ci.db
+      AUTO_MIGRATE: "true"
+      BOOTSTRAP_ADMIN_USERNAME: admin
+      BOOTSTRAP_ADMIN_PASSWORD: CiAdmin#2026
+      SMOKE_PASSWORD: CiAdmin#2026
+      JWT_SECRET: ci-only-jwt-secret-0123456789abcdef
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run db:seed
+      - run: npm run test:transaction
+      - name: Start API and web
+        run: |
+          npm start > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+          npm run dev:web > /tmp/web.log 2>&1 &
+          echo $! > /tmp/web.pid
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:8787/ready && curl -fsS http://127.0.0.1:5173/ && exit 0
+            sleep 1
+          done
+          cat /tmp/api.log
+          cat /tmp/web.log
+          exit 1
+      - name: API smoke tests
+        run: npm run smoke
+      - uses: browser-actions/setup-chrome@v1
+        id: setup-chrome
+      - name: Browser UI tests
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          SMOKE_WEB_BASE: http://127.0.0.1:5173/
+        run: npm run ui:check
+      - name: Rate-limit bypass test
+        run: npm run test:rate-limit
+      - name: Service logs
+        if: failure()
+        run: |
+          cat /tmp/api.log || true
+          cat /tmp/web.log || true
+      - name: Stop services
+        if: always()
+        run: |
+          kill "$(cat /tmp/api.pid)" 2>/dev/null || true
+          kill "$(cat /tmp/web.pid)" 2>/dev/null || true
+
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dw_console
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dw_console"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DB_DRIVER: postgres
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/dw_console
+      AUTO_MIGRATE: "true"
+      BOOTSTRAP_ADMIN_USERNAME: admin
+      BOOTSTRAP_ADMIN_PASSWORD: CiAdmin#2026
+      SMOKE_PASSWORD: CiAdmin#2026
+      JWT_SECRET: ci-only-jwt-secret-0123456789abcdef
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run db:migrate
+      - run: npm run db:seed
+      - run: npm run test:transaction
+      - name: Start API
+        run: |
+          npm start > /tmp/api-pg.log 2>&1 &
+          echo $! > /tmp/api-pg.pid
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:8787/ready && exit 0
+            sleep 1
+          done
+          cat /tmp/api-pg.log
+          exit 1
+      - run: npm run smoke
+      - run: npm run test:rate-limit
+      - name: Service logs
+        if: failure()
+        run: cat /tmp/api-pg.log || true
+      - name: Stop service
+        if: always()
+        run: kill "$(cat /tmp/api-pg.pid)" 2>/dev/null || true

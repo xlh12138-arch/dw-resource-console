@@ -1,5 +1,5 @@
 import { runMigrations } from './auto-migrate.js';
-import { db } from './index.js';
+import { db, withTransaction } from './index.js';
 import {
   auditLogs,
   environmentDict,
@@ -15,19 +15,21 @@ import {
 } from './schema.js';
 
 await runMigrations();
-// 先解除资源对项目 / 项目环境的引用（ADD COLUMN 的外键不带级联置空）
-await db.update(resources).set({ projectId: null, projectEnvId: null });
-await db.delete(envSlots);
-await db.delete(projectEnvironments);
-await db.delete(envTemplates);
-await db.delete(projects);
-await db.delete(auditLogs);
-await db.delete(refreshTokens);
-await db.delete(resources);
-await db.delete(users);
-await db.delete(resourceTypeFields);
-await db.delete(resourceTypes);
-await db.delete(environmentDict);
+await withTransaction(async () => {
+  // 先解除资源对项目 / 项目环境的引用（ADD COLUMN 的外键不带级联置空）
+  await db.update(resources).set({ projectId: null, projectEnvId: null });
+  await db.delete(envSlots);
+  await db.delete(projectEnvironments);
+  await db.delete(envTemplates);
+  await db.delete(projects);
+  await db.delete(auditLogs);
+  await db.delete(refreshTokens);
+  await db.delete(resources);
+  await db.delete(users);
+  await db.delete(resourceTypeFields);
+  await db.delete(resourceTypes);
+  await db.delete(environmentDict);
+});
 // eslint-disable-next-line no-console
 console.log('[db] 已清空业务数据与字典配置（含项目、项目环境、环境模板、资源类型与环境字典）');
 process.exit(0);

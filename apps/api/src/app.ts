@@ -10,7 +10,7 @@ import {
 } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { config } from './config/env.js';
-import { db } from './db/index.js';
+import { execSql } from './db/index.js';
 import { newRequestId } from './lib/password.js';
 import { authRoutes } from './modules/auth/routes.js';
 import { auditRoutes } from './modules/audit/routes.js';
@@ -35,7 +35,7 @@ export async function buildApp() {
         : { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss', ignore: 'pid,hostname' } },
     },
     genReqId: () => newRequestId(),
-    trustProxy: true,
+    trustProxy: config.server.trustProxy,
     bodyLimit: 2 * 1024 * 1024,
   }).withTypeProvider<ZodTypeProvider>();
 
@@ -96,7 +96,7 @@ export async function buildApp() {
       timestamp: new Date().toISOString(),
     });
     try {
-      await db.get(sql`select 1 as ok`);
+      await execSql(sql`select 1 as ok`);
       return { status: 'ready', ...payload() };
     } catch {
       return reply.code(503).send({ status: 'not-ready', ...payload() });

@@ -2,18 +2,19 @@
  * 项目 / 项目环境 / 环境模板 冒烟测试（需先启动 API）
  * 用法：node scripts/smoke-project.mjs
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
-const envFile = readFileSync(new URL('../.env', import.meta.url), 'utf8');
+const envUrl = new URL('../.env', import.meta.url);
+const envFile = existsSync(envUrl) ? readFileSync(envUrl, 'utf8') : '';
 const envMap = Object.fromEntries(
   envFile
     .split(/\r?\n/)
     .filter((l) => l && !l.trimStart().startsWith('#') && l.includes('='))
     .map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]),
 );
-const ADMIN_PASSWORD = envMap.BOOTSTRAP_ADMIN_PASSWORD ?? 'change-me';
+const ADMIN_PASSWORD = process.env.SMOKE_PASSWORD ?? envMap.BOOTSTRAP_ADMIN_PASSWORD ?? 'change-me';
 
-const BASE = 'http://127.0.0.1:8787/api/v1';
+const BASE = process.env.SMOKE_BASE ?? 'http://127.0.0.1:8787/api/v1';
 let passed = 0;
 let failed = 0;
 

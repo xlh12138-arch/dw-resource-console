@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, inArray, isNull, like, or, sql } from 'drizzle-orm';
-import { db } from '../../db/index.js';
+import { config } from '../../config/env.js';
+import { db, firstRow } from '../../db/index.js';
 import { getTypeMeta } from '../dict/validator.js';
 import { envSlots, projectEnvironments, resources, type ResourceRow } from '../../db/schema.js';
 import type { resourceQuerySchema } from '@dw/shared';
@@ -37,7 +38,7 @@ function buildWhere(q: ResourceQuery, scope?: ResourceScope) {
         like(resources.code, term),
         like(resources.owner, term),
         like(resources.datacenter, term),
-        like(resources.attrs, term),
+        sql`cast(${resources.attrs} as text) like ${term}`,
         like(resources.remark, term),
       ),
     );
@@ -50,7 +51,7 @@ function buildWhere(q: ResourceQuery, scope?: ResourceScope) {
   // 标签支持逗号分隔多值，语义为「同时包含」
   if (q.tag) {
     for (const tag of q.tag.split(',').map((t) => t.trim()).filter(Boolean)) {
-      clauses.push(like(resources.tags, `%"${tag}"%`));
+      clauses.push(sql`cast(${resources.tags} as text) like ${`%"${tag}"%`}`);
     }
   }
   if (q.unassigned) clauses.push(isNull(resources.projectId));
@@ -91,13 +92,12 @@ export const resourceRepository = {
     return db.select().from(resources).where(buildWhere(q as ResourceQuery, scope));
   },
 
-  /** better-sqlite3 为同步驱动，.get() 直接返回行对象或 undefined */
-  findById(id: number): ResourceRow | undefined {
-    return db.select().from(resources).where(eq(resources.id, id)).get();
+  findById(id: number): Promise<ResourceRow | undefined> {
+    return firstRow<ResourceRow>(db.select().from(resources).where(eq(resources.id, id)));
   },
 
-  findByCode(code: string): ResourceRow | undefined {
-    return db.select().from(resources).where(eq(resources.code, code)).get();
+  findByCode(code: string): Promise<ResourceRow | undefined> {
+    return firstRow<ResourceRow>(db.select().from(resources).where(eq(resources.code, code)));
   },
 
   async findByIds(ids: number[]): Promise<ResourceRow[]> {
@@ -105,17 +105,18 @@ export const resourceRepository = {
     return db.select().from(resources).where(inArray(resources.id, ids));
   },
 
-  create(values: typeof resources.$inferInsert): ResourceRow {
-    return db.insert(resources).values(values).returning().get();
+  async create(values: typeof resources.$inferInsert): Promise<ResourceRow> {
+    const rows = await db.insert(resources).values(values).returning();
+    return rows[0]!;
   },
 
-  update(id: number, values: Partial<typeof resources.$inferInsert>): ResourceRow {
-    return db
+  async update(id: number, values: Partial<typeof resources.$inferInsert>): Promise<ResourceRow> {
+    const rows = await db
       .update(resources)
       .set({ ...values, updatedAt: new Date() })
       .where(eq(resources.id, id))
-      .returning()
-      .get();
+      .returning();
+    return rows[0]!;
   },
 
   async remove(id: number): Promise<void> {
@@ -124,7 +125,10 @@ export const resourceRepository = {
 
   /** 按 IP 精查（attrs JSON 文本匹配），用于 IP 占用检测 */
   async findByIp(ip: string): Promise<ResourceRow[]> {
-    return db.select().from(resources).where(like(resources.attrs, `%"${ip}"%`));
+    return db
+      .select()
+      .from(resources)
+      .where(sql`cast(${resources.attrs} as text) like ${`%"${ip}"%`}`);
   },
 
   async countBy(field: 'type' | 'environment' | 'status' | 'datacenter') {
@@ -161,7 +165,11 @@ export const resourceRepository = {
     const [{ value }] = await db
       .select({ value: count() })
       .from(resources)
-      .where(sql`${resources.createdAt} >= ${since.getTime()}`);
+      .where(
+        sql`${resources.createdAt} >= ${
+          config.db.driver === 'postgres' ? since : since.getTime()
+        }`,
+      );
     return value;
   },
 
@@ -231,10 +239,10 @@ export const resourceRepository = {
   async ancestorsOf(id: number): Promise<ResourceRow[]> {
     const out: ResourceRow[] = [];
     const seen = new Set<number>([id]);
-    let current = this.findById(id);
+    let current = await this.findById(id);
     while (current?.parentId) {
       if (seen.has(current.parentId)) break;
-      const parent = this.findById(current.parentId);
+      const parent = await this.findById(current.parentId);
       if (!parent) break;
       seen.add(parent.id);
       out.push(parent);

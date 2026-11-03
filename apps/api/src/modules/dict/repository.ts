@@ -1,5 +1,5 @@
 import { asc, count, eq, inArray } from 'drizzle-orm';
-import { db } from '../../db/index.js';
+import { db, firstRow } from '../../db/index.js';
 import {
   environmentDict,
   envSlots,
@@ -33,20 +33,21 @@ export const resourceTypeRepository = {
   },
 
   async findByCode(code: string): Promise<ResourceTypeRow | undefined> {
-    return db.select().from(resourceTypes).where(eq(resourceTypes.code, code)).get();
+    return firstRow<ResourceTypeRow>(db.select().from(resourceTypes).where(eq(resourceTypes.code, code)));
   },
 
-  create(values: typeof resourceTypes.$inferInsert): ResourceTypeRow {
-    return db.insert(resourceTypes).values(values).returning().get();
+  async create(values: typeof resourceTypes.$inferInsert): Promise<ResourceTypeRow> {
+    const rows = await db.insert(resourceTypes).values(values).returning();
+    return rows[0]!;
   },
 
-  update(code: string, values: Partial<typeof resourceTypes.$inferInsert>): ResourceTypeRow {
-    return db
+  async update(code: string, values: Partial<typeof resourceTypes.$inferInsert>): Promise<ResourceTypeRow> {
+    const rows = await db
       .update(resourceTypes)
       .set({ ...values, updatedAt: new Date() })
       .where(eq(resourceTypes.code, code))
-      .returning()
-      .get();
+      .returning();
+    return rows[0]!;
   },
 
   async remove(code: string): Promise<void> {
@@ -126,20 +127,23 @@ export const environmentRepository = {
   },
 
   async findByCode(code: string): Promise<EnvironmentRow | undefined> {
-    return db.select().from(environmentDict).where(eq(environmentDict.code, code)).get();
+    return firstRow<EnvironmentRow>(
+      db.select().from(environmentDict).where(eq(environmentDict.code, code)),
+    );
   },
 
-  create(values: typeof environmentDict.$inferInsert): EnvironmentRow {
-    return db.insert(environmentDict).values(values).returning().get();
+  async create(values: typeof environmentDict.$inferInsert): Promise<EnvironmentRow> {
+    const rows = await db.insert(environmentDict).values(values).returning();
+    return rows[0]!;
   },
 
-  update(code: string, values: Partial<typeof environmentDict.$inferInsert>): EnvironmentRow {
-    return db
+  async update(code: string, values: Partial<typeof environmentDict.$inferInsert>): Promise<EnvironmentRow> {
+    const rows = await db
       .update(environmentDict)
       .set({ ...values, updatedAt: new Date() })
       .where(eq(environmentDict.code, code))
-      .returning()
-      .get();
+      .returning();
+    return rows[0]!;
   },
 
   async remove(code: string): Promise<void> {

@@ -12,6 +12,7 @@ import {
 } from '@dw/shared';
 import { environmentRepository, resourceTypeFieldRepository, resourceTypeRepository } from './repository.js';
 import { invalidateDictCache } from './validator.js';
+import { withTransaction } from '../../db/index.js';
 
 /**
  * 内置字典初始化：把代码里内置的五类资源与三种环境写入字典表。
@@ -60,11 +61,11 @@ function fieldTypeOf(kind: string, isIp: boolean): string {
 
 export async function ensureBuiltinDict(): Promise<void> {
   let created = 0;
-
+  await withTransaction(async () => {
   for (const [index, code] of RESOURCE_TYPES.entries()) {
     const exists = await resourceTypeRepository.exists(code);
     if (!exists) {
-      resourceTypeRepository.create({
+      await resourceTypeRepository.create({
         code,
         label: RESOURCE_TYPE_LABELS[code],
         prefix: RESOURCE_TYPE_PREFIX[code],
@@ -103,7 +104,7 @@ export async function ensureBuiltinDict(): Promise<void> {
 
   for (const [index, code] of ENVIRONMENTS.entries()) {
     if (!(await environmentRepository.exists(code))) {
-      environmentRepository.create({
+      await environmentRepository.create({
         code,
         label: ENVIRONMENT_LABELS[code as keyof typeof ENVIRONMENT_LABELS],
         tone: ENV_TONES[code] ?? 'gray',
@@ -121,11 +122,13 @@ export async function ensureBuiltinDict(): Promise<void> {
       const patch: { builtin?: boolean; color?: string } = {};
       if (!row.builtin) patch.builtin = true;
       if (!row.color && ENV_COLORS[code]) patch.color = ENV_COLORS[code];
-      if (Object.keys(patch).length > 0) environmentRepository.update(code, patch);
+      if (Object.keys(patch).length > 0) await environmentRepository.update(code, patch);
     }
   }
 
   invalidateDictCache();
+  });
+
   if (created > 0) {
     // eslint-disable-next-line no-console
     console.log(`[dict] 内置字典初始化完成，新增 ${created} 条字典项`);

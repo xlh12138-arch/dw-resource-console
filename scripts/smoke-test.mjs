@@ -2,20 +2,22 @@
  * 冒烟测试：验证鉴权、CRUD、校验、RBAC、审计、导出。
  * 用法：先启动服务（npm run dev:api），再 node .tmp/smoke.mjs
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 // 管理员口令取自 .env（首次播种时使用的值），避免脚本里硬编码凭据
-const envFile = readFileSync(new URL('../.env', import.meta.url), 'utf8');
+const envUrl = new URL('../.env', import.meta.url);
+const envFile = existsSync(envUrl) ? readFileSync(envUrl, 'utf8') : '';
 const envMap = Object.fromEntries(
   envFile
     .split(/\r?\n/)
     .filter((l) => l && !l.trimStart().startsWith('#') && l.includes('='))
     .map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]),
 );
-const ADMIN_PASSWORD = envMap.BOOTSTRAP_ADMIN_PASSWORD ?? 'change-me';
+const ADMIN_USERNAME = process.env.SMOKE_ADMIN_USER ?? envMap.BOOTSTRAP_ADMIN_USERNAME ?? 'admin';
+const ADMIN_PASSWORD = process.env.SMOKE_PASSWORD ?? envMap.BOOTSTRAP_ADMIN_PASSWORD ?? 'change-me';
 
-const BASE = 'http://127.0.0.1:8787';
-const B = `${BASE}/api/v1`;
+const B = process.env.SMOKE_BASE ?? 'http://127.0.0.1:8787/api/v1';
+const BASE = new URL(B).origin;
 let pass = 0;
 let fail = 0;
 
@@ -29,12 +31,20 @@ function check(name, cond, extra = '') {
   }
 }
 
-async function req(path, { method = 'GET', token, body } = {}) {
+function refreshCookieFrom(res) {
+  const values = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie')].filter(Boolean);
+  return values
+    .map((value) => value.split(';', 1)[0])
+    .find((value) => value.startsWith('dw_refresh='));
+}
+
+async function req(path, { method = 'GET', token, body, cookie } = {}) {
   const res = await fetch(`${B}${path}`, {
     method,
     headers: {
       ...(body ? { 'content-type': 'application/json' } : {}),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(cookie ? { cookie } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -45,7 +55,7 @@ async function req(path, { method = 'GET', token, body } = {}) {
   } catch {
     json = text;
   }
-  return { status: res.status, json, text };
+  return { status: res.status, json, text, cookie: refreshCookieFrom(res) };
 }
 
 const login = async (username, password) =>
@@ -60,8 +70,12 @@ const docs = await fetch(`${BASE}/docs/`);
 check('GET /docs 可访问', docs.status === 200, `status=${docs.status}`);
 
 console.log('\n[2] 认证');
-const admin = await login('admin', ADMIN_PASSWORD);
+const admin = await login(ADMIN_USERNAME, ADMIN_PASSWORD);
 check('管理员登录成功', admin.status === 200 && !!admin.json.accessToken);
+check(
+  '刷新令牌不出现在响应体，仅通过 HttpOnly Cookie 下发',
+  !('refreshToken' in (admin.json ?? {})) && !!admin.cookie,
+);
 const A = admin.json.accessToken;
 const badLogin = await login('admin', 'wrong-password');
 check('错误口令返回 401', badLogin.status === 401, JSON.stringify(badLogin.json?.error?.code));
@@ -249,13 +263,18 @@ const resAudit = await req(`/resources/${id}/audit`, { token: A });
 check('资源级审计可追溯', Array.isArray(resAudit.json) && resAudit.json.length >= 2, `count=${resAudit.json?.length}`);
 
 console.log('\n[10] 刷新令牌与登出');
-const refreshed = await req('/auth/refresh', { method: 'POST', body: { refreshToken: admin.json.refreshToken } });
+const refreshed = await req('/auth/refresh', { method: 'POST', cookie: admin.cookie });
 check('刷新令牌换取新访问令牌', refreshed.status === 200 && !!refreshed.json.accessToken);
-const reused = await req('/auth/refresh', { method: 'POST', body: { refreshToken: admin.json.refreshToken } });
+check('续期响应同样不暴露刷新令牌', !('refreshToken' in (refreshed.json ?? {})) && !!refreshed.cookie);
+const reused = await req('/auth/refresh', { method: 'POST', cookie: admin.cookie });
 check('旧刷新令牌已轮换失效', reused.status === 401);
 const me = await req('/auth/me', { token: refreshed.json.accessToken });
 check('新令牌可获取用户信息', me.json.username === 'admin');
-const logout = await req('/auth/logout', { method: 'POST', token: refreshed.json.accessToken, body: { refreshToken: refreshed.json.refreshToken } });
+const logout = await req('/auth/logout', {
+  method: 'POST',
+  token: refreshed.json.accessToken,
+  cookie: refreshed.cookie,
+});
 check('登出成功', logout.status === 200);
 
 const disabledNormal = await req(`/users/${createdNormal.json.id}`, { method: 'PATCH', token: A, body: { status: 'DISABLED' } });

@@ -26,6 +26,8 @@
     "smoke:capacity": "node scripts/smoke-capacity-period.mjs",
     "smoke:hierarchy": "node scripts/smoke-hierarchy-period.mjs",
     "smoke:user": "node scripts/smoke-user.mjs",
+    "test:transaction": "node scripts/test-transaction.mjs",
+    "test:rate-limit": "node scripts/test-rate-limit.mjs",
     "ui:check": "node scripts/ui-check.mjs",
     "db:generate": "npm run db:generate -w @dw/api",
     "db:migrate": "npm run db:migrate -w @dw/api",

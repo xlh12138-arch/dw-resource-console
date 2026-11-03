@@ -14,6 +14,7 @@ import {
 import { z } from 'zod';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { actorOf } from '../../lib/actor.js';
+import { withTransaction } from '../../db/index.js';
 import { auditRepository } from '../audit/repository.js';
 import { resourceRepository } from './repository.js';
 import { resourceService } from './service.js';
@@ -124,7 +125,9 @@ export const resourceRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: { body: resourceCreateSchema, response: { 201: resourceSchema } },
     },
     async (request, reply) => {
-      const created = await resourceService.create(request.body, actorOf(request), request.id);
+      const created = await withTransaction(() =>
+        resourceService.create(request.body, actorOf(request), request.id),
+      );
       return reply.code(201).send(created);
     },
   );
@@ -135,7 +138,10 @@ export const resourceRoutes: FastifyPluginAsyncZod = async (app) => {
       ...writeGuard,
       schema: { params: idParams, body: resourceUpdateSchema, response: { 200: resourceSchema } },
     },
-    async (request) => resourceService.update(request.params.id, request.body, actorOf(request), request.id),
+    async (request) =>
+      withTransaction(() =>
+        resourceService.update(request.params.id, request.body, actorOf(request), request.id),
+      ),
   );
 
   app.delete(
@@ -144,7 +150,8 @@ export const resourceRoutes: FastifyPluginAsyncZod = async (app) => {
       preHandler: [app.authenticate, app.authorize('resource:delete')],
       schema: { params: idParams, response: { 200: z.object({ id: z.number() }) } },
     },
-    async (request) => resourceService.remove(request.params.id, actorOf(request), request.id),
+    async (request) =>
+      withTransaction(() => resourceService.remove(request.params.id, actorOf(request), request.id)),
   );
 
   /** 供前端表单使用的「同类型已有资源」下拉（如 GDS 上游节点选择） */

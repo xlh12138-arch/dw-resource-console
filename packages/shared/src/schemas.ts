@@ -469,8 +469,6 @@ export const loginSchema = z.object({
   password: z.string().min(8).max(128),
 });
 
-export const refreshSchema = z.object({ refreshToken: z.string().min(16).max(512) });
-
 export const userSchema = z.object({
   id: z.number().int(),
   username: z.string(),
@@ -484,7 +482,6 @@ export type UserDto = z.infer<typeof userSchema>;
 
 export const authResultSchema = z.object({
   accessToken: z.string(),
-  refreshToken: z.string(),
   expiresIn: z.number().int(),
   user: userSchema,
 });

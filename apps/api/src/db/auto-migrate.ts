@@ -5,10 +5,16 @@ import { db } from './index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-/** 启动时自动执行迁移：开发环境开箱即用；生产建议单独执行 npm run db:migrate */
+/** 启动时自动执行迁移：两种驱动使用各自的原生迁移目录。 */
 export async function runMigrations(): Promise<void> {
   if (!config.autoMigrate) return;
+  if (config.db.driver === 'postgres') {
+    const { migrate } = await import('drizzle-orm/node-postgres/migrator');
+    await migrate(db as unknown as Parameters<typeof migrate>[0], {
+      migrationsFolder: resolve(here, '../../drizzle-pg'),
+    });
+    return;
+  }
   const { migrate } = await import('drizzle-orm/better-sqlite3/migrator');
-  // src/db → apps/api/drizzle（编译后 dist/db → apps/api/drizzle）
-  migrate(db, { migrationsFolder: resolve(here, '../../drizzle') });
+  await migrate(db, { migrationsFolder: resolve(here, '../../drizzle') });
 }

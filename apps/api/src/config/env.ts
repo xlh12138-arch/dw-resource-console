@@ -32,9 +32,16 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().int().min(1).max(65535).default(8787),
   API_BASE_PATH: z.string().startsWith('/').default('/api/v1'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  /**
+   * 可信反向代理。支持 false / true / 逗号分隔的代理 IP/CIDR。
+   * 生产环境不应无条件信任所有 X-Forwarded-For。
+   */
+  TRUST_PROXY: z.string().default('false'),
 
   DB_DRIVER: z.enum(['sqlite', 'postgres']).default('sqlite'),
   DATABASE_URL: z.string().min(1).default('./data/dw-console.db'),
+  DB_SSL: z.string().optional(),
+  DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
 
   JWT_SECRET: z.string().min(16, 'JWT_SECRET 长度至少 16 位，请使用 openssl rand -hex 48 生成'),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
@@ -59,6 +66,16 @@ if (!parsed.success) {
 
 const raw = parsed.data;
 
+function parseTrustProxy(value: string): boolean | string[] {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true') return true;
+  if (normalized === 'false' || normalized === '') return false;
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 /** 支持 15m / 2h / 7d / 3600 这类写法 */
 function parseTtl(input: string): number {
   const matched = /^(\d+)(s|m|h|d)?$/.exec(input.trim());
@@ -73,12 +90,22 @@ export const config = {
   env: raw.NODE_ENV,
   isProd: raw.NODE_ENV === 'production',
   log: { level: raw.LOG_LEVEL },
-  server: { host: raw.API_HOST, port: raw.API_PORT, basePath: raw.API_BASE_PATH },
+  server: {
+    host: raw.API_HOST,
+    port: raw.API_PORT,
+    basePath: raw.API_BASE_PATH,
+    trustProxy: parseTrustProxy(raw.TRUST_PROXY),
+  },
   cors: {
     // 生产环境禁止通配符，必须显式列出来源
     origins: raw.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean),
   },
-  db: { driver: raw.DB_DRIVER, url: raw.DATABASE_URL },
+  db: {
+    driver: raw.DB_DRIVER,
+    url: raw.DATABASE_URL,
+    ssl: bool(raw.DB_SSL, false),
+    poolMax: raw.DB_POOL_MAX,
+  },
   auth: {
     jwtSecret: raw.JWT_SECRET,
     accessTokenTtlSeconds: parseTtl(raw.ACCESS_TOKEN_TTL),

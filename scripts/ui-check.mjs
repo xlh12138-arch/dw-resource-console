@@ -6,17 +6,33 @@
  *  4. Cookie 登录：刷新页面保持登录态
  */
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const CHROME =
+  process.env.CHROME_PATH ??
+  [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+  ].find((candidate) => existsSync(candidate));
+if (!CHROME) throw new Error('未找到 Chrome/Chromium，请设置 CHROME_PATH');
 // 每次运行换一个调试端口与独立 profile，避免与残留实例互相干扰
 const PORT = 9333 + (Date.now() % 60);
-const PROFILE = `C:\\Windows\\Temp\\cdp-ui-${Date.now()}`;
-const APP = 'http://localhost:5173/';
+const PROFILE = join(tmpdir(), `cdp-ui-${Date.now()}`);
+const APP = process.env.SMOKE_WEB_BASE ?? 'http://localhost:5173/';
 
-const env = readFileSync(new URL('../.env', import.meta.url), 'utf8');
-const password = (env.match(/^BOOTSTRAP_ADMIN_PASSWORD=(.*)$/m) ?? [])[1]?.trim();
-const username = (env.match(/^BOOTSTRAP_ADMIN_USERNAME=(.*)$/m) ?? [])[1]?.trim() || 'admin';
+const envUrl = new URL('../.env', import.meta.url);
+const env = existsSync(envUrl) ? readFileSync(envUrl, 'utf8') : '';
+const password =
+  process.env.SMOKE_PASSWORD ?? (env.match(/^BOOTSTRAP_ADMIN_PASSWORD=(.*)$/m) ?? [])[1]?.trim();
+const username =
+  process.env.SMOKE_ADMIN_USER ??
+  (env.match(/^BOOTSTRAP_ADMIN_USERNAME=(.*)$/m) ?? [])[1]?.trim() ??
+  'admin';
 
 let pass = 0;
 let fail = 0;

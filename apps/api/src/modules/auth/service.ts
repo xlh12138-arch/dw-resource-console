@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { config } from '../../config/env.js';
-import { db } from '../../db/index.js';
+import { db, execSql, withTransaction } from '../../db/index.js';
 import { refreshTokens, type UserRow } from '../../db/schema.js';
 import { forbidden, unauthorized } from '../../lib/errors.js';
 import { hashPassword, randomToken, verifyPassword } from '../../lib/password.js';
@@ -36,13 +36,15 @@ export const authService = {
    * 幂等，每次启动执行一次即可（无旧数据时 changes 为 0）。
    */
   async normalizeLegacyRoles(): Promise<number> {
-    const viewerResult = await db.run(
-      sql`UPDATE users SET role = 'READONLY' WHERE role = 'VIEWER'`,
-    );
-    const otherResult = await db.run(
-      sql`UPDATE users SET role = 'USER' WHERE role NOT IN ('ADMIN', 'USER', 'READONLY')`,
-    );
-    const changed = Number(viewerResult.changes ?? 0) + Number(otherResult.changes ?? 0);
+    const changed = await withTransaction(async () => {
+      const viewerResult = await execSql(
+        sql`UPDATE users SET role = 'READONLY' WHERE role = 'VIEWER'`,
+      );
+      const otherResult = await execSql(
+        sql`UPDATE users SET role = 'USER' WHERE role NOT IN ('ADMIN', 'USER', 'READONLY')`,
+      );
+      return Number(viewerResult.changes) + Number(otherResult.changes);
+    });
     if (changed > 0) {
       // eslint-disable-next-line no-console
       console.log(
@@ -58,23 +60,28 @@ export const authService = {
     const count = await userRepository.count();
     if (count > 0) return;
     const passwordHash = await hashPassword(config.auth.bootstrapAdmin.password);
-    await userRepository.create({
-      username: config.auth.bootstrapAdmin.username,
-      displayName: '系统管理员',
-      passwordHash,
-      role: 'ADMIN',
-    });
-    await userRepository.create({
-      username: 'user',
-      displayName: '普通用户',
-      passwordHash: await hashPassword('User@12345'),
-      role: 'USER',
-    });
-    await userRepository.create({
-      username: 'readonly',
-      displayName: '只读用户',
-      passwordHash: await hashPassword('Readonly@12345'),
-      role: 'READONLY',
+    const demoPasswordHash = await hashPassword('User@12345');
+    const readonlyPasswordHash = await hashPassword('Readonly@12345');
+    await withTransaction(async () => {
+      if ((await userRepository.count()) > 0) return;
+      await userRepository.create({
+        username: config.auth.bootstrapAdmin.username,
+        displayName: '系统管理员',
+        passwordHash,
+        role: 'ADMIN',
+      });
+      await userRepository.create({
+        username: 'user',
+        displayName: '普通用户',
+        passwordHash: demoPasswordHash,
+        role: 'USER',
+      });
+      await userRepository.create({
+        username: 'readonly',
+        displayName: '只读用户',
+        passwordHash: readonlyPasswordHash,
+        role: 'READONLY',
+      });
     });
     // eslint-disable-next-line no-console
     console.log(
@@ -103,26 +110,28 @@ export const authService = {
     if (!user || !ok) throw unauthorized('用户名或密码错误');
     if (user.status !== 'ACTIVE') throw forbidden('账号已停用，请联系管理员');
 
-    const accessToken = ctx.signAccessToken(user);
-    const refreshToken = await this.issueRefreshToken(user.id, ctx.userAgent);
-    await userRepository.update(user.id, { lastLoginAt: new Date() });
+    return withTransaction(async () => {
+      const accessToken = ctx.signAccessToken(user);
+      const refreshToken = await this.issueRefreshToken(user.id, ctx.userAgent);
+      await userRepository.update(user.id, { lastLoginAt: new Date() });
 
-    await auditRepository.record({
-      actorId: user.id,
-      actorName: user.displayName,
-      action: 'LOGIN',
-      targetType: 'AUTH',
-      targetName: user.username,
-      changes: [{ field: 'ip', label: '来源 IP', from: null, to: ctx.ip ?? null }],
-      requestId: ctx.requestId ?? null,
+      await auditRepository.record({
+        actorId: user.id,
+        actorName: user.displayName,
+        action: 'LOGIN',
+        targetType: 'AUTH',
+        targetName: user.username,
+        changes: [{ field: 'ip', label: '来源 IP', from: null, to: ctx.ip ?? null }],
+        requestId: ctx.requestId ?? null,
+      });
+
+      return {
+        accessToken,
+        refreshToken,
+        expiresIn: config.auth.accessTokenTtlSeconds,
+        user: toUserDto(user),
+      };
     });
-
-    return {
-      accessToken,
-      refreshToken,
-      expiresIn: config.auth.accessTokenTtlSeconds,
-      user: toUserDto(user),
-    };
   },
 
   async issueRefreshToken(userId: number, userAgent?: string): Promise<string> {
@@ -138,46 +147,50 @@ export const authService = {
 
   /** 刷新令牌轮换：旧令牌立即吊销，防止重放 */
   async refresh(token: string, ctx: { signAccessToken: TokenSigner; userAgent?: string }) {
-    const [row] = await db
-      .select()
-      .from(refreshTokens)
-      .where(and(eq(refreshTokens.tokenHash, sha256(token)), isNull(refreshTokens.revokedAt)));
-    if (!row) throw unauthorized('刷新令牌无效，请重新登录');
-    if (row.expiresAt.getTime() < Date.now()) throw unauthorized('刷新令牌已过期，请重新登录');
+    return withTransaction(async () => {
+      const [row] = await db
+        .select()
+        .from(refreshTokens)
+        .where(and(eq(refreshTokens.tokenHash, sha256(token)), isNull(refreshTokens.revokedAt)));
+      if (!row) throw unauthorized('刷新令牌无效，请重新登录');
+      if (row.expiresAt.getTime() < Date.now()) throw unauthorized('刷新令牌已过期，请重新登录');
 
-    const user = await userRepository.findById(row.userId);
-    if (!user || user.status !== 'ACTIVE') throw unauthorized('账号不可用，请重新登录');
+      const user = await userRepository.findById(row.userId);
+      if (!user || user.status !== 'ACTIVE') throw unauthorized('账号不可用，请重新登录');
 
-    await db
-      .update(refreshTokens)
-      .set({ revokedAt: new Date() })
-      .where(eq(refreshTokens.id, row.id));
+      await db
+        .update(refreshTokens)
+        .set({ revokedAt: new Date() })
+        .where(eq(refreshTokens.id, row.id));
 
-    const refreshToken = await this.issueRefreshToken(user.id, ctx.userAgent);
-    return {
-      accessToken: ctx.signAccessToken(user),
-      refreshToken,
-      expiresIn: config.auth.accessTokenTtlSeconds,
-      user: toUserDto(user),
-    };
+      const refreshToken = await this.issueRefreshToken(user.id, ctx.userAgent);
+      return {
+        accessToken: ctx.signAccessToken(user),
+        refreshToken,
+        expiresIn: config.auth.accessTokenTtlSeconds,
+        user: toUserDto(user),
+      };
+    });
   },
 
   async logout(token: string | undefined, actor: { id: number | null; username: string }) {
-    if (!token) return { success: true };
-    const [row] = await db
-      .select()
-      .from(refreshTokens)
-      .where(eq(refreshTokens.tokenHash, sha256(token)));
-    if (row) {
-      await db.update(refreshTokens).set({ revokedAt: new Date() }).where(eq(refreshTokens.id, row.id));
-    }
-    await auditRepository.record({
-      actorId: actor.id,
-      actorName: actor.username,
-      action: 'LOGOUT',
-      targetType: 'AUTH',
-      targetName: actor.username,
+    return withTransaction(async () => {
+      if (!token) return { success: true };
+      const [row] = await db
+        .select()
+        .from(refreshTokens)
+        .where(eq(refreshTokens.tokenHash, sha256(token)));
+      if (row) {
+        await db.update(refreshTokens).set({ revokedAt: new Date() }).where(eq(refreshTokens.id, row.id));
+      }
+      await auditRepository.record({
+        actorId: actor.id,
+        actorName: actor.username,
+        action: 'LOGOUT',
+        targetType: 'AUTH',
+        targetName: actor.username,
+      });
+      return { success: true };
     });
-    return { success: true };
   },
 };

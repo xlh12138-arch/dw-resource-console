@@ -28,12 +28,20 @@ function ok(cond, label, extra) {
   }
 }
 
-async function req(path, { method = 'GET', token, body } = {}) {
+function refreshCookieFrom(res) {
+  const values = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie')].filter(Boolean);
+  return values
+    .map((value) => value.split(';', 1)[0])
+    .find((value) => value.startsWith('dw_refresh='));
+}
+
+async function req(path, { method = 'GET', token, body, cookie } = {}) {
   const res = await fetch(BASE + path, {
     method,
     headers: {
       ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(cookie ? { cookie } : {}),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
@@ -44,7 +52,7 @@ async function req(path, { method = 'GET', token, body } = {}) {
   } catch {
     /* 非 JSON 响应 */
   }
-  return { status: res.status, json, text };
+  return { status: res.status, json, text, cookie: refreshCookieFrom(res) };
 }
 
 const ADMIN = {
@@ -101,8 +109,8 @@ ok(typeof userId === 'number', '返回新用户 id');
 
 const before = await req('/auth/login', { method: 'POST', body: { username, password: oldPwd } });
 ok(before.status === 200, '重置前旧密码可登录');
-const oldRefresh = before.json?.refreshToken;
-ok(typeof oldRefresh === 'string' && oldRefresh.length > 16, '拿到重置前的刷新令牌');
+ok(typeof before.cookie === 'string' && before.cookie.length > 16, '拿到重置前的刷新 Cookie');
+ok(!('refreshToken' in (before.json ?? {})), '登录响应不含刷新令牌');
 
 /* ------------------------------------------------------------------ *
  * [3] 管理员重置密码
@@ -127,7 +135,7 @@ ok(oldLogin.status === 401, `旧密码登录被拒（${oldLogin.status}）`);
 const newLogin = await req('/auth/login', { method: 'POST', body: { username, password: newPwd } });
 ok(newLogin.status === 200, `新密码登录成功（${newLogin.status}）`, newLogin.text);
 
-const staleRefresh = await req('/auth/refresh', { method: 'POST', body: { refreshToken: oldRefresh } });
+const staleRefresh = await req('/auth/refresh', { method: 'POST', cookie: before.cookie });
 ok(staleRefresh.status === 401, `重置前的刷新令牌已吊销（${staleRefresh.status}）`);
 
 /* ------------------------------------------------------------------ *

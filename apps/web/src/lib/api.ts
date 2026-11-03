@@ -19,7 +19,6 @@ export const API = `${API_ROOT}/api/v1`;
  * 这里保留一份内存副本，只为兼容「未启用 Cookie 的调用方」与主动刷新流程。
  */
 let accessToken: string | null = null;
-let refreshToken: string | null = null;
 let onSessionExpired: (() => void) | null = null;
 /** 并发请求同时 401 时只发一次续期请求 */
 let refreshInFlight: Promise<AuthResult | null> | null = null;
@@ -29,17 +28,15 @@ export function setSessionExpiredHandler(fn: () => void): void {
 }
 
 export function getTokens() {
-  return { accessToken, refreshToken };
+  return { accessToken };
 }
 
-export function setTokens(tokens: { accessToken: string; refreshToken: string }): void {
+export function setTokens(tokens: { accessToken: string }): void {
   accessToken = tokens.accessToken;
-  refreshToken = tokens.refreshToken;
 }
 
 export function clearTokens(): void {
   accessToken = null;
-  refreshToken = null;
 }
 
 export class ApiError extends Error {
@@ -119,18 +116,14 @@ export function friendlyMessage(error: unknown): string {
  */
 async function doRefresh(): Promise<AuthResult | null> {
   try {
-    const payload = refreshToken ? JSON.stringify({ refreshToken }) : undefined;
     const res = await fetch(`${API}/auth/refresh`, {
       method: 'POST',
       // 关键：带上 Cookie，服务端据此识别会话
       credentials: 'include',
-      // 无请求体时不能声明 application/json，否则 Fastify 会因空 body 返回 400
-      headers: payload ? { 'content-type': 'application/json' } : undefined,
-      body: payload,
     });
     if (!res.ok) return null;
     const data = (await res.json()) as AuthResult;
-    setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+    setTokens({ accessToken: data.accessToken });
     return data;
   } catch {
     return null;

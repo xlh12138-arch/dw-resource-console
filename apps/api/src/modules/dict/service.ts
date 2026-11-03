@@ -115,7 +115,7 @@ export const resourceTypeService = {
       throw conflict(`资源类型编码 ${input.code} 已存在`);
     }
     await this.assertFields(input.fields);
-    resourceTypeRepository.create({
+      await resourceTypeRepository.create({
       code: input.code,
       label: input.label,
       prefix: input.prefix,
@@ -410,7 +410,7 @@ export const environmentService = {
 
   async create(input: EnvironmentDictCreateInput, actor: Actor, requestId?: string): Promise<EnvironmentDto> {
     if (await environmentRepository.exists(input.code)) throw conflict(`环境编码 ${input.code} 已存在`);
-    const row = environmentRepository.create({
+      const row = await environmentRepository.create({
       code: input.code,
       label: input.label,
       tone: input.tone,

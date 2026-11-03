@@ -17,7 +17,7 @@ const securityImpl: FastifyPluginAsyncZod = async (app) => {
       // 允许同源 / curl / 服务端直连（origin 为空）
       if (!origin) return cb(null, true);
       if (config.cors.origins.includes(origin)) return cb(null, true);
-      return cb(new Error('CORS 来源不被允许'), false);
+      return cb(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
@@ -27,8 +27,9 @@ const securityImpl: FastifyPluginAsyncZod = async (app) => {
   await app.register(rateLimit, {
     max: config.rateLimit.max,
     timeWindow: config.rateLimit.timeWindow,
-    // 登录接口单独更严格的限流由路由级配置覆盖
-    keyGenerator: (request) => `${request.ip}:${request.headers['x-forwarded-for'] ?? ''}`,
+    // 只使用 Fastify 按 TRUST_PROXY 配置解析后的地址。绝不能把客户端请求头
+    // 再次拼进 key，否则攻击者可轮换 X-Forwarded-For 绕过限流。
+    keyGenerator: (request) => request.ip,
   });
 };
 

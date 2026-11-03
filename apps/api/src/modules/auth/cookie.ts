@@ -27,10 +27,8 @@ export function clearRefreshCookie(reply: FastifyReply): void {
   reply.clearCookie(REFRESH_COOKIE, { path: '/' });
 }
 
-/** 优先取请求体里的刷新令牌（兼容既有调用方），缺失时回落到 Cookie */
+/** 刷新令牌只从 httpOnly Cookie 读取。 */
 export function refreshTokenFrom(request: FastifyRequest): string | undefined {
-  const fromBody = (request.body as { refreshToken?: string } | undefined)?.refreshToken;
-  if (fromBody) return fromBody;
   return (request as FastifyRequest & { cookies?: Record<string, string | undefined> }).cookies?.[
     REFRESH_COOKIE
   ];

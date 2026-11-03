@@ -18,6 +18,7 @@ import {
 import { z } from 'zod';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { actorOf } from '../../lib/actor.js';
+import { withTransaction } from '../../db/index.js';
 import { environmentService, resourceTypeService } from './service.js';
 
 const idParams = z.object({ code: z.string().min(1).max(40) });
@@ -55,7 +56,9 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
     '/resource-types',
     { ...write, schema: { body: resourceTypeCreateSchema, response: { 201: resourceTypeMutationSchema } } },
     async (request, reply) => {
-      const detail = await resourceTypeService.create(request.body, actorOf(request), request.id);
+      const detail = await withTransaction(() =>
+        resourceTypeService.create(request.body, actorOf(request), request.id),
+      );
       return reply.code(201).send({
         detail,
         sync: null,
@@ -84,11 +87,13 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: { params: idParams, body: resourceTypeUpdateSchema, response: { 200: resourceTypeMutationSchema } },
     },
     async (request) => {
-      const { detail, sync, pendingAttrSync } = await resourceTypeService.update(
-        request.params.code,
-        request.body,
-        actorOf(request),
-        request.id,
+      const { detail, sync, pendingAttrSync } = await withTransaction(() =>
+        resourceTypeService.update(
+          request.params.code,
+          request.body,
+          actorOf(request),
+          request.id,
+        ),
       );
       const references = await resourceTypeService.references(detail.code);
       return { detail, sync, pendingAttrSync, references };
@@ -106,10 +111,12 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request) => {
-      const updated = await resourceTypeService.syncAttrs(request.params.code, {
-        keyRenames: request.body.keyRenames,
-        dropUnknown: request.body.dropUnknown,
-      });
+      const updated = await withTransaction(() =>
+        resourceTypeService.syncAttrs(request.params.code, {
+          keyRenames: request.body.keyRenames,
+          dropUnknown: request.body.dropUnknown,
+        }),
+      );
       const pending = await resourceTypeService.pendingAttrSyncCount(request.params.code);
       return { updated, pending };
     },
@@ -119,7 +126,14 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
     '/resource-types/:code',
     { ...drop, schema: { params: idParams, body: dictDeleteSchema.nullable().optional(), response: { 200: dictSyncResultSchema } } },
     async (request) =>
-      resourceTypeService.remove(request.params.code, request.body?.migrateTo ?? undefined, actorOf(request), request.id),
+      withTransaction(() =>
+        resourceTypeService.remove(
+          request.params.code,
+          request.body?.migrateTo ?? undefined,
+          actorOf(request),
+          request.id,
+        ),
+      ),
   );
 };
 
@@ -151,7 +165,9 @@ export const environmentRoutes: FastifyPluginAsyncZod = async (app) => {
     '/environments',
     { ...write, schema: { body: environmentDictCreateSchema, response: { 201: environmentMutationSchema } } },
     async (request, reply) => {
-      const detail = await environmentService.create(request.body, actorOf(request), request.id);
+      const detail = await withTransaction(() =>
+        environmentService.create(request.body, actorOf(request), request.id),
+      );
       return reply.code(201).send({ detail, sync: null, references: null, pendingNameSync: 0, nameSynced: 0 });
     },
   );
@@ -169,11 +185,13 @@ export const environmentRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: { params: idParams, body: environmentDictUpdateSchema, response: { 200: environmentMutationSchema } },
     },
     async (request) => {
-      const { detail, sync, pendingNameSync, nameSynced } = await environmentService.update(
-        request.params.code,
-        request.body,
-        actorOf(request),
-        request.id,
+      const { detail, sync, pendingNameSync, nameSynced } = await withTransaction(() =>
+        environmentService.update(
+          request.params.code,
+          request.body,
+          actorOf(request),
+          request.id,
+        ),
       );
       const references = await environmentService.references(detail.code);
       return { detail, sync, references, pendingNameSync, nameSynced };
@@ -184,6 +202,13 @@ export const environmentRoutes: FastifyPluginAsyncZod = async (app) => {
     '/environments/:code',
     { ...drop, schema: { params: idParams, body: dictDeleteSchema.nullable().optional(), response: { 200: dictSyncResultSchema } } },
     async (request) =>
-      environmentService.remove(request.params.code, request.body?.migrateTo ?? undefined, actorOf(request), request.id),
+      withTransaction(() =>
+        environmentService.remove(
+          request.params.code,
+          request.body?.migrateTo ?? undefined,
+          actorOf(request),
+          request.id,
+        ),
+      ),
   );
 };

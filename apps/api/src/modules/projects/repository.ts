@@ -1,5 +1,5 @@
 import { and, asc, count, desc, eq, inArray, like, or } from 'drizzle-orm';
-import { db } from '../../db/index.js';
+import { db, firstRow } from '../../db/index.js';
 import {
   envSlots,
   envTemplateItems,
@@ -54,25 +54,26 @@ export const projectRepository = {
     return db.select().from(projects).orderBy(asc(projects.id));
   },
 
-  findById(id: number): ProjectRow | undefined {
-    return db.select().from(projects).where(eq(projects.id, id)).get();
+  findById(id: number): Promise<ProjectRow | undefined> {
+    return firstRow<ProjectRow>(db.select().from(projects).where(eq(projects.id, id)));
   },
 
-  findByCode(code: string): ProjectRow | undefined {
-    return db.select().from(projects).where(eq(projects.code, code)).get();
+  findByCode(code: string): Promise<ProjectRow | undefined> {
+    return firstRow<ProjectRow>(db.select().from(projects).where(eq(projects.code, code)));
   },
 
-  create(values: typeof projects.$inferInsert): ProjectRow {
-    return db.insert(projects).values(values).returning().get();
+  async create(values: typeof projects.$inferInsert): Promise<ProjectRow> {
+    const rows = await db.insert(projects).values(values).returning();
+    return rows[0]!;
   },
 
-  update(id: number, values: Partial<typeof projects.$inferInsert>): ProjectRow {
-    return db
+  async update(id: number, values: Partial<typeof projects.$inferInsert>): Promise<ProjectRow> {
+    const rows = await db
       .update(projects)
       .set({ ...values, updatedAt: new Date() })
       .where(eq(projects.id, id))
-      .returning()
-      .get();
+      .returning();
+    return rows[0]!;
   },
 
   async remove(id: number): Promise<void> {
@@ -83,7 +84,7 @@ export const projectRepository = {
     const [{ value: total }] = await db.select({ value: count() }).from(projects);
     let seq = total + 1;
     let code = `PRJ-${String(seq).padStart(4, '0')}`;
-    while (this.findByCode(code)) {
+    while (await this.findByCode(code)) {
       seq += 1;
       code = `PRJ-${String(seq).padStart(4, '0')}`;
     }
@@ -116,29 +117,33 @@ export const projectEnvRepository = {
     return db.select().from(projectEnvironments).orderBy(asc(projectEnvironments.id));
   },
 
-  findById(id: number): ProjectEnvRow | undefined {
-    return db.select().from(projectEnvironments).where(eq(projectEnvironments.id, id)).get();
+  findById(id: number): Promise<ProjectEnvRow | undefined> {
+    return firstRow<ProjectEnvRow>(
+      db.select().from(projectEnvironments).where(eq(projectEnvironments.id, id)),
+    );
   },
 
-  findByName(projectId: number, name: string): ProjectEnvRow | undefined {
-    return db
+  findByName(projectId: number, name: string): Promise<ProjectEnvRow | undefined> {
+    return firstRow<ProjectEnvRow>(
+      db
       .select()
       .from(projectEnvironments)
       .where(and(eq(projectEnvironments.projectId, projectId), eq(projectEnvironments.name, name)))
-      .get();
+    );
   },
 
-  create(values: typeof projectEnvironments.$inferInsert): ProjectEnvRow {
-    return db.insert(projectEnvironments).values(values).returning().get();
+  async create(values: typeof projectEnvironments.$inferInsert): Promise<ProjectEnvRow> {
+    const rows = await db.insert(projectEnvironments).values(values).returning();
+    return rows[0]!;
   },
 
-  update(id: number, values: Partial<typeof projectEnvironments.$inferInsert>): ProjectEnvRow {
-    return db
+  async update(id: number, values: Partial<typeof projectEnvironments.$inferInsert>): Promise<ProjectEnvRow> {
+    const rows = await db
       .update(projectEnvironments)
       .set({ ...values, updatedAt: new Date() })
       .where(eq(projectEnvironments.id, id))
-      .returning()
-      .get();
+      .returning();
+    return rows[0]!;
   },
 
   async remove(id: number): Promise<void> {
@@ -172,16 +177,18 @@ export const slotRepository = {
       .orderBy(asc(envSlots.sortOrder), asc(envSlots.id));
   },
 
-  findById(id: number): EnvSlotRow | undefined {
-    return db.select().from(envSlots).where(eq(envSlots.id, id)).get();
+  findById(id: number): Promise<EnvSlotRow | undefined> {
+    return firstRow<EnvSlotRow>(db.select().from(envSlots).where(eq(envSlots.id, id)));
   },
 
-  create(values: typeof envSlots.$inferInsert): EnvSlotRow {
-    return db.insert(envSlots).values(values).returning().get();
+  async create(values: typeof envSlots.$inferInsert): Promise<EnvSlotRow> {
+    const rows = await db.insert(envSlots).values(values).returning();
+    return rows[0]!;
   },
 
-  update(id: number, values: Partial<typeof envSlots.$inferInsert>): EnvSlotRow {
-    return db.update(envSlots).set(values).where(eq(envSlots.id, id)).returning().get();
+  async update(id: number, values: Partial<typeof envSlots.$inferInsert>): Promise<EnvSlotRow> {
+    const rows = await db.update(envSlots).set(values).where(eq(envSlots.id, id)).returning();
+    return rows[0]!;
   },
 
   async remove(id: number): Promise<void> {
@@ -242,12 +249,12 @@ export const templateRepository = {
     return db.select().from(envTemplates).orderBy(asc(envTemplates.id));
   },
 
-  findById(id: number) {
-    return db.select().from(envTemplates).where(eq(envTemplates.id, id)).get();
+  findById(id: number): Promise<typeof envTemplates.$inferSelect | undefined> {
+    return firstRow(db.select().from(envTemplates).where(eq(envTemplates.id, id)));
   },
 
-  findByCode(code: string) {
-    return db.select().from(envTemplates).where(eq(envTemplates.code, code)).get();
+  findByCode(code: string): Promise<typeof envTemplates.$inferSelect | undefined> {
+    return firstRow(db.select().from(envTemplates).where(eq(envTemplates.code, code)));
   },
 
   listItems(templateId: number) {
@@ -258,17 +265,18 @@ export const templateRepository = {
       .orderBy(asc(envTemplateItems.sortOrder), asc(envTemplateItems.id));
   },
 
-  create(values: typeof envTemplates.$inferInsert) {
-    return db.insert(envTemplates).values(values).returning().get();
+  async create(values: typeof envTemplates.$inferInsert) {
+    const rows = await db.insert(envTemplates).values(values).returning();
+    return rows[0]!;
   },
 
-  update(id: number, values: Partial<typeof envTemplates.$inferInsert>) {
-    return db
+  async update(id: number, values: Partial<typeof envTemplates.$inferInsert>) {
+    const rows = await db
       .update(envTemplates)
       .set({ ...values, updatedAt: new Date() })
       .where(eq(envTemplates.id, id))
-      .returning()
-      .get();
+      .returning();
+    return rows[0]!;
   },
 
   async remove(id: number): Promise<void> {
@@ -284,7 +292,7 @@ export const templateRepository = {
     const [{ value: total }] = await db.select({ value: count() }).from(envTemplates);
     let seq = total + 1;
     let code = `TPL-${String(seq).padStart(4, '0')}`;
-    while (this.findByCode(code)) {
+    while (await this.findByCode(code)) {
       seq += 1;
       code = `TPL-${String(seq).padStart(4, '0')}`;
     }
@@ -309,8 +317,8 @@ export const templateRepository = {
 
 /** 资源主表辅助：批量更新项目归属 */
 export const resourceProjectRepository = {
-  findById(id: number) {
-    return db.select().from(resources).where(eq(resources.id, id)).get();
+  findById(id: number): Promise<typeof resources.$inferSelect | undefined> {
+    return firstRow(db.select().from(resources).where(eq(resources.id, id)));
   },
 
   async findByIds(ids: number[]) {

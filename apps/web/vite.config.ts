@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
+const apiTarget = process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8787';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -19,9 +20,9 @@ export default defineConfig({
     port: Number(process.env.WEB_PORT ?? 5173),
     // 开发态用同源代理访问后端，避免 CORS 与跨域 Cookie 问题
     proxy: {
-      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true },
-      '/health': { target: 'http://127.0.0.1:8787', changeOrigin: true },
-      '/docs': { target: 'http://127.0.0.1:8787', changeOrigin: true },
+      '/api': { target: apiTarget, changeOrigin: true },
+      '/health': { target: apiTarget, changeOrigin: true },
+      '/docs': { target: apiTarget, changeOrigin: true },
     },
     fs: { allow: [repoRoot] },
   },

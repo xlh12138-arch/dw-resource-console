@@ -31,6 +31,7 @@ import {
 import { z } from 'zod';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { actorOf } from '../../lib/actor.js';
+import { withTransaction } from '../../db/index.js';
 import { resourceService } from '../resources/service.js';
 import { projectEnvService, projectService, templateService } from './service.js';
 
@@ -65,7 +66,9 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
     '/projects',
     { ...write, schema: { body: projectCreateSchema, response: { 201: projectSchema } } },
     async (request, reply) => {
-      const created = await projectService.create(request.body, actorOf(request), request.id);
+      const created = await withTransaction(() =>
+        projectService.create(request.body, actorOf(request), request.id),
+      );
       return reply.code(201).send(created);
     },
   );
@@ -79,13 +82,17 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
   app.patch(
     '/projects/:id',
     { ...write, schema: { params: idParams, body: projectUpdateSchema, response: { 200: projectSchema } } },
-    async (request) => projectService.update(request.params.id, request.body, actorOf(request), request.id),
+    async (request) =>
+      withTransaction(() =>
+        projectService.update(request.params.id, request.body, actorOf(request), request.id),
+      ),
   );
 
   app.delete(
     '/projects/:id',
     { ...drop, schema: { params: idParams, response: { 200: z.object({ id: z.number() }) } } },
-    async (request) => projectService.remove(request.params.id, actorOf(request), request.id),
+    async (request) =>
+      withTransaction(() => projectService.remove(request.params.id, actorOf(request), request.id)),
   );
 
   app.get(
@@ -105,10 +112,12 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request, reply) => {
-      const created = await projectEnvService.create(
-        { ...request.body, projectId: request.params.id },
-        actorOf(request),
-        request.id,
+      const created = await withTransaction(() =>
+        projectEnvService.create(
+          { ...request.body, projectId: request.params.id },
+          actorOf(request),
+          request.id,
+        ),
       );
       return reply.code(201).send(created);
     },
@@ -126,12 +135,14 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request) =>
-      projectService.detach(
-        request.params.id,
-        request.params.resourceId,
-        request.body?.includeSlots ?? false,
-        actorOf(request),
-        request.id,
+      withTransaction(() =>
+        projectService.detach(
+          request.params.id,
+          request.params.resourceId,
+          request.body?.includeSlots ?? false,
+          actorOf(request),
+          request.id,
+        ),
       ),
   );
 
@@ -149,13 +160,19 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       ...write,
       schema: { params: envIdParams, body: projectEnvUpdateSchema, response: { 200: projectEnvDetailSchema } },
     },
-    async (request) => projectEnvService.update(request.params.id, request.body, actorOf(request), request.id),
+    async (request) =>
+      withTransaction(() =>
+        projectEnvService.update(request.params.id, request.body, actorOf(request), request.id),
+      ),
   );
 
   app.delete(
     '/project-environments/:id',
     { ...drop, schema: { params: envIdParams, response: { 200: z.object({ id: z.number() }) } } },
-    async (request) => projectEnvService.remove(request.params.id, actorOf(request), request.id),
+    async (request) =>
+      withTransaction(() =>
+        projectEnvService.remove(request.params.id, actorOf(request), request.id),
+      ),
   );
 
   app.post(
@@ -164,7 +181,10 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       ...write,
       schema: { params: envIdParams, body: envSlotCreateSchema, response: { 200: projectEnvDetailSchema } },
     },
-    async (request) => projectEnvService.addSlots(request.params.id, request.body, actorOf(request), request.id),
+    async (request) =>
+      withTransaction(() =>
+        projectEnvService.addSlots(request.params.id, request.body, actorOf(request), request.id),
+      ),
   );
 
   /** 候选资源：放开环境限制并标注跨环境 / 已被占用 / 时间重叠 / 容量余量，供绑定前提示 */
@@ -201,7 +221,15 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request) =>
-      projectEnvService.assignSlot(request.params.id, request.params.slotId, request.body, actorOf(request), request.id),
+      withTransaction(() =>
+        projectEnvService.assignSlot(
+          request.params.id,
+          request.params.slotId,
+          request.body,
+          actorOf(request),
+          request.id,
+        ),
+      ),
   );
 
   /** 续期：延长占用结束时间，或 endAt=null 转为长期占用 */
@@ -222,7 +250,15 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request) =>
-      projectEnvService.renewSlot(request.params.id, request.params.slotId, request.body, actorOf(request), request.id),
+      withTransaction(() =>
+        projectEnvService.renewSlot(
+          request.params.id,
+          request.params.slotId,
+          request.body,
+          actorOf(request),
+          request.id,
+        ),
+      ),
   );
 
   /** 释放：立即释放占用（含容量），槽位保留可再次分配 */
@@ -236,7 +272,14 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request) =>
-      projectEnvService.releaseSlot(request.params.id, request.params.slotId, actorOf(request), request.id),
+      withTransaction(() =>
+        projectEnvService.releaseSlot(
+          request.params.id,
+          request.params.slotId,
+          actorOf(request),
+          request.id,
+        ),
+      ),
   );
 
   /** 调整占用期限（不改变绑定关系） */
@@ -251,7 +294,15 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request) =>
-      projectEnvService.updateSlotPeriod(request.params.id, request.params.slotId, request.body, actorOf(request), request.id),
+      withTransaction(() =>
+        projectEnvService.updateSlotPeriod(
+          request.params.id,
+          request.params.slotId,
+          request.body,
+          actorOf(request),
+          request.id,
+        ),
+      ),
   );
 
   /** 环境占用时间轴：按区间展示各槽位的占用与共用情况 */
@@ -271,7 +322,14 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request) =>
-      projectEnvService.unassignSlot(request.params.id, request.params.slotId, actorOf(request), request.id),
+      withTransaction(() =>
+        projectEnvService.unassignSlot(
+          request.params.id,
+          request.params.slotId,
+          actorOf(request),
+          request.id,
+        ),
+      ),
   );
 
   // 删除槽位属于环境日常维护，写权限即可（不需要删除资源的权限）
@@ -279,7 +337,14 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
     '/project-environments/:id/slots/:slotId',
     { ...write, schema: { params: slotParams, response: { 200: projectEnvDetailSchema } } },
     async (request) =>
-      projectEnvService.removeSlot(request.params.id, request.params.slotId, actorOf(request), request.id),
+      withTransaction(() =>
+        projectEnvService.removeSlot(
+          request.params.id,
+          request.params.slotId,
+          actorOf(request),
+          request.id,
+        ),
+      ),
   );
 
   app.post(
@@ -293,7 +358,14 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (request) =>
-      projectEnvService.applyTemplate(request.params.id, request.body.templateId, actorOf(request), request.id),
+      withTransaction(() =>
+        projectEnvService.applyTemplate(
+          request.params.id,
+          request.body.templateId,
+          actorOf(request),
+          request.id,
+        ),
+      ),
   );
 };
 
@@ -320,7 +392,9 @@ export const templateRoutes: FastifyPluginAsyncZod = async (app) => {
     '/env-templates',
     { ...write, schema: { body: envTemplateCreateSchema, response: { 201: envTemplateDetailSchema } } },
     async (request, reply) => {
-      const created = await templateService.create(request.body, actorOf(request), request.id);
+      const created = await withTransaction(() =>
+        templateService.create(request.body, actorOf(request), request.id),
+      );
       return reply.code(201).send(created);
     },
   );
@@ -337,20 +411,26 @@ export const templateRoutes: FastifyPluginAsyncZod = async (app) => {
       ...write,
       schema: { params: idParams, body: envTemplateUpdateSchema, response: { 200: envTemplateDetailSchema } },
     },
-    async (request) => templateService.update(request.params.id, request.body, actorOf(request), request.id),
+    async (request) =>
+      withTransaction(() =>
+        templateService.update(request.params.id, request.body, actorOf(request), request.id),
+      ),
   );
 
   app.delete(
     '/env-templates/:id',
     { ...drop, schema: { params: idParams, response: { 200: z.object({ id: z.number() }) } } },
-    async (request) => templateService.remove(request.params.id, actorOf(request), request.id),
+    async (request) =>
+      withTransaction(() => templateService.remove(request.params.id, actorOf(request), request.id)),
   );
 
   app.post(
     '/env-templates/:id/clone',
     { ...write, schema: { params: idParams, response: { 201: envTemplateDetailSchema } } },
     async (request, reply) => {
-      const cloned = await templateService.clone(request.params.id, actorOf(request), request.id);
+      const cloned = await withTransaction(() =>
+        templateService.clone(request.params.id, actorOf(request), request.id),
+      );
       return reply.code(201).send(cloned);
     },
   );
@@ -362,7 +442,9 @@ export const templateRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: { params: idParams, body: instantiateTemplateSchema, response: { 201: projectEnvDetailSchema } },
     },
     async (request, reply) => {
-      const env = await templateService.instantiate(request.params.id, request.body, actorOf(request), request.id);
+      const env = await withTransaction(() =>
+        templateService.instantiate(request.params.id, request.body, actorOf(request), request.id),
+      );
       return reply.code(201).send(env);
     },
   );
@@ -376,6 +458,7 @@ export const bulkAssignRoutes: FastifyPluginAsyncZod = async (app) => {
       preHandler: [app.authenticate, app.authorize('resource:write')],
       schema: { body: bulkAssignSchema, response: { 200: bulkAssignResultSchema } },
     },
-    async (request) => resourceService.bulkAssign(request.body, actorOf(request), request.id),
+    async (request) =>
+      withTransaction(() => resourceService.bulkAssign(request.body, actorOf(request), request.id)),
   );
 };

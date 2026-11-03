@@ -2,7 +2,7 @@
 
 面向数据仓库基础设施的**资源台账与治理服务**：统一管理**批量调度服务器、批量调度平台 IP、采集交换平台 IP、NAS 存储、GDS 服务器**，提供台账录入、检索、IP 冲突检测、批量导入导出、变更审计、RBAC 权限与概览视图。
 
-> 本仓库既是「完整方案说明」，也是可直接运行的 Demo（前后端均已跑通，353 项接口冒烟 + 46 项 UI 实测全部通过）。
+> 本仓库既是「完整方案说明」，也是可直接运行的 Demo（前后端均已跑通；当前 387 项接口断言、71 项 UI 断言、事务回滚与限流绕过测试全部通过）。
 
 ---
 
@@ -14,7 +14,7 @@
 | 后端框架 | Fastify | 5.x | 吞吐高、插件与封装模型清晰、原生 JSON Schema 校验链路 |
 | 校验/契约 | Zod + `fastify-type-provider-zod` | 4.x / 7.x | **一份 schema 同时产出**：运行时校验、TS 类型、OpenAPI 文档、响应裁剪 |
 | ORM / 迁移 | Drizzle ORM + drizzle-kit | 0.45 / 0.31 | 类型安全 SQL、版本化可回滚迁移、SQLite 与 PostgreSQL 同构代码 |
-| 数据库 | SQLite（better-sqlite3） | 13.x | Demo 零运维；`DB_DRIVER` 切到 `postgres` 仅换驱动即可上生产 |
+| 数据库 | SQLite（better-sqlite3）/ PostgreSQL（node-postgres） | 13.x / 8.x | SQLite 零运维；PostgreSQL 使用独立 schema、迁移目录和连接池，通过 `DB_DRIVER` 切换 |
 | 认证 | JWT 访问令牌 + 服务端刷新令牌（httpOnly Cookie） | @fastify/jwt 10.x + @fastify/cookie | 访问令牌 15 分钟短时效且只存内存；刷新令牌存库可吊销并轮换，经 httpOnly Cookie 下发，刷新页面可静默续期 |
 | 口令哈希 | Node `crypto.scrypt` | 内置 | 免第三方原生依赖，自带 salt 与定长摘要 |
 | 日志 | Pino（Fastify 内置） | — | 结构化 JSON、请求 ID 贯穿、敏感头自动 redact |
@@ -39,7 +39,7 @@ dw-resource-console/
 │  └─ src/{enums.ts,schemas.ts,index.ts}
 ├─ apps/api/                  # 后端：按功能组织 + 三层架构
 │  ├─ src/config/env.ts       # 集中配置 + 启动即校验（快速失败）
-│  ├─ src/db/                 # schema / 连接 / 迁移 / 种子 / 重置
+│  ├─ src/db/                 # SQLite / PostgreSQL schema、双驱动连接与事务、迁移、种子、重置
 │  ├─ src/lib/                # errors(类型化错误) password(scrypt) actor(审计操作人)
 │  ├─ src/plugins/            # error-handler / security(cors·helmet·限流) / auth(jwt·RBAC)
 │  └─ src/modules/            # 按功能：auth / resources / dict / projects / audit / stats / users / meta
@@ -64,6 +64,8 @@ dw-resource-console/
 ```
 
 ### 2.2 数据模型（SQLite / PostgreSQL 同构）
+
+SQLite schema 位于 `schema.sqlite.ts`，PostgreSQL schema 位于 `schema.pg.ts`，迁移分别位于 `drizzle/` 与 `drizzle-pg/`。业务层通过统一的事务上下文访问当前驱动，不把 SQLite SQL 发给 PostgreSQL。
 
 - **users**：账号、角色（`ADMIN`/`USER`/`READONLY`）、状态、最近登录
 - **refresh_tokens**：刷新令牌摘要（不存明文）、过期与吊销时间，支持轮换
@@ -419,14 +421,14 @@ if (modalStack[modalStack.length - 1] !== modalId) return; // 还有更晚打开
 
 ### 4. Cookie 登录：刷新页面不再掉登录态
 
-- 后端：`@fastify/cookie` 注册后，登录 / 续期时把刷新令牌写入 `dw_refresh`（`httpOnly` + `sameSite=lax` + 生产 `secure` + `path=/`），登出时清除；`POST /auth/refresh` 优先读请求体里的令牌、**缺失时回落 Cookie**，无请求体时不再依赖 body 也能续期（`body` schema 用 `nullish`，因为 Fastify 在无请求体时传入的是 `null` 而非 `undefined`）。
+- 后端：`@fastify/cookie` 注册后，登录 / 续期时把刷新令牌写入 `dw_refresh`（`httpOnly` + `sameSite=lax` + 生产 `secure` + `path=/`），登出时清除；刷新令牌**只从 Cookie 读取，不进入 JSON 响应体**。
 - 前端：所有请求带 `credentials: 'include'`；访问令牌仍**只存内存**，`AuthProvider` 挂载时先 `restoreSession()`（凭 Cookie 静默换访问令牌）再把 `ready` 置为 true，因此刷新页面、新开标签页都能直接恢复登录，且脚本读不到刷新令牌。
 
 ### 5. 验证
 
 - `npm run typecheck`、`npm run build` 通过。
-- 后端冒烟新增 `npm run smoke:capacity`（30 项）覆盖错峰复用、重叠求和被拒、空档期可占用、长期占用重叠、峰值时段与明细、占用曲线；六套合计 **306 项全绿**。
-- `node scripts/ui-check.mjs`（无头 Chrome + CDP）17 项全绿：环境卡片按钮与徽标无重叠、两层弹窗的 ESC 关闭顺序、资源详情展示「按时间段峰值」、刷新页面保持登录且 Cookie 对 JS 不可见。
+- 后端冒烟当前 **387 项全绿**，覆盖错峰复用、重叠求和被拒、空档期可占用、长期占用重叠、峰值时段与明细、占用曲线、三级权限与字典同步。
+- `npm run ui:check`（无头 Chrome + CDP）当前 **71 项全绿**：环境卡片、模态框、容量、Cookie 登录、时间轴和三级角色视角均已覆盖。
 
 ---
 
@@ -575,9 +577,9 @@ npm run db:reset        # 清空业务数据（保留表结构）
 
 | 方法 | 路径 | 说明 | 权限 |
 | --- | --- | --- | --- |
-| POST | `/auth/login` | 登录，返回访问令牌 + 刷新令牌 | 公开（限流 10 次/分） |
-| POST | `/auth/refresh` | 刷新令牌轮换 | 公开 |
-| POST | `/auth/logout` | 吊销刷新令牌 | 登录 |
+| POST | `/auth/login` | 登录，返回访问令牌；刷新令牌只写入 httpOnly Cookie | 公开（独立限流） |
+| POST | `/auth/refresh` | 从 httpOnly Cookie 读取并轮换刷新令牌 | 公开 |
+| POST | `/auth/logout` | 从 Cookie 吊销刷新令牌 | 登录 |
 | GET | `/auth/me` | 当前用户信息 | 登录 |
 | GET | `/resources` | 分页列表（关键字/类型/环境/状态/机房/标签（逗号多值，同时包含）/所属项目/未标注/`rootOnly`/`parentId` + 排序） | 登录 |
 | GET | `/resources/:id` | 资源详情（含容量明细：槽位占用 + 子资源申请、引用明细（含占用起止与超期天数）、子资源列表、祖先链） | 登录 |
@@ -702,23 +704,24 @@ npm run db:reset        # 清空业务数据（保留表结构）
 
 ## 六、生产化落地建议（Demo 之外的下一步）
 
-1. **数据库**：`DB_DRIVER=postgres` + `DATABASE_URL` 指向 PostgreSQL，安装 `pg` 后把 `db/index.ts` 的驱动换成 `drizzle-orm/node-postgres` 即可，业务代码零改动；同步配置连接池与只读副本。
+1. **数据库**：`DB_DRIVER=postgres` + `DATABASE_URL` 直接切换 PostgreSQL；连接池大小由 `DB_POOL_MAX` 控制，TLS 由 `DB_SSL` 控制，PostgreSQL 迁移位于 `drizzle-pg/`。
 2. **令牌与身份**：刷新令牌已改为服务端下发 `httpOnly; SameSite=Lax`（生产 `Secure`）Cookie，前端不接触；后续可接入 OIDC / LDAP / 企业微信统一身份，并把密码重置改为「邮件/短信一次性链接」。
-3. **可观测性**：Pino 结构化日志接入 ELK / Loki；`/health`、`/ready` 接入 K8s 探针；补充 Prometheus 指标（请求耗时 P95、限流命中、冲突校验失败率）。
-4. **接入治理**：与 CMDB / 监控 / 调度平台做双向同步（Webhook 或定时对账），避免台账漂移；NAS 容量与 GDS 存活可通过后台任务定时采集（任务需幂等 + 重试 + 死信）。
-5. **数据保护**：敏感字段加密存储，数据库定时备份与恢复演练；导出文件加水印与审批流。
-6. **测试补齐**：单测 mock 仓储层保持快速，集成测试用真实数据库 + 事务回滚；把 `scripts/smoke-test.mjs`、`scripts/smoke-project.mjs`、`scripts/smoke-dict.mjs`、`scripts/smoke-slot-capacity.mjs`、`scripts/smoke-capacity-period.mjs`、`scripts/smoke-hierarchy-period.mjs`、`scripts/smoke-user.mjs` 接入 CI（后两者需注入管理员口令环境变量）。
-7. **项目环境编排**：模板只是「资源需求清单」，下一步可接 terraform / Ansible / K8s Operator 做真实发放；环境状态（规划中→搭建中→运行中）可接入审批流与工单系统。
-8. **字典治理**：字典变更可加审批流与变更窗口；引用同步在大表上建议改为异步任务 + 进度查询（当前为同步事务，千级以内数据毫秒级完成）；字典可增加「生效范围 / 租户」维度以支持多团队各自维护。
+3. **代理与限流**：服务直接暴露时保持 `TRUST_PROXY=false`；部署在反向代理后只填写可信代理 IP/CIDR。限流始终使用 Fastify 解析后的来源地址，不会信任客户端自行携带的 `X-Forwarded-For`。
+4. **可观测性**：Pino 结构化日志接入 ELK / Loki；`/health`、`/ready` 接入 K8s 探针；补充 Prometheus 指标（请求耗时 P95、限流命中、冲突校验失败率）。
+5. **接入治理**：与 CMDB / 监控 / 调度平台做双向同步（Webhook 或定时对账），避免台账漂移；NAS 容量与 GDS 存活可通过后台任务定时采集（任务需幂等 + 重试 + 死信）。
+6. **数据保护**：敏感字段加密存储，数据库定时备份与恢复演练；导出文件加水印与审批流。
+7. **测试与 CI**：GitHub Actions 已覆盖类型检查、构建、SQLite、PostgreSQL、事务回滚、387 项接口冒烟、限流绕过测试与 71 项浏览器测试。
+8. **项目环境编排**：模板只是「资源需求清单」，下一步可接 terraform / Ansible / K8s Operator 做真实发放；环境状态（规划中→搭建中→运行中）可接入审批流与工单系统。
+9. **字典治理**：字典变更可加审批流与变更窗口；引用同步在大表上建议改为异步任务 + 进度查询（当前为同步事务，千级以内数据毫秒级完成）；字典可增加「生效范围 / 租户」维度以支持多团队各自维护。
 
 ## 七、已知限制
 
 - Demo 为单进程部署，未做集群与分布式锁；IP 唯一性依赖数据库事务与查询，极高并发下建议加唯一索引或分布式锁。
 - 访问令牌只存内存；刷新令牌经 httpOnly Cookie 下发，刷新页面可静默续期，但**关闭浏览器不会保留会话之外的额外设备绑定**，多设备登录互不感知（可按需在 `refresh_tokens` 上按 UA/IP 做设备管理与强制下线）。
-- SQLite 适合单机与演示；多实例部署必须切换 PostgreSQL。
+- SQLite 适合单机与演示；多实例部署必须切换 PostgreSQL。两种驱动都走真实事务；SQLite 事务由进程内互斥锁串行化，因此不支持多实例。
 - SQLite 的 `ALTER TABLE ADD COLUMN` 不携带 `ON DELETE SET NULL`，删除项目/环境时由服务层显式解除资源引用（切 PG 后由外键级联即可）。
 - 模板「是否必需」目前仅作展示，未做环境就绪度强校验（可按需把「必需槽位全部分配」作为环境置为运行中的前置条件）。
-- 前端未做国际化与移动端适配；构建产物单包 540 KB，可按需 `manualChunks` 拆包。
+- 前端未做国际化与移动端适配；构建产物单包约 694 KB，可按需 `manualChunks` 拆包。
 - 字典的引用同步与迁移式删除在**单个事务**内完成，适合千级以内数据量；更大规模需改为分批异步任务并提供进度查询。
 - 资源类型字段的 `SELECT` 选项变更不会自动改写存量资源里已存的旧选项值（仅改名 / 删字段会走 `sync-attrs`），如需强一致可在保存时一并提交 `keyRenames`。
 - 内置资源类型（`builtin`）的编码允许修改并同步，但不建议：外部系统若按编码集成会受影响。

@@ -4,7 +4,7 @@
  */
 import { config } from '../config/env.js';
 import { runMigrations } from '../db/auto-migrate.js';
-import { db } from '../db/index.js';
+import { db, withTransaction } from '../db/index.js';
 import { envTemplates, projects, resources } from '../db/schema.js';
 import { authService } from '../modules/auth/service.js';
 import { ensureBuiltinDict } from '../modules/dict/bootstrap.js';
@@ -521,40 +521,42 @@ await runMigrations();
 await ensureBuiltinDict();
 await authService.ensureBootstrapAdmin();
 
-const existing = await db.select({ id: resources.id }).from(resources).limit(1);
-if (existing.length > 0) {
-  // eslint-disable-next-line no-console
-  console.log('[seed] 已存在资源数据，跳过资源初始化（如需重置请先执行 npm run db:reset）');
-} else {
-  // 先建父资源，再按 parentName 建子资源；用 map 记录名称 → id
-  const resourceIdByName = new Map<string, number>();
-  for (const seed of SEEDS.filter((s) => !s.parentName)) {
-    const { parentName: _parentName, demandAmount: _demand, ...payload } = seed;
-    const created = await resourceService.create(payload, actor);
-    resourceIdByName.set(created.name, created.id);
+await withTransaction(async () => {
+  const existing = await db.select({ id: resources.id }).from(resources).limit(1);
+  if (existing.length > 0) {
     // eslint-disable-next-line no-console
-    console.log(`[seed] ${created.code} ${created.name} (${created.type})`);
-  }
-  for (const seed of SEEDS.filter((s) => s.parentName)) {
-    const parentId = resourceIdByName.get(seed.parentName!);
-    if (!parentId) {
+    console.log('[seed] 已存在资源数据，跳过资源初始化（如需重置请先执行 npm run db:reset）');
+  } else {
+    // 先建父资源，再按 parentName 建子资源；用 map 记录名称 → id
+    const resourceIdByName = new Map<string, number>();
+    for (const seed of SEEDS.filter((s) => !s.parentName)) {
+      const { parentName: _parentName, demandAmount: _demand, ...payload } = seed;
+      const created = await resourceService.create(payload, actor);
+      resourceIdByName.set(created.name, created.id);
       // eslint-disable-next-line no-console
-      console.warn(`[seed] 跳过子资源 ${seed.name}：父资源 ${seed.parentName} 不存在`);
-      continue;
+      console.log(`[seed] ${created.code} ${created.name} (${created.type})`);
     }
-    const { parentName: _parentName, ...payload } = seed;
-    const created = await resourceService.create({ ...payload, parentId }, actor);
-    resourceIdByName.set(created.name, created.id);
+    for (const seed of SEEDS.filter((s) => s.parentName)) {
+      const parentId = resourceIdByName.get(seed.parentName!);
+      if (!parentId) {
+        // eslint-disable-next-line no-console
+        console.warn(`[seed] 跳过子资源 ${seed.name}：父资源 ${seed.parentName} 不存在`);
+        continue;
+      }
+      const { parentName: _parentName, ...payload } = seed;
+      const created = await resourceService.create({ ...payload, parentId }, actor);
+      resourceIdByName.set(created.name, created.id);
+      // eslint-disable-next-line no-console
+      console.log(
+        `[seed]   └ ${created.code} ${created.name} (子资源，向父资源申请 ${seed.demandAmount ?? 0})`,
+      );
+    }
     // eslint-disable-next-line no-console
-    console.log(
-      `[seed]   └ ${created.code} ${created.name} (子资源，向父资源申请 ${seed.demandAmount ?? 0})`,
-    );
+    console.log(`[seed] 完成，共写入 ${SEEDS.length} 条资源；管理员账号 ${config.auth.bootstrapAdmin.username}`);
   }
-  // eslint-disable-next-line no-console
-  console.log(`[seed] 完成，共写入 ${SEEDS.length} 条资源；管理员账号 ${config.auth.bootstrapAdmin.username}`);
-}
 
-await seedTemplates();
-await seedProjects();
+  await seedTemplates();
+  await seedProjects();
+});
 
 process.exit(0);
