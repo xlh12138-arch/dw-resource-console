@@ -1,0 +1,885 @@
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Download, FolderTree, Link2, Pencil, Plus, Search, Tag, Trash2, Upload, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router';
+import {
+  RESOURCE_STATUSES,
+  RESOURCE_STATUS_LABELS,
+
+  type ResourceDto,
+  type ResourceStatus,
+} from '@dw/shared';
+import { useDict } from '../lib/dict';
+import { projectsApi, resourcesApi, type ResourceQuery } from '../lib/endpoints';
+import { friendlyMessage } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { ResourceDetailModal } from '../components/resource-detail';
+import { ResourceFormModal } from '../components/resource-form';
+import { useToast } from '../components/toast';
+import { Button, Card, ClickableBadge, EmptyState, ErrorBanner, Field, Input, Modal, ModalCancelButton, Pagination, Select, Spinner, Td, Th, Table, Textarea } from '../components/ui';
+import { EnvBadge } from '../components/env-badge';
+
+const PAGE_SIZE = 20;
+
+/**
+ * 台账容量列与资源详情同口径：优先展示「按时间段的峰值占用」（错峰不累加）。
+ * capacityPeak 为 null 时（老数据或未设容量）回落到不分时段的合计。
+ */
+function capacityUsed(r: ResourceDto): number {
+  return r.capacityPeak ?? r.capacityAllocated;
+}
+
+function capacityLeft(r: ResourceDto): number {
+  if (r.capacityTotal === null) return 0;
+  return r.capacityPeakAvailable ?? r.capacityAvailable ?? Math.max(0, r.capacityTotal - capacityUsed(r));
+}
+
+/** 资源状态 → 徽标配色（台账列表与筛选标签共用） */
+function statusTone(status: ResourceStatus): 'gray' | 'green' | 'amber' | 'red' {
+  if (status === 'IN_USE') return 'green';
+  if (status === 'MAINTAINING') return 'amber';
+  if (status === 'RETIRED') return 'red';
+  return 'gray';
+}
+
+/** 单个筛选条件标签：点 × 只移除这一项，不影响其他筛选 */
+function FilterChip({
+  label,
+  tone = 'violet',
+  onRemove,
+}: {
+  label: string;
+  tone?: 'gray' | 'blue' | 'green' | 'amber' | 'red' | 'violet';
+  onRemove: () => void;
+}) {
+  return (
+    <ClickableBadge tone={tone} onClick={onRemove} title="移除该筛选条件">
+      {label}
+      <X size={11} className="ml-1" />
+    </ClickableBadge>
+  );
+}
+
+function download(filename: string, content: string): void {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function ResourcesPage() {
+  const dict = useDict();
+  const { push } = useToast();
+  const { can: canDo } = useAuth();
+  const queryClient = useQueryClient();
+  const canWrite = canDo('resource:write');
+  const canDelete = canDo('resource:delete');
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [keyword, setKeyword] = useState(searchParams.get('q') ?? '');
+  const [selected, setSelected] = useState<number[]>([]);
+
+  /**
+   * URL 即筛选条件的唯一来源：任何筛选变化都写回 URL，页面再从 URL 反推查询条件。
+   * 这样「点标签加筛选」「点 × 去掉某一个筛选」都只改一个参数，不会互相覆盖。
+   */
+  const query = useMemo<ResourceQuery>(() => {
+    const p = searchParams;
+    const num = (key: string) => {
+      const v = p.get(key);
+      return v && !Number.isNaN(Number(v)) ? Number(v) : undefined;
+    };
+    return {
+      page: num('page') ?? 1,
+      pageSize: PAGE_SIZE,
+      sortBy: 'updatedAt',
+      sortOrder: 'desc',
+      q: p.get('q') || undefined,
+      type: p.get('type') ?? undefined,
+      environment: p.get('environment') ?? undefined,
+      status: (p.get('status') as ResourceStatus | null) ?? undefined,
+      datacenter: p.get('datacenter') || undefined,
+      id: num('id'),
+      projectId: num('projectId'),
+      projectEnvId: num('projectEnvId'),
+      parentId: num('parentId'),
+      tag: p.get('tag') ?? undefined,
+      rootOnly: p.get('rootOnly') === 'true' ? true : undefined,
+      unassigned: p.get('unassigned') === 'true' ? true : undefined,
+    };
+  }, [searchParams]);
+
+  /** 写一个或多个筛选参数（空值即删除该条件）；resetPage=false 用于翻页 */
+  const setFilter = (
+    patch: Record<string, string | number | boolean | null | undefined>,
+    resetPage = true,
+  ) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of Object.entries(patch)) {
+          if (value === undefined || value === null || value === '' || value === false) next.delete(key);
+          else next.set(key, String(value));
+        }
+        if (resetPage) next.delete('page');
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
+  /** 同一维度重复点击时取消该筛选 */
+  const toggleFilter = (key: string, value: string) => {
+    const current = searchParams.get(key);
+    setFilter({ [key]: current === String(value) ? undefined : value });
+  };
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [formState, setFormState] = useState<{ open: boolean; initial: ResourceDto | null; type: string }>({
+    open: false,
+    initial: null,
+    type: 'BATCH_SCHED_SERVER',
+  });
+  const [detail, setDetail] = useState<ResourceDto | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ResourceDto | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+
+  // 外部跳转（概览 / 详情 / 项目页）带来的关键字变化要同步回输入框
+  const urlKeyword = searchParams.get('q') ?? '';
+  useEffect(() => {
+    setKeyword((prev) => (prev === urlKeyword ? prev : urlKeyword));
+  }, [urlKeyword]);
+
+  // 关键字输入防抖，避免每敲一个字符就请求一次
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilter({ q: keyword || undefined });
+    }, 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyword]);
+
+  const list = useQuery({
+    queryKey: ['resources', query],
+    queryFn: () => resourcesApi.list(query),
+    placeholderData: keepPreviousData,
+  });
+
+  const projects = useQuery({ queryKey: ['projects-options'], queryFn: () => projectsApi.options() });
+  const tags = useQuery({ queryKey: ['resource-tags'], queryFn: () => resourcesApi.tags() });
+
+  /** 选中的标签集合（多标签取「同时包含」） */
+  const activeTags = useMemo(
+    () => (query.tag ?? '').split(',').map((t) => t.trim()).filter(Boolean),
+    [query.tag],
+  );
+
+  const applyTag = (next: string[]) => {
+    setFilter({ tag: next.length > 0 ? next.join(',') : undefined });
+  };
+
+  const toggleTag = (tag: string) => {
+    applyTag(activeTags.includes(tag) ? activeTags.filter((t) => t !== tag) : [...activeTags, tag]);
+  };
+
+  const bulkAssign = useMutation({
+    mutationFn: (projectId: number) => resourcesApi.bulkAssign({ ids: selected, projectId }),
+    onSuccess: (result) => {
+      push('success', `已将 ${result.updated} 个资源标注到项目`);
+      setSelected([]);
+      setBulkOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ['resources'] });
+      void queryClient.invalidateQueries({ queryKey: ['stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (err) => push('error', friendlyMessage(err)),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: number) => resourcesApi.remove(id),
+    onSuccess: () => {
+      push('success', '资源已删除');
+      setPendingDelete(null);
+      void queryClient.invalidateQueries({ queryKey: ['resources'] });
+      void queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+    onError: (err) => push('error', friendlyMessage(err)),
+  });
+
+  const columns = useMemo(
+    () => (formState.type ? dict.typeColumns(formState.type) : []),
+    [formState.type, dict],
+  );
+
+  const rows = list.data?.items ?? [];
+  /** 按 id 精确定位时，列表里就是这一条，用它的编码回显筛选标签 */
+  const focused = query.id ? rows.find((r) => r.id === query.id) : undefined;
+  /** 按父资源筛选时，用首行的父信息回显「父资源」标签 */
+  const parentHint = rows.find((r) => r.parentId === query.parentId) ?? rows[0];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900">资源台账</h1>
+          <p className="text-xs text-slate-500">
+            批量调度服务器 / 调度平台IP / 采集交换平台IP / NAS / GDS 服务器
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                const csv = await resourcesApi.exportCsv(query);
+                download(`resources-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+                push('success', '已导出当前筛选结果');
+              } catch (err) {
+                push('error', friendlyMessage(err));
+              }
+            }}
+          >
+            <Download size={14} />
+            导出 CSV
+          </Button>
+          {canWrite && selected.length > 0 && (
+            <Button variant="outline" onClick={() => setBulkOpen(true)}>
+              <Tag size={14} />
+              标注项目（{selected.length}）
+            </Button>
+          )}
+          {canWrite && (
+            <>
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                <Upload size={14} />
+                批量导入
+              </Button>
+              <Button onClick={() => setFormState({ open: true, initial: null, type: formState.type })}>
+                <Plus size={14} />
+                新增资源
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <Card>
+        <div className="flex flex-wrap items-end gap-3 px-5 py-4">
+          <div className="min-w-56 flex-1">
+            <Field label="关键字">
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input
+                  className="pl-9"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder="搜索编码 / 名称 / IP / 负责人 / 备注"
+                />
+              </div>
+            </Field>
+          </div>
+          <div className="w-44">
+            <Field label="资源类型">
+              <Select
+                value={query.type ?? ''}
+                placeholder="全部类型"
+                options={dict.typeOptions()}
+                onChange={(e) => setFilter({ type: e.target.value || undefined })}
+              />
+            </Field>
+          </div>
+          <div className="w-32">
+            <Field label="环境">
+              <Select
+                value={query.environment ?? ''}
+                placeholder="全部"
+                options={dict.envOptions()}
+                onChange={(e) => setFilter({ environment: e.target.value || undefined })}
+              />
+            </Field>
+          </div>
+          <div className="w-32">
+            <Field label="状态">
+              <Select
+                value={query.status ?? ''}
+                placeholder="全部"
+                options={RESOURCE_STATUSES.map((s) => ({ value: s, label: RESOURCE_STATUS_LABELS[s] }))}
+                onChange={(e) => setFilter({ status: e.target.value || undefined })}
+              />
+            </Field>
+          </div>
+          <div className="w-40">
+            <Field label="所属项目">
+              <Select
+                value={query.unassigned ? '__none__' : (query.projectId ? String(query.projectId) : '')}
+                placeholder="全部项目"
+                fallbackLabel="当前筛选项目"
+                options={[
+                  { value: '__none__', label: '未标注项目' },
+                  ...(projects.data ?? []).map((p) => ({ value: String(p.id), label: p.name })),
+                ]}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFilter({
+                    projectId: v && v !== '__none__' ? Number(v) : undefined,
+                    unassigned: v === '__none__' ? true : undefined,
+                  });
+                }}
+              />
+            </Field>
+          </div>
+          <div className="w-36">
+            <Field label="机房">
+              <Input
+                value={query.datacenter ?? ''}
+                onChange={(e) => setFilter({ datacenter: e.target.value || undefined })}
+                placeholder="如 深圳A机房"
+              />
+            </Field>
+          </div>
+          <div className="w-40">
+            <Field label="标签">
+              <Select
+                value={activeTags.length === 1 ? activeTags[0] : ''}
+                placeholder="全部标签"
+                fallbackLabel="当前筛选标签"
+                options={(tags.data ?? []).map((t) => ({ value: t.tag, label: `#${t.tag}（${t.count}）` }))}
+                onChange={(e) => applyTag(e.target.value ? [e.target.value] : [])}
+              />
+            </Field>
+          </div>
+          <div className="w-40">
+            <Field label="层级">
+              <Select
+                value={query.parentId ? `p${query.parentId}` : query.rootOnly ? 'root' : ''}
+                placeholder="全部层级"
+                options={[
+                  { value: 'root', label: '仅顶层资源' },
+                  ...(query.parentId
+                    ? [{ value: `p${query.parentId}`, label: '已按父资源筛选' }]
+                    : []),
+                ]}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFilter({
+                    parentId: v.startsWith('p') ? Number(v.slice(1)) : undefined,
+                    rootOnly: v === 'root' ? true : undefined,
+                    id: undefined,
+                  });
+                }}
+              />
+            </Field>
+          </div>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setKeyword('');
+              setSelected([]);
+              setSearchParams({}, { replace: true });
+            }}
+          >
+            重置
+          </Button>
+        </div>
+
+        {/* 当前生效的筛选：每一项都可以单独移除，互不影响 */}
+        {(activeTags.length > 0 ||
+          query.q ||
+          query.type ||
+          query.environment ||
+          query.status ||
+          query.datacenter ||
+          query.projectId ||
+          query.unassigned ||
+          query.parentId ||
+          query.id ||
+          query.rootOnly) && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-5 py-2.5 text-xs text-slate-500">
+            <span>当前筛选：</span>
+            {query.q ? (
+              <FilterChip label={`关键字：${query.q}`} onRemove={() => setFilter({ q: undefined })} />
+            ) : null}
+            {query.type ? (
+              <FilterChip label={`类型：${dict.typeLabel(query.type)}`} onRemove={() => setFilter({ type: undefined })} />
+            ) : null}
+            {query.environment ? (
+              <FilterChip
+                label={`环境：${dict.envLabel(query.environment)}`}
+                tone="blue"
+                onRemove={() => setFilter({ environment: undefined })}
+              />
+            ) : null}
+            {query.status ? (
+              <FilterChip
+                label={`状态：${RESOURCE_STATUS_LABELS[query.status as ResourceStatus]}`}
+                tone={statusTone(query.status as ResourceStatus)}
+                onRemove={() => setFilter({ status: undefined })}
+              />
+            ) : null}
+            {query.datacenter ? (
+              <FilterChip label={`机房：${query.datacenter}`} onRemove={() => setFilter({ datacenter: undefined })} />
+            ) : null}
+            {query.projectId ? (
+              <FilterChip
+                label={`项目：${projects.data?.find((p) => p.id === query.projectId)?.name ?? query.projectId}`}
+                onRemove={() => setFilter({ projectId: undefined })}
+              />
+            ) : null}
+            {query.unassigned ? (
+              <FilterChip label="未标注项目" onRemove={() => setFilter({ unassigned: undefined })} />
+            ) : null}
+            {query.id ? (
+              <FilterChip
+                label={`资源：${focused?.code ?? `#${query.id}`}${focused ? ` ${focused.name}` : ''}`}
+                tone="amber"
+                onRemove={() => setFilter({ id: undefined })}
+              />
+            ) : null}
+            {query.parentId ? (
+              <FilterChip
+                label={`父资源：${parentHint?.parentCode ?? parentHint?.parentName ?? `#${query.parentId}`} 的子资源`}
+                tone="blue"
+                onRemove={() => setFilter({ parentId: undefined })}
+              />
+            ) : null}
+            {query.rootOnly ? (
+              <FilterChip label="仅顶层资源" onRemove={() => setFilter({ rootOnly: undefined })} />
+            ) : null}
+            {activeTags.map((t) => (
+              <FilterChip key={t} label={`#${t}`} onRemove={() => toggleTag(t)} />
+            ))}
+          </div>
+        )}
+
+        {list.isError && (
+          <div className="px-5 pb-4">
+            <ErrorBanner message={friendlyMessage(list.error)} />
+          </div>
+        )}
+
+        {list.isLoading ? (
+          <div className="flex h-56 items-center justify-center">
+            <Spinner className="h-6 w-6" />
+          </div>
+        ) : rows.length === 0 ? (
+          <EmptyState
+            title="没有匹配的资源"
+            desc="调整筛选条件，或新增一条资源记录"
+            action={
+              canWrite && (
+                <Button size="sm" onClick={() => setFormState({ open: true, initial: null, type: 'BATCH_SCHED_SERVER' })}>
+                  新增资源
+                </Button>
+              )
+            }
+          />
+        ) : (
+          <Table
+            head={
+              <tr>
+                <Th className="w-10">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 accent-brand-600"
+                    aria-label="全选"
+                    checked={selected.length > 0 && selected.length === rows.length}
+                    onChange={(e) => setSelected(e.target.checked ? rows.map((r) => r.id) : [])}
+                  />
+                </Th>
+                <Th>编码</Th>
+                <Th>名称</Th>
+                <Th>类型</Th>
+                <Th>关键属性</Th>
+                <Th>所属项目</Th>
+                <Th>标签</Th>
+                <Th>环境</Th>
+                <Th>容量</Th>
+                <Th>状态</Th>
+                <Th>负责人</Th>
+                <Th>更新时间</Th>
+                <Th className="text-right">操作</Th>
+              </tr>
+            }
+          >
+            {rows.map((r) => (
+              <tr key={r.id} className="hover:bg-slate-50">
+                <Td>
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 accent-brand-600"
+                    aria-label={`选择 ${r.code}`}
+                    checked={selected.includes(r.id)}
+                    onChange={(e) =>
+                      setSelected((prev) =>
+                        e.target.checked ? [...prev, r.id] : prev.filter((x) => x !== r.id),
+                      )
+                    }
+                  />
+                </Td>
+                <Td className="font-mono text-xs text-slate-500">{r.code}</Td>
+                <Td>
+                  <div className={r.parentId ? 'pl-4' : ''}>
+                    {r.parentId ? (
+                      <span className="mr-1 font-mono text-[11px] text-slate-400">└</span>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="text-left font-medium text-slate-900 hover:text-brand-700"
+                      onClick={() => setDetail(r)}
+                      title="查看资源详情、容量明细与被引用情况"
+                    >
+                      {r.name}
+                      {r.slotRefCount > 0 && (
+                        <span className="ml-1 inline-flex items-center gap-0.5 text-[11px] font-normal text-violet-600">
+                          <Link2 size={11} />
+                          {r.slotRefCount}
+                        </span>
+                      )}
+                    </button>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                      {r.parentId ? (
+                        <ClickableBadge
+                          tone="blue"
+                          title={`查看父资源 ${r.parentName ?? r.parentCode}`}
+                          onClick={() => setFilter({ id: r.parentId, parentId: undefined, rootOnly: undefined })}
+                        >
+                          <FolderTree size={10} className="mr-1" />
+                          父：{r.parentName ?? r.parentCode}
+                        </ClickableBadge>
+                      ) : null}
+                      {r.childCount > 0 ? (
+                        <ClickableBadge
+                          tone="amber"
+                          title="查看该资源下的子资源"
+                          onClick={() => setFilter({ parentId: r.id, id: undefined, rootOnly: undefined })}
+                        >
+                          子资源 ×{r.childCount}
+                        </ClickableBadge>
+                      ) : null}
+                    </div>
+                  </div>
+                </Td>
+                <Td>
+                  <ClickableBadge
+                    tone="blue"
+                    title={query.type === r.type ? '取消类型筛选' : `按类型「${dict.typeLabel(r.type)}」筛选`}
+                    onClick={() => toggleFilter('type', r.type)}
+                  >
+                    {dict.typeLabel(r.type)}
+                  </ClickableBadge>
+                </Td>
+                <Td className="max-w-64">
+                  <span className="text-xs text-slate-600">
+                    {(dict.typeColumns(r.type) ?? [])
+                      .map((k) => `${k}=${String(r.attrs[k] ?? '—')}`)
+                      .join(' · ')}
+                  </span>
+                </Td>
+                <Td>
+                  {r.projectName && r.projectId ? (
+                    <ClickableBadge
+                      tone="violet"
+                      title={query.projectId === r.projectId ? '取消项目筛选' : `按项目「${r.projectName}」筛选`}
+                      onClick={() => toggleFilter('projectId', String(r.projectId))}
+                    >
+                      {r.projectName}
+                    </ClickableBadge>
+                  ) : (
+                    <span className="text-xs text-slate-400">未标注</span>
+                  )}
+                </Td>
+                <Td>
+                  <div className="flex max-w-40 flex-wrap gap-1">
+                    {r.tags.length === 0 ? (
+                      <span className="text-xs text-slate-400">—</span>
+                    ) : (
+                      r.tags.map((t) => (
+                        <ClickableBadge key={t} tone="gray" title={`按标签 #${t} 筛选`} onClick={() => toggleTag(t)}>
+                          #{t}
+                        </ClickableBadge>
+                      ))
+                    )}
+                  </div>
+                </Td>
+                <Td>
+                  <button
+                    type="button"
+                    title={query.environment === r.environment ? '取消环境筛选' : `按环境「${dict.envLabel(r.environment)}」筛选`}
+                    onClick={() => toggleFilter('environment', r.environment)}
+                  >
+                    <EnvBadge code={r.environment} label={dict.envLabel(r.environment)} />
+                  </button>
+                </Td>
+                <Td>
+                  {r.capacityTotal !== null ? (
+                    <div
+                      className="min-w-28"
+                      title={
+                        r.capacityPeak !== null && r.capacityAllocated > r.capacityPeak + 0.01
+                          ? `合计占用 ${r.capacityAllocated}${r.capacityUnit ? ` ${r.capacityUnit}` : ''}（未按时间段拆分）；按时间段峰值 ${r.capacityPeak}，差额来自错峰复用`
+                          : undefined
+                      }
+                    >
+                      <div className="flex items-baseline justify-between text-[11px] text-slate-600">
+                        <span>
+                          {/* 与资源详情同口径：按时间段的峰值占用（错峰不累加） */}
+                          {capacityUsed(r)}/{r.capacityTotal}
+                          {r.capacityUnit ? ` ${r.capacityUnit}` : ''}
+                        </span>
+                        <span>余 {capacityLeft(r)}</span>
+                      </div>
+                      <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className={`h-full rounded-full ${
+                            r.capacityTotal > 0 && capacityUsed(r) / r.capacityTotal > 0.9
+                              ? 'bg-rose-500'
+                              : 'bg-brand-500'
+                          }`}
+                          style={{
+                            width: `${Math.min(100, r.capacityTotal > 0 ? (capacityUsed(r) / r.capacityTotal) * 100 : 0)}%`,
+                          }}
+                        />
+                      </div>
+                      {r.childAllocated > 0 ? (
+                        <p className="mt-0.5 text-[10px] text-slate-400">
+                          其中子资源 {r.childAllocated}
+                          {r.capacityUnit ? ` ${r.capacityUnit}` : ''}
+                        </p>
+                      ) : null}
+                      {r.capacityPeak !== null && r.capacityAllocated > r.capacityPeak + 0.01 ? (
+                        <p className="mt-0.5 text-[10px] text-violet-600">错峰复用 · 峰值 {r.capacityPeak}</p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400">未设置</span>
+                  )}
+                </Td>
+                <Td>
+                  <ClickableBadge
+                    tone={statusTone(r.status)}
+                    title={query.status === r.status ? '取消状态筛选' : `按状态「${RESOURCE_STATUS_LABELS[r.status]}」筛选`}
+                    onClick={() => toggleFilter('status', r.status)}
+                  >
+                    {RESOURCE_STATUS_LABELS[r.status]}
+                  </ClickableBadge>
+                </Td>
+                <Td>{r.owner ?? '—'}</Td>
+                <Td className="whitespace-nowrap text-xs text-slate-500">
+                  {new Date(r.updatedAt).toLocaleString('zh-CN')}
+                </Td>
+                <Td className="text-right">
+                  <div className="flex justify-end gap-1">
+                    {canWrite && (
+                      <Button variant="ghost" size="sm" onClick={() => setFormState({ open: true, initial: r, type: r.type })}>
+                        <Pencil size={13} />
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button variant="ghost" size="sm" onClick={() => setPendingDelete(r)}>
+                        <Trash2 size={13} className="text-rose-600" />
+                      </Button>
+                    )}
+                  </div>
+                </Td>
+              </tr>
+            ))}
+          </Table>
+        )}
+
+        {list.data && (
+          <Pagination
+            page={list.data.meta.page}
+            totalPages={list.data.meta.totalPages}
+            total={list.data.meta.total}
+            pageSize={list.data.meta.pageSize}
+            onChange={(page) => setFilter({ page }, false)}
+          />
+        )}
+      </Card>
+
+      <ResourceFormModal
+        open={formState.open}
+        initial={formState.initial}
+        defaultType={formState.type}
+        onClose={() => setFormState((s) => ({ ...s, open: false }))}
+        onSaved={() => {
+          void queryClient.invalidateQueries({ queryKey: ['resources'] });
+          void queryClient.invalidateQueries({ queryKey: ['stats'] });
+        }}
+      />
+
+      <ResourceDetailModal
+        resource={detail}
+        onClose={() => setDetail(null)}
+        onEdit={(r) => {
+          setDetail(null);
+          setFormState({ open: true, initial: r, type: r.type });
+        }}
+      />
+
+      <Modal
+        open={Boolean(pendingDelete)}
+        title="删除资源"
+        desc="删除后将写入审计日志，且不可恢复"
+        width="max-w-md"
+        onClose={() => setPendingDelete(null)}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setPendingDelete(null)}>
+              取消
+            </Button>
+            <Button
+              variant="danger"
+              disabled={removeMutation.isPending}
+              onClick={() => pendingDelete && removeMutation.mutate(pendingDelete.id)}
+            >
+              {removeMutation.isPending ? '删除中…' : '确认删除'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-700">
+          确认删除 <span className="font-medium">{pendingDelete?.code}</span>
+          {pendingDelete ? `（${pendingDelete.name}）` : ''} 吗？
+        </p>
+      </Modal>
+
+      <Modal
+        open={bulkOpen}
+        title="批量标注项目"
+        desc="把选中的资源标注到指定项目，便于按项目维度查看与统计"
+        width="max-w-md"
+        onClose={() => setBulkOpen(false)}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setBulkOpen(false)}>
+              取消
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-700">
+            已选中 <span className="font-medium">{selected.length}</span> 个资源
+          </p>
+          <div className="space-y-2">
+            {(projects.data ?? []).map((p) => (
+              <Button
+                key={p.id}
+                variant="outline"
+                className="w-full justify-start"
+                disabled={bulkAssign.isPending}
+                onClick={() => bulkAssign.mutate(p.id)}
+              >
+                {p.name}
+                <span className="ml-auto font-mono text-xs text-slate-400">{p.code}</span>
+              </Button>
+            ))}
+          </div>
+          {(projects.data ?? []).length === 0 && (
+            <EmptyState title="还没有项目" desc="请先在「需求项目」中创建一个项目" />
+          )}
+        </div>
+      </Modal>
+
+      <ImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        defaultType={query.type ?? 'BATCH_SCHED_SERVER'}
+        columns={columns}
+        onDone={() => {
+          void queryClient.invalidateQueries({ queryKey: ['resources'] });
+          void queryClient.invalidateQueries({ queryKey: ['stats'] });
+          setImportOpen(false);
+        }}
+      />
+    </div>
+  );
+}
+
+function ImportModal({
+  open,
+  onClose,
+  defaultType,
+  columns,
+  onDone,
+}: {
+  open: boolean;
+  onClose: () => void;
+  defaultType: string;
+  columns: string[];
+  onDone: () => void;
+}) {
+  const dict = useDict();
+  const { push } = useToast();
+  const [type, setType] = useState<string>(defaultType);
+  const [csv, setCsv] = useState('');
+  const [onConflict, setOnConflict] = useState<'skip' | 'overwrite'>('skip');
+
+  useEffect(() => {
+    if (open) {
+      setType(defaultType);
+      setCsv('');
+    }
+  }, [open, defaultType]);
+
+  const mutation = useMutation({
+    mutationFn: () => resourcesApi.importCsv({ type, csv, onConflict }),
+    onSuccess: (result) => {
+      push(
+        result.errors.length ? 'info' : 'success',
+        `导入完成：新增 ${result.created} 条，更新 ${result.updated} 条，跳过 ${result.skipped} 条，失败 ${result.errors.length} 条`,
+      );
+      onDone();
+    },
+    onError: (err) => push('error', friendlyMessage(err)),
+  });
+
+  const sample = ['name,environment,status,owner,' + columns.join(','), '示例资源,PROD,IN_USE,张三,'].join('\n');
+
+  return (
+    <Modal
+      open={open}
+      title="批量导入资源"
+      desc="粘贴 CSV 文本，首行为表头；按「名称 + 环境」判定重复"
+      onClose={onClose}
+      onSave={() => mutation.mutate()}
+      footer={
+        <>
+          <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
+          <Button disabled={!csv.trim() || mutation.isPending} onClick={() => mutation.mutate()}>
+            {mutation.isPending ? '导入中…' : '开始导入'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="资源类型" required>
+            <Select value={type} options={dict.typeOptions({ includeDisabled: false })} onChange={(e) => setType(e.target.value)} />
+          </Field>
+          <Field label="重复数据处理">
+            <Select
+              value={onConflict}
+              options={[
+                { value: 'skip', label: '跳过（保持原记录）' },
+                { value: 'overwrite', label: '覆盖（更新原记录）' },
+              ]}
+              onChange={(e) => setOnConflict(e.target.value as 'skip' | 'overwrite')}
+            />
+          </Field>
+        </div>
+        <Field label="CSV 内容" required hint={`公共列：name,environment,status,datacenter,owner,tags,remark；类型专属列：${columns.join(', ')}`}>
+          <Textarea
+            className="min-h-40 font-mono text-xs"
+            value={csv}
+            onChange={(e) => setCsv(e.target.value)}
+            placeholder={sample}
+          />
+        </Field>
+      </div>
+    </Modal>
+  );
+}

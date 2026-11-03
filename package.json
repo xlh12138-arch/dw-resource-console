@@ -1,0 +1,39 @@
+{
+  "name": "dw-resource-console",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "数据仓库资源管理系统 - 批量调度服务器 / 调度平台IP / 采集交换平台IP / NAS / GDS 服务器 统一管理控制台",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "npm run build -w @dw/shared && concurrently -k -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run build -w @dw/shared && npm run dev -w @dw/api",
+    "dev:web": "npm run dev -w @dw/web",
+    "build": "npm run build -w @dw/shared && npm run build -w @dw/api && npm run build -w @dw/web",
+    "start": "npm run start -w @dw/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "smoke": "node scripts/smoke-test.mjs && node scripts/smoke-project.mjs && node scripts/smoke-dict.mjs && node scripts/smoke-slot-capacity.mjs && node scripts/smoke-capacity-period.mjs && node scripts/smoke-hierarchy-period.mjs && node scripts/smoke-user.mjs",
+    "smoke:resource": "node scripts/smoke-test.mjs",
+    "smoke:project": "node scripts/smoke-project.mjs",
+    "smoke:dict": "node scripts/smoke-dict.mjs",
+    "smoke:slot": "node scripts/smoke-slot-capacity.mjs",
+    "smoke:capacity": "node scripts/smoke-capacity-period.mjs",
+    "smoke:hierarchy": "node scripts/smoke-hierarchy-period.mjs",
+    "smoke:user": "node scripts/smoke-user.mjs",
+    "ui:check": "node scripts/ui-check.mjs",
+    "db:generate": "npm run db:generate -w @dw/api",
+    "db:migrate": "npm run db:migrate -w @dw/api",
+    "db:seed": "npm run db:seed -w @dw/api",
+    "db:reset": "npm run db:reset -w @dw/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "5.9.3"
+  }
+}
