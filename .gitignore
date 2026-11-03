@@ -19,3 +19,6 @@ apps/api/data/
 *.db-journal
 *.db-wal
 *.db-shm
+
+# WorkBuddy 本地数据（会话记忆、缓存等，不入库）
+.workbuddy/
