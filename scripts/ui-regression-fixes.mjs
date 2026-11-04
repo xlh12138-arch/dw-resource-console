@@ -184,6 +184,15 @@ try {
   `);
   await sleep(300);
   await evaluate(`
+    const input = document.querySelector('input[type="password"]');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    setter.call(input, ${JSON.stringify(password)});
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  `);
+  await sleep(100);
+  await evaluate(`
     const form = document.querySelector('form');
     form.querySelector('button[type=submit]')?.click();
     return true;

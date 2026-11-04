@@ -209,6 +209,15 @@ try {
     return demo.length;
   `);
   await sleep(400);
+  await ev(`
+    const input = document.querySelector('input[type="password"]');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    setter.call(input, ${JSON.stringify(password)});
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  `);
+  await sleep(100);
   const filled = await ev(`
     const inputs = [...document.querySelectorAll('input')];
     return JSON.stringify(inputs.map((i) => i.value));
