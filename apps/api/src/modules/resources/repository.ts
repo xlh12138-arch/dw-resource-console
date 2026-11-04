@@ -62,6 +62,15 @@ function buildWhere(q: ResourceQuery, scope?: ResourceScope) {
   if (q.unassigned) clauses.push(isNull(resources.projectId));
   // 精确按 id 定位（子资源跳父资源时只看该资源本身）
   if (q.id) clauses.push(eq(resources.id, q.id));
+  // 按 id 集合过滤（列表接口与导出共用；导出时由 service 直接按 ids 取数）
+  if (q.ids) {
+    const ids = q.ids
+      .split(',')
+      .map(Number)
+      .filter((n) => Number.isSafeInteger(n) && n > 0);
+    // 全是非法 id 时显式返回空集，避免退化成「不过滤」
+    clauses.push(ids.length > 0 ? inArray(resources.id, ids) : sql`1 = 0`);
+  }
   if (q.parentId) clauses.push(eq(resources.parentId, q.parentId));
   if (q.rootOnly) clauses.push(isNull(resources.parentId));
 

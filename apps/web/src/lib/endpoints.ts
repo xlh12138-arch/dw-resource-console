@@ -39,6 +39,8 @@ export interface ResourceQuery {
   projectEnvId?: number;
   /** 按资源 id 精确定位（子资源跳父资源时只看该资源） */
   id?: number;
+  /** 逗号分隔的 id 集合：导出勾选资源时只取这些 id */
+  ids?: string;
   /** 只看某父资源下的子资源 */
   parentId?: number;
   /** 只看顶层资源（不含子资源） */

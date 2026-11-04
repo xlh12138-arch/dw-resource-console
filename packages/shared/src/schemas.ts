@@ -187,6 +187,13 @@ export const resourceQuerySchema = z.object({
   tag: z.string().trim().max(120).optional(),
   /** 按资源 id 精确定位（用于「从子资源跳到父资源」时只看该资源本身） */
   id: z.coerce.number().int().positive().optional(),
+  /** 逗号分隔的 id 集合；台账勾选导出时按该集合精确取数，不再叠加其他筛选 */
+  ids: z
+    .string()
+    .trim()
+    .max(2000)
+    .regex(/^\d+(,\d+)*$/, 'ids 必须是逗号分隔的正整数')
+    .optional(),
   projectId: z.coerce.number().int().positive().optional(),
   projectEnvId: z.coerce.number().int().positive().optional(),
   /** 只看某个父资源下的子资源 */

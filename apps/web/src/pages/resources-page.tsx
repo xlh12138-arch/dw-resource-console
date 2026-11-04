@@ -284,18 +284,32 @@ export function ResourcesPage() {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
+            title={selected.length > 0 ? `仅导出已勾选的 ${selected.length} 个资源` : '导出当前筛选结果'}
             onClick={async () => {
               try {
-                const csv = await resourcesApi.exportCsv(query);
+                // 有勾选时只按勾选的 id 导出，忽略当前筛选；未勾选时保持导出筛选结果
+                const exportQuery: ResourceQuery = selected.length > 0
+                  ? { ids: selected.join(',') }
+                  : query;
+                const csv = await resourcesApi.exportCsv(exportQuery);
+                if (!csv) {
+                  push('error', '所选资源已不存在，请刷新后重试');
+                  return;
+                }
                 download(`resources-${new Date().toISOString().slice(0, 10)}.csv`, csv);
-                push('success', '已导出当前筛选结果');
+                push(
+                  'success',
+                  selected.length > 0
+                    ? `已导出勾选的 ${selected.length} 个资源`
+                    : '已导出当前筛选结果',
+                );
               } catch (err) {
                 push('error', friendlyMessage(err));
               }
             }}
           >
             <Download size={14} />
-            导出 CSV
+            导出 CSV{selected.length > 0 ? `（已选 ${selected.length}）` : ''}
           </Button>
           {canWrite && selected.length > 0 && (
             <Button variant="outline" onClick={() => setBulkOpen(true)}>

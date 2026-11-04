@@ -1213,10 +1213,31 @@ export const resourceService = {
     return result;
   },
 
-  /** 导出当前筛选结果为 CSV */
-  async exportCsv(query: ResourceQuery) {
-    const scope = await resolveScope(query);
-    const { items } = await resourceRepository.list({ ...query, page: 1, pageSize: 200 }, scope);
+  /**
+   * 导出 CSV：勾选了资源时只导出勾选的 id（按勾选顺序，不受筛选条件与 200 条上限影响）；
+   * 未勾选时导出当前筛选结果。已被删除的 id 自动跳过。
+   */
+  async exportCsv(query: ResourceQuery): Promise<string> {
+    let items: ResourceRow[];
+    if (query.ids) {
+      const ids = [
+        ...new Set(
+          query.ids
+            .split(',')
+            .map(Number)
+            .filter((n) => Number.isSafeInteger(n) && n > 0),
+        ),
+      ];
+      const found = await resourceRepository.findByIds(ids);
+      const byId = new Map(found.map((r) => [r.id, r]));
+      items = ids.flatMap((id) => {
+        const row = byId.get(id);
+        return row ? [row] : [];
+      });
+    } else {
+      const scope = await resolveScope(query);
+      ({ items } = await resourceRepository.list({ ...query, page: 1, pageSize: 200 }, scope));
+    }
     const maps = await loadProjectLabels();
     const typeLabels = new Map<string, string>();
     for (const r of items) {
