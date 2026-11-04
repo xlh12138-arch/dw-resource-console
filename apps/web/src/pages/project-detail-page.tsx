@@ -93,6 +93,7 @@ export function ProjectDetailPage() {
   const [pendingDeleteSlot, setPendingDeleteSlot] = useState<EnvSlotDto | null>(null);
   const [pendingDetach, setPendingDetach] = useState<ResourceDto | null>(null);
   const [renewTarget, setRenewTarget] = useState<{ env: ProjectEnvDetail; slot: EnvSlotDto } | null>(null);
+  const [editSlot, setEditSlot] = useState<{ env: ProjectEnvDetail; slot: EnvSlotDto } | null>(null);
   const [pendingRelease, setPendingRelease] = useState<{ env: ProjectEnvDetail; slot: EnvSlotDto } | null>(null);
   const [editEnv, setEditEnv] = useState<ProjectEnvDto | null>(null);
   const [envView, setEnvView] = useState<'slots' | 'timeline'>('slots');
@@ -565,7 +566,12 @@ export function ProjectDetailPage() {
                 >
                   {env.slots.map((slot) => (
                     <tr key={slot.id} className={slot.overdueDays > 0 ? 'bg-rose-50/40' : undefined}>
-                      <Td className="font-medium text-slate-800">{slot.slotRole}</Td>
+                      <Td className="font-medium text-slate-800">
+                        <div>{slot.slotRole}</div>
+                        {slot.remark ? (
+                          <div className="mt-0.5 text-[11px] font-normal text-slate-400">{slot.remark}</div>
+                        ) : null}
+                      </Td>
                       <Td>
                         <Badge tone="blue">{dict.typeLabel(slot.resourceType)}</Badge>
                       </Td>
@@ -622,6 +628,16 @@ export function ProjectDetailPage() {
                       </Td>
                       <Td className="text-right">
                         <div className="flex justify-end gap-1">
+                          {canWrite && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="编辑槽位类型、名称和备注"
+                              onClick={() => setEditSlot({ env, slot })}
+                            >
+                              <Pencil size={13} />
+                            </Button>
+                          )}
                           {canWrite && (
                             <Button
                               variant="ghost"
@@ -748,6 +764,15 @@ export function ProjectDetailPage() {
         onClose={() => setRenewTarget(null)}
         onSaved={() => {
           setRenewTarget(null);
+          invalidateAll();
+        }}
+      />
+
+      <EditSlotModal
+        state={editSlot}
+        onClose={() => setEditSlot(null)}
+        onSaved={() => {
+          setEditSlot(null);
           invalidateAll();
         }}
       />
@@ -1555,6 +1580,90 @@ function AssignSlotModal({
             ))}
           </div>
         )}
+      </div>
+    </Modal>
+  );
+}
+
+/** 编辑槽位的需求类型、名称与备注；已绑定资源的槽位不允许直接改类型。 */
+function EditSlotModal({
+  state,
+  onClose,
+  onSaved,
+}: {
+  state: { env: ProjectEnvDetail; slot: EnvSlotDto } | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const dict = useDict();
+  const { push } = useToast();
+  const [resourceType, setResourceType] = useState('');
+  const [slotRole, setSlotRole] = useState('');
+  const [remark, setRemark] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!state) return;
+    setResourceType(state.slot.resourceType);
+    setSlotRole(state.slot.slotRole);
+    setRemark(state.slot.remark ?? '');
+    setError('');
+  }, [state]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      envApi.updateSlot(state!.env.id, state!.slot.id, {
+        resourceType,
+        slotRole,
+        remark: remark.trim() || null,
+      }),
+    onSuccess: () => {
+      push('success', '槽位信息已更新');
+      onSaved();
+    },
+    onError: (err) => setError(friendlyMessage(err)),
+  });
+
+  const typeLocked = Boolean(state?.slot.resourceId);
+  const invalid = !resourceType || !slotRole.trim();
+
+  return (
+    <Modal
+      open={Boolean(state)}
+      width="max-w-xl"
+      title={`编辑槽位 · ${state?.slot.slotRole ?? ''}`}
+      desc="可修改槽位名称和备注；未绑定资源时也可调整需求资源类型"
+      onClose={onClose}
+      onSave={() => !invalid && mutation.mutate()}
+      footer={
+        <>
+          <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
+          <Button disabled={invalid || mutation.isPending} onClick={() => mutation.mutate()}>
+            {mutation.isPending ? '保存中…' : '保存修改'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {error && <ErrorBanner message={error} />}
+        <Field
+          label="需求资源类型"
+          required
+          hint={typeLocked ? '槽位已绑定资源，需先释放或更换资源后才能修改类型' : undefined}
+        >
+          <Select
+            value={resourceType}
+            disabled={typeLocked}
+            options={dict.typeOptions({ includeDisabled: typeLocked })}
+            onChange={(e) => setResourceType(e.target.value)}
+          />
+        </Field>
+        <Field label="槽位名称" required>
+          <Input value={slotRole} onChange={(e) => setSlotRole(e.target.value)} placeholder="如：备用调度节点" />
+        </Field>
+        <Field label="备注" hint="用于补充槽位用途、配额说明或交付要求">
+          <Textarea value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="可选" />
+        </Field>
       </div>
     </Modal>
   );

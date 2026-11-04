@@ -143,6 +143,15 @@ export const envApi = {
   remove: (id: number) => api.del<{ id: number }>(`/project-environments/${id}`),
   addSlots: (id: number, body: { resourceType: string; slotRole: string; quantity?: number }) =>
     api.post<ProjectEnvDetail>(`/project-environments/${id}/slots`, body),
+  updateSlot: (
+    id: number,
+    slotId: number,
+    body: { resourceType?: string; slotRole?: string; remark?: string | null },
+  ) =>
+    api.patch<{ slot: EnvSlotDto; env: ProjectEnvDetail }>(
+      `/project-environments/${id}/slots/${slotId}`,
+      body,
+    ),
   /** 槽位候选资源：含跨环境 / 已被占用 / 时间重叠 / 容量余量提示 */
   candidates: (id: number, slotId: number, period?: { startAt?: string; endAt?: string }) =>
     api.get<SlotCandidates>(`/project-environments/${id}/slots/${slotId}/candidates${toQuery(period ?? {})}`),

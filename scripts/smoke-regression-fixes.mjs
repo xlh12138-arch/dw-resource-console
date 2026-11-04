@@ -50,6 +50,34 @@ const typeCode = `REG_DEFAULT_${stamp}`;
 const parentTypeCode = `REG_CAP_${stamp}`;
 
 try {
+  console.log('\n[0] 无容量槽位引用时编辑名称');
+  const allResources = await req('/resources?pageSize=200', { token });
+  const referenced = allResources.json?.items?.find(
+    (item) => item.slotRefCount > 0 && item.capacityTotal === null && item.parentId === null,
+  );
+  if (referenced) {
+    const renameReferenced = await req(`/resources/${referenced.id}`, {
+      method: 'PATCH',
+      token,
+      body: {
+        name: referenced.name,
+        environment: referenced.environment,
+        status: referenced.status,
+        datacenter: referenced.datacenter ?? undefined,
+        owner: referenced.owner ?? undefined,
+        tags: referenced.tags,
+        remark: referenced.remark ?? undefined,
+        attrs: referenced.attrs,
+        parentId: null,
+        demandAmount: null,
+        capacityTotal: null,
+        capacityUnit: null,
+        projectId: referenced.projectId,
+      },
+    });
+    ok(renameReferenced.status === 200, '未改变容量时编辑名称不会误报引用', renameReferenced.text);
+  }
+
   console.log('\n[1] 字段默认值');
   const type = await req('/resource-types', {
     method: 'POST',
@@ -187,7 +215,45 @@ try {
   });
   ok(grow.status === 200, '计算父资源余量时排除当前子资源', grow.text);
 
-  console.log('\n[3] 清理');
+  console.log('\n[3] 编辑项目环境槽位');
+  const projectList = await req('/projects?pageSize=20', { token });
+  let editableSlot = null;
+  for (const project of projectList.json?.items ?? []) {
+    const projectDetail = await req(`/projects/${project.id}`, { token });
+    const envId = projectDetail.json?.environments?.[0]?.id;
+    if (!envId) continue;
+    const envDetail = await req(`/project-environments/${envId}`, { token });
+    const slot = envDetail.json?.slots?.[0];
+    if (slot) {
+      editableSlot = { envId, slot };
+      break;
+    }
+  }
+  if (editableSlot) {
+    const nextRole = `回归槽位-${stamp}`;
+    const edited = await req(
+      `/project-environments/${editableSlot.envId}/slots/${editableSlot.slot.id}`,
+      {
+        method: 'PATCH',
+        token,
+        body: { slotRole: nextRole, remark: '回归测试备注' },
+      },
+    );
+    ok(
+      edited.status === 200 &&
+        edited.json?.slot?.slotRole === nextRole &&
+        edited.json?.slot?.remark === '回归测试备注',
+      '可编辑槽位名称和备注',
+      edited.text,
+    );
+    await req(`/project-environments/${editableSlot.envId}/slots/${editableSlot.slot.id}`, {
+      method: 'PATCH',
+      token,
+      body: { slotRole: editableSlot.slot.slotRole, remark: editableSlot.slot.remark },
+    });
+  }
+
+  console.log('\n[4] 清理');
   for (const id of [childA.json?.id, childB.json?.id, parent.json?.id, first.json?.id, second.json?.id]) {
     if (id) await req(`/resources/${id}`, { method: 'DELETE', token });
   }

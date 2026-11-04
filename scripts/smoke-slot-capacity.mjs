@@ -44,7 +44,10 @@ async function req(path, { method = 'GET', token, body } = {}) {
   return { status: res.status, json, text };
 }
 
-const ADMIN = { username: 'admin', password: 'Admin@12345' };
+const ADMIN = {
+  username: process.env.SMOKE_ADMIN_USER ?? 'admin',
+  password: process.env.SMOKE_PASSWORD ?? 'Admin@12345',
+};
 
 const A = (await req('/auth/login', { method: 'POST', body: ADMIN })).json.accessToken;
 

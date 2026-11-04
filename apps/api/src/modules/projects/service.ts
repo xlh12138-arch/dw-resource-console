@@ -787,6 +787,59 @@ export const projectEnvService = {
     return buildEnvDetail(env);
   },
 
+  /** 编辑槽位名称、备注；未绑定资源时也允许调整需求资源类型。 */
+  async updateSlot(
+    envId: number,
+    slotId: number,
+    input: { resourceType?: string; slotRole?: string; remark?: string | null },
+    actor: Actor,
+    requestId?: string,
+  ) {
+    const env = await projectEnvRepository.findById(envId);
+    if (!env) throw notFound(`项目环境 ${envId} 不存在`);
+    const slot = await slotRepository.findById(slotId);
+    if (!slot || slot.environmentId !== envId) throw notFound(`槽位 ${slotId} 不存在`);
+
+    const nextType = input.resourceType ?? slot.resourceType;
+    if (nextType !== slot.resourceType) {
+      if (slot.resourceId !== null) {
+        throw conflict('该槽位已绑定资源，请先释放或更换资源后再修改槽位需求类型');
+      }
+      const meta = await getTypeMeta(nextType);
+      if (!meta.exists || !meta.enabled) {
+        throw validationError('请选择已启用的资源类型', { field: 'resourceType' });
+      }
+    }
+
+    const updated = await slotRepository.update(slotId, {
+      ...(input.resourceType !== undefined ? { resourceType: nextType } : {}),
+      ...(input.slotRole !== undefined ? { slotRole: input.slotRole } : {}),
+      ...(input.remark !== undefined ? { remark: input.remark } : {}),
+      updatedAt: new Date(),
+    });
+    await auditRepository.record({
+      actorId: actor.id,
+      actorName: actor.username,
+      action: 'UPDATE',
+      targetType: 'ENVIRONMENT',
+      targetId: String(envId),
+      targetName: env.name,
+      changes: [
+        ...(input.resourceType !== undefined && nextType !== slot.resourceType
+          ? [{ field: 'resourceType', label: '槽位需求类型', from: slot.resourceType, to: nextType }]
+          : []),
+        ...(input.slotRole !== undefined && input.slotRole !== slot.slotRole
+          ? [{ field: 'slotRole', label: '槽位名称', from: slot.slotRole, to: input.slotRole }]
+          : []),
+        ...(input.remark !== undefined && input.remark !== slot.remark
+          ? [{ field: 'remark', label: '槽位备注', from: slot.remark, to: input.remark }]
+          : []),
+      ],
+      requestId,
+    });
+    return { slot: toSlotDto(updated), env: await buildEnvDetail(env) };
+  },
+
   /**
    * 槽位绑定资源：
    * - 类型必须一致（硬校验）

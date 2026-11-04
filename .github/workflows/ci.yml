@@ -31,6 +31,8 @@ jobs:
       SMOKE_PASSWORD: CiAdmin#2026
       JWT_SECRET: ci-only-jwt-secret-0123456789abcdef
       NODE_ENV: test
+      RATE_LIMIT_MAX: "10000"
+      RATE_LIMIT_LOGIN_MAX: "100"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,46 +43,38 @@ jobs:
       - run: npm run build
       - run: npm run db:seed
       - run: npm run test:transaction
-      - name: Start API and web
-        run: |
-          npm start > /tmp/api.log 2>&1 &
-          echo $! > /tmp/api.pid
-          npm run dev:web > /tmp/web.log 2>&1 &
-          echo $! > /tmp/web.pid
-          for i in $(seq 1 60); do
-            curl -fsS http://127.0.0.1:8787/ready && curl -fsS http://127.0.0.1:5173/ && exit 0
-            sleep 1
-          done
-          cat /tmp/api.log
-          cat /tmp/web.log
-          exit 1
-      - name: API smoke tests
-        run: npm run smoke
-      - run: npm run smoke:regression-fixes
       - uses: browser-actions/setup-chrome@v1
         id: setup-chrome
-      - name: Browser UI tests
+      - name: Run SQLite integration tests
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           SMOKE_WEB_BASE: http://127.0.0.1:5173/
-        run: npm run ui:check
-      - name: UI regression fixes
-        env:
-          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
-          SMOKE_WEB_BASE: http://127.0.0.1:5173/
-        run: npm run ui:regression-fixes
-      - name: Rate-limit bypass test
-        run: npm run test:rate-limit
-      - name: Service logs
-        if: failure()
         run: |
-          cat /tmp/api.log || true
-          cat /tmp/web.log || true
-      - name: Stop services
-        if: always()
-        run: |
-          kill "$(cat /tmp/api.pid)" 2>/dev/null || true
-          kill "$(cat /tmp/web.pid)" 2>/dev/null || true
+          set -euo pipefail
+          cleanup() {
+            kill "${api_pid:-}" "${web_pid:-}" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          npm start > /tmp/api.log 2>&1 &
+          api_pid=$!
+          npm run dev:web > /tmp/web.log 2>&1 &
+          web_pid=$!
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8787/ready >/dev/null && curl -fsS http://localhost:5173/ >/dev/null; then
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              cat /tmp/api.log
+              cat /tmp/web.log
+              exit 1
+            fi
+            sleep 1
+          done
+          npm run smoke
+          npm run smoke:regression-fixes
+          npm run ui:check
+          npm run ui:regression-fixes
+          npm run test:rate-limit
 
   postgres-integration:
     runs-on: ubuntu-latest
@@ -107,6 +101,8 @@ jobs:
       SMOKE_PASSWORD: CiAdmin#2026
       JWT_SECRET: ci-only-jwt-secret-0123456789abcdef
       NODE_ENV: test
+      RATE_LIMIT_MAX: "10000"
+      RATE_LIMIT_LOGIN_MAX: "100"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -118,22 +114,25 @@ jobs:
       - run: npm run db:migrate
       - run: npm run db:seed
       - run: npm run test:transaction
-      - name: Start API
+      - name: Run PostgreSQL integration tests
         run: |
+          set -euo pipefail
+          cleanup() {
+            kill "${api_pid:-}" 2>/dev/null || true
+          }
+          trap cleanup EXIT
           npm start > /tmp/api-pg.log 2>&1 &
-          echo $! > /tmp/api-pg.pid
+          api_pid=$!
           for i in $(seq 1 60); do
-            curl -fsS http://127.0.0.1:8787/ready && exit 0
+            if curl -fsS http://127.0.0.1:8787/ready >/dev/null; then
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              cat /tmp/api-pg.log
+              exit 1
+            fi
             sleep 1
           done
-          cat /tmp/api-pg.log
-          exit 1
-      - run: npm run smoke
-      - run: npm run smoke:regression-fixes
-      - run: npm run test:rate-limit
-      - name: Service logs
-        if: failure()
-        run: cat /tmp/api-pg.log || true
-      - name: Stop service
-        if: always()
-        run: kill "$(cat /tmp/api-pg.pid)" 2>/dev/null || true
+          npm run smoke
+          npm run smoke:regression-fixes
+          npm run test:rate-limit

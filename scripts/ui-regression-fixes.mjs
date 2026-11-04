@@ -301,8 +301,41 @@ try {
     return document.querySelectorAll('[role="dialog"] .divide-y > div select').length;
   `);
   ok(after === before + 1, '编辑模板时可添加资源类型', { before, after });
+  const addedValues = await evaluate(`
+    const rows = [...document.querySelectorAll('[role="dialog"] .divide-y > div')];
+    const row = rows[rows.length - 1];
+    return {
+      type: row?.querySelector('select')?.value ?? '__missing__',
+      role: row?.querySelector('input')?.value ?? '__missing__',
+    };
+  `);
+  ok(addedValues.type === '' && addedValues.role === '', '新增资源类型不预填默认值', addedValues);
 
-  console.log('\n[3] 字典排序');
+  console.log('\n[3] 项目环境槽位编辑');
+  await navigate('/projects');
+  await waitFor(`return document.querySelectorAll('a[href^="/projects/"]').length > 0`, '项目列表');
+  await evaluate(`
+    document.querySelector('a[href^="/projects/"]')?.click();
+    return true;
+  `);
+  await waitFor(`return document.body.innerText.includes('项目环境')`, '项目详情');
+  await evaluate(`
+    const button = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('槽位'));
+    button?.click();
+    return true;
+  `);
+  await waitFor(`return document.querySelector('[role="dialog"]')?.innerText.includes('槽位列表')`, '槽位列表');
+  ok(
+    await evaluate(`return [...document.querySelectorAll('button[title="编辑槽位类型、名称和备注"]')].length > 0`),
+    '环境槽位提供编辑入口',
+  );
+  await evaluate(`
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    return true;
+  `);
+  await sleep(250);
+
+  console.log('\n[4] 字典排序');
   await navigate('/dict');
   await waitFor(`return document.body.innerText.includes('资源类型')`, '字典配置');
   const rowsBefore = await evaluate(`

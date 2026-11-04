@@ -31,15 +31,6 @@ import {
 
 const PAGE_SIZE = 20;
 
-/** 按资源类型给出默认槽位名，减少手工输入 */
-const DEFAULT_ROLE: Record<string, string> = {
-  BATCH_SCHED_SERVER: '调度节点',
-  BATCH_SCHED_PLATFORM_IP: '批量调度平台入口',
-  COLLECT_EXCHANGE_PLATFORM_IP: '采集交换平台入口',
-  NAS: '共享存储',
-  GDS_SERVER: 'GDS 节点',
-};
-
 export function TemplatesPage() {
   const dict = useDict();
   void dict;
@@ -290,7 +281,7 @@ function TemplateFormModal({
     setCode(initial?.code ?? '');
     setName(initial?.name ?? '');
     setDescription(initial?.description ?? '');
-    setItems(initial ? [] : [{ resourceType: 'BATCH_SCHED_SERVER', slotRole: DEFAULT_ROLE.BATCH_SCHED_SERVER, quantity: 1, required: true }]);
+    setItems(initial ? [] : [{ resourceType: '', slotRole: '', quantity: 1, required: true }]);
     setError('');
   }, [open, initial]);
 
@@ -310,6 +301,7 @@ function TemplateFormModal({
   }, [open, initial, detail.data]);
 
   const totalSlots = items.reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
+  const itemsInvalid = items.some((item) => !item.resourceType || !item.slotRole.trim());
 
   const patchItem = (index: number, patch: Partial<TemplateItemInput>) =>
     setItems((prev) => prev.map((it, idx) => (idx === index ? { ...it, ...patch } : it)));
@@ -352,7 +344,7 @@ function TemplateFormModal({
             共 {items.length} 类资源 · 展开 {totalSlots} 个槽位
           </span>
           <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
-          <Button disabled={!name || items.length === 0 || mutation.isPending} onClick={() => mutation.mutate()}>
+          <Button disabled={!name || items.length === 0 || itemsInvalid || mutation.isPending} onClick={() => mutation.mutate()}>
             {mutation.isPending ? '保存中…' : '保存模板'}
           </Button>
         </>
@@ -386,7 +378,7 @@ function TemplateFormModal({
               onClick={() =>
                 setItems((prev) => [
                   ...prev,
-                  { resourceType: 'NAS', slotRole: DEFAULT_ROLE.NAS, quantity: 1, required: true },
+                  { resourceType: '', slotRole: '', quantity: 1, required: true },
                 ])
               }
             >
@@ -405,14 +397,11 @@ function TemplateFormModal({
                   <Field label="资源类型">
                     <Select
                       value={item.resourceType}
+                      placeholder="请选择资源类型"
                       options={dict.typeOptions()}
                       onChange={(e) =>
                         patchItem(index, {
                           resourceType: e.target.value,
-                          slotRole:
-                            item.slotRole === DEFAULT_ROLE[item.resourceType] || !item.slotRole
-                              ? DEFAULT_ROLE[e.target.value]
-                              : item.slotRole,
                         })
                       }
                     />

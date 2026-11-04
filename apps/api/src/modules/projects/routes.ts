@@ -6,6 +6,7 @@ import {
   envSlotPeriodSchema,
   envSlotRenewSchema,
   envSlotSchema,
+  envSlotUpdateSchema,
   envTimelineSchema,
   envTemplateCreateSchema,
   envTemplateDetailSchema,
@@ -184,6 +185,28 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) =>
       withTransaction(() =>
         projectEnvService.addSlots(request.params.id, request.body, actorOf(request), request.id),
+      ),
+  );
+
+  app.patch(
+    '/project-environments/:id/slots/:slotId',
+    {
+      ...write,
+      schema: {
+        params: slotParams,
+        body: envSlotUpdateSchema,
+        response: { 200: z.object({ slot: envSlotSchema, env: projectEnvDetailSchema }) },
+      },
+    },
+    async (request) =>
+      withTransaction(() =>
+        projectEnvService.updateSlot(
+          request.params.id,
+          request.params.slotId,
+          request.body,
+          actorOf(request),
+          request.id,
+        ),
       ),
   );
 

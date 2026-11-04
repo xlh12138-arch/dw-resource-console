@@ -675,6 +675,15 @@ export const envSlotCreateSchema = z.object({
   remark: longText.optional(),
 });
 
+/** 编辑槽位基础信息；已绑定资源时不允许直接改变资源类型。 */
+export const envSlotUpdateSchema = z
+  .object({
+    resourceType: resourceTypeCodeSchema.optional(),
+    slotRole: z.string().trim().min(1).max(64).optional(),
+    remark: longText.nullable().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, { message: '至少需要更新一个字段' });
+
 /** 占用期限输入：endAt 传 null 表示长期占用（不限期限） */
 const periodShape = {
   startAt: z.string().datetime({ offset: true }).or(z.string().date()).nullable().optional(),

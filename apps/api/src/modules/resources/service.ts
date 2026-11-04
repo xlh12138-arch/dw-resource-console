@@ -998,11 +998,15 @@ export const resourceService = {
     // 调容量前先核算现有占用（槽位 + 子资源），避免下调后装不下已有申请：
     // 顶层资源校验「新总容量 ≥ 已占用」，子资源校验「新申请量 ≥ 其下级已占用」
     const capacityChanged =
-      patch.capacityTotal !== undefined && patch.capacityTotal !== before.capacityTotal;
+      patch.capacityTotal !== undefined &&
+      (patch.capacityTotal ?? null) !== (before.capacityTotal ?? null);
     if (capacityChanged && !nextParent) {
       await assertCapacityAdjustable(before, patch.capacityTotal ?? null);
     }
-    if (patch.demandAmount !== undefined) {
+    const demandChanged =
+      patch.demandAmount !== undefined &&
+      (patch.demandAmount ?? null) !== (before.demandAmount ?? null);
+    if (demandChanged && nextParent) {
       await assertCapacityAdjustable(before, before.capacityTotal, patch.demandAmount);
     }
 
