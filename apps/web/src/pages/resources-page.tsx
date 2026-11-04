@@ -274,14 +274,14 @@ export function ResourcesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">资源台账</h1>
-          <p className="text-xs text-slate-500">
+      <div className="page-head">
+        <div className="page-heading">
+          <h1>资源台账</h1>
+          <p>
             批量调度服务器 / 调度平台IP / 采集交换平台IP / NAS / GDS 服务器
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="page-actions">
           <Button
             variant="outline"
             onClick={async () => {
@@ -319,7 +319,7 @@ export function ResourcesPage() {
       </div>
 
       <Card>
-        <div className="flex flex-wrap items-end gap-3 px-5 py-4">
+        <div className="resource-filter-grid">
           <div className="min-w-56 flex-1">
             <Field label="关键字">
               <div className="relative">
@@ -530,6 +530,7 @@ export function ResourcesPage() {
           />
         ) : (
           <Table
+            minWidthClass="min-w-[1180px]"
             head={
               <tr>
                 <Th className="w-10">

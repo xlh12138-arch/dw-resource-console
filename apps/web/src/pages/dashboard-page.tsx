@@ -8,47 +8,42 @@ import { Card, Badge, CardHeader, ClickableBadge, EmptyState, ErrorBanner, Spinn
 import { EnvBadge } from '../components/env-badge';
 import { friendlyMessage } from '../lib/api';
 
-function StatCard({
+function MetricCell({
   title,
   value,
   unit,
   desc,
   icon,
-  tone,
   onClick,
   hint,
+  alert = false,
 }: {
   title: string;
   value: string | number;
   unit?: string;
   desc?: string;
   icon: React.ReactNode;
-  tone: string;
   onClick?: () => void;
   hint?: string;
+  alert?: boolean;
 }) {
+  const className = `metric-cell${alert ? ' is-alert' : ''}`;
   const body = (
-    <Card className={`p-5 ${onClick ? 'transition-colors hover:border-brand-300' : ''}`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs text-slate-500">{title}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">
-            {value}
-            {unit && <span className="ml-1 text-sm font-normal text-slate-500">{unit}</span>}
-          </p>
-          {desc && <p className="mt-1 text-xs text-slate-500">{desc}</p>}
-          {hint && <p className="mt-0.5 text-[11px] text-brand-600">{hint}</p>}
-        </div>
-        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${tone}`}>{icon}</div>
+    <>
+      <div className="metric-label">
+        <span>{title}</span>
+        {icon}
       </div>
-    </Card>
+      <p className="metric-value">
+        {value}
+        {unit && <small>{unit}</small>}
+      </p>
+      {desc && <p className="metric-note">{desc}</p>}
+      {hint && <p className="metric-link">{hint}</p>}
+    </>
   );
-  if (!onClick) return body;
-  return (
-    <button type="button" onClick={onClick} className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
-      {body}
-    </button>
-  );
+  if (!onClick) return <div className={className}>{body}</div>;
+  return <button type="button" onClick={onClick} className={className}>{body}</button>;
 }
 
 function BarList({
@@ -59,7 +54,7 @@ function BarList({
   onPick?: (item: { label: string; key?: string | number }) => void;
 }) {
   return (
-    <ul className="space-y-3 px-5 py-4">
+    <ul className="space-y-2.5 px-4 py-3.5">
       {items.map((item) => (
         <li key={item.key ?? item.label}>
           <button
@@ -69,13 +64,13 @@ function BarList({
             className={`group w-full text-left ${onPick ? 'cursor-pointer' : 'cursor-default'}`}
             title={onPick ? item.hint ?? '点击在资源台账中查看' : undefined}
           >
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className={`text-slate-600 ${onPick ? 'group-hover:text-brand-700' : ''}`}>{item.label}</span>
-              <span className="font-medium text-slate-800">{item.count}</span>
+            <div className="mb-1.5 flex items-center justify-between gap-3 text-[11px]">
+              <span className={`truncate text-[#607178] ${onPick ? 'group-hover:text-brand-700' : ''}`}>{item.label}</span>
+              <span className="shrink-0 font-mono text-[11px] font-semibold tabular-nums text-[#3e5057]">{item.count}</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-1.5 overflow-hidden rounded-[1px] bg-[#edf0f1]">
               <div
-                className={`h-full rounded-full ${item.tone} transition-opacity ${onPick ? 'group-hover:opacity-80' : ''}`}
+                className={`h-full rounded-[1px] ${item.tone} transition-opacity ${onPick ? 'group-hover:opacity-80' : ''}`}
                 style={{ width: `${item.total ? Math.round((item.count / item.total) * 100) : 0}%` }}
               />
             </div>
@@ -111,11 +106,11 @@ export function DashboardPage() {
   const inUse = data.byStatus.find((s) => s.status === 'IN_USE')?.count ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">资源概览</h1>
-          <p className="text-xs text-slate-500">数据仓库基础设施台账总览 · 最近 7 天新增 {data.createdLast7Days} 条</p>
+    <div className="space-y-4">
+      <div className="page-head">
+        <div className="page-heading">
+          <h1>资源概览</h1>
+          <p>数据仓库基础设施台账总览 · 最近 7 天新增 {data.createdLast7Days} 条</p>
           {data.ipConflict.count > 0 ? (
             <p className="mt-1 inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-0.5 text-[11px] text-rose-600">
               <AlertTriangle size={11} />
@@ -126,57 +121,54 @@ export function DashboardPage() {
         <button
           type="button"
           onClick={() => refetch()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+          className="inline-flex h-8 items-center gap-1.5 rounded border border-[#cbd3d7] bg-white px-3 text-[11px] font-medium text-[#53656c] hover:bg-[#f6f8f8]"
         >
           <RefreshCcw size={13} className={isFetching ? 'animate-spin' : ''} />
           刷新
         </button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
+      <div className="metric-strip">
+        <MetricCell
           title="资源总数"
           value={data.total}
           desc={`在用 ${inUse} 条 · 父 ${data.hierarchy.parentCount} / 子 ${data.hierarchy.childCount}`}
-          icon={<Boxes size={17} className="text-brand-600" />}
-          tone="bg-brand-50"
+          icon={<Boxes size={15} />}
           onClick={() => navigate('/resources')}
           hint="查看全部资源 →"
         />
-        <StatCard
+        <MetricCell
           title={`${primaryEnv?.label ?? '主环境'}资源`}
           value={prodCount}
           desc="环境可在字典配置中自定义"
-          icon={<TrendingUp size={17} className="text-emerald-600" />}
-          tone="bg-emerald-50"
+          icon={<TrendingUp size={15} />}
           onClick={primaryEnv ? () => navigate(`/resources?environment=${primaryEnv.environment}`) : undefined}
           hint={primaryEnv ? '按该环境筛选 →' : undefined}
         />
-        <StatCard
+        <MetricCell
           title="占用超期"
           value={data.slotPeriod.expiredCount}
           desc={`已占用 ${data.slotPeriod.occupiedCount} · 7 天内到期 ${data.slotPeriod.expiringSoonCount} · 长期 ${data.slotPeriod.longTermCount}`}
-          icon={<Clock size={17} className={data.slotPeriod.expiredCount ? 'text-rose-600' : 'text-slate-400'} />}
-          tone={data.slotPeriod.expiredCount ? 'bg-rose-50' : 'bg-slate-100'}
+          icon={<Clock size={15} />}
+          alert={data.slotPeriod.expiredCount > 0}
           onClick={() => {
             const first = (data.overdueByProject ?? [])[0];
             navigate(first?.projectId ? `/projects/${first.projectId}` : '/projects');
           }}
           hint={data.slotPeriod.expiredCount ? '查看超期明细 →' : undefined}
         />
-        <StatCard
+        <MetricCell
           title="NAS 容量使用率"
           value={data.nasCapacity.usageRate}
           unit="%"
           desc={`${Math.round(data.nasCapacity.usedGb)} / ${Math.round(data.nasCapacity.capacityGb)} GB（${data.nasCapacity.count} 套）`}
-          icon={<HardDrive size={17} className="text-violet-600" />}
-          tone="bg-violet-50"
+          icon={<HardDrive size={15} />}
           onClick={() => navigate('/resources?type=NAS')}
           hint="查看 NAS 资源 →"
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="dashboard-chart-grid">
         <Card>
           <CardHeader title="按资源类型分布" desc="点击任意类型在台账中筛选" />
           <BarList
@@ -198,7 +190,7 @@ export function DashboardPage() {
               label: dict.envLabel(e.environment),
               count: e.count,
               total: data.total,
-              tone: e.environment === primaryEnv?.environment ? 'bg-emerald-500' : 'bg-slate-400',
+              tone: e.environment === primaryEnv?.environment ? 'bg-brand-600' : 'bg-slate-400',
             }))}
             onPick={(item) => navigate(`/resources?environment=${item.key}`)}
           />
@@ -223,7 +215,7 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="dashboard-chart-grid">
         <Card className="lg:col-span-2">
           <CardHeader
             title="按项目分布"
@@ -238,7 +230,7 @@ export function DashboardPage() {
                 label: p.name,
                 count: p.count,
                 total: data.total,
-                tone: p.projectId === null ? 'bg-slate-400' : 'bg-violet-500',
+                tone: p.projectId === null ? 'bg-slate-400' : 'bg-brand-500',
               }))}
               onPick={(item) =>
                 navigate(item.key === 'none' ? '/resources?unassigned=true' : `/resources?projectId=${item.key}`)
@@ -251,21 +243,21 @@ export function DashboardPage() {
           {(data.byTag ?? []).length === 0 ? (
             <EmptyState title="还没有标签" desc="在资源表单里为资源添加标签" />
           ) : (
-            <div className="flex flex-wrap gap-1.5 px-5 py-4">
+            <div className="flex flex-wrap gap-1.5 px-4 py-3.5">
               {(data.byTag ?? []).map((t) => (
                 <ClickableBadge
                   key={t.tag}
-                  tone="violet"
+                  tone="blue"
                   title={`按标签 #${t.tag} 筛选`}
                   onClick={() => navigate(`/resources?tag=${encodeURIComponent(t.tag)}`)}
                 >
                   #{t.tag}
-                  <span className="ml-1 text-[10px] text-violet-500">{t.count}</span>
+                  <span className="ml-1 text-[10px] text-brand-500">{t.count}</span>
                 </ClickableBadge>
               ))}
             </div>
           )}
-          <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+          <div className="border-t border-[#e4e8ea] px-4 py-2.5 text-[11px] text-[#7b898f]">
             <p className="flex items-center gap-1.5">
               <FolderTree size={12} />
               顶层资源 {data.hierarchy.rootCount} 个 · 子资源 {data.hierarchy.childCount} 个
