@@ -49,47 +49,33 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
   const dict = useDict();
   const isEdit = Boolean(initial);
 
+  // 父组件按打开次数重建本组件；初始化只发生一次，避免打开后的异步回填覆盖用户刚选的资源类型。
   const [type, setType] = useState<string>(initial?.type ?? defaultType);
-  const [name, setName] = useState('');
-  const [environment, setEnvironment] = useState<string>('DEV');
-  const [status, setStatus] = useState<ResourceStatus>('IN_USE');
-  const [datacenter, setDatacenter] = useState('');
-  const [owner, setOwner] = useState('');
-  const [tags, setTags] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [parentId, setParentId] = useState('');
-  const [demandAmount, setDemandAmount] = useState('');
-  const [capacityTotal, setCapacityTotal] = useState('');
-  const [capacityUnit, setCapacityUnit] = useState('GB');
+  const [name, setName] = useState(initial?.name ?? '');
+  const [environment, setEnvironment] = useState<string>(
+    initial?.environment ?? dict.activeEnvironments[0]?.code ?? 'DEV',
+  );
+  const [status, setStatus] = useState<ResourceStatus>(initial?.status ?? 'IN_USE');
+  const [datacenter, setDatacenter] = useState(initial?.datacenter ?? '');
+  const [owner, setOwner] = useState(initial?.owner ?? '');
+  const [tags, setTags] = useState((initial?.tags ?? []).join(', '));
+  const [projectId, setProjectId] = useState(initial?.projectId ? String(initial.projectId) : '');
+  const [parentId, setParentId] = useState(initial?.parentId ? String(initial.parentId) : '');
+  const [demandAmount, setDemandAmount] = useState(
+    initial?.demandAmount !== null && initial?.demandAmount !== undefined ? String(initial.demandAmount) : '',
+  );
+  const [capacityTotal, setCapacityTotal] = useState(
+    initial?.capacityTotal !== null && initial?.capacityTotal !== undefined ? String(initial.capacityTotal) : '',
+  );
+  const [capacityUnit, setCapacityUnit] = useState(initial?.capacityUnit ?? 'GB');
   const [capacityRemark, setCapacityRemark] = useState('');
-  const [remark, setRemark] = useState('');
-  const [attrs, setAttrs] = useState<Record<string, unknown>>({});
+  const [remark, setRemark] = useState(initial?.remark ?? '');
+  const [attrs, setAttrs] = useState<Record<string, unknown>>(
+    (initial?.attrs ?? {}) as Record<string, unknown>,
+  );
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState('');
   const [formIssues, setFormIssues] = useState<FieldIssue[]>([]);
-
-  // 打开弹窗时回填
-  useEffect(() => {
-    if (!open) return;
-    setType(initial?.type ?? defaultType);
-    setName(initial?.name ?? '');
-    setEnvironment(initial?.environment ?? dict.activeEnvironments[0]?.code ?? 'DEV');
-    setStatus(initial?.status ?? 'IN_USE');
-    setDatacenter(initial?.datacenter ?? '');
-    setOwner(initial?.owner ?? '');
-    setTags((initial?.tags ?? []).join(', '));
-    setProjectId(initial?.projectId ? String(initial.projectId) : '');
-    setParentId(initial?.parentId ? String(initial.parentId) : '');
-    setDemandAmount(initial?.demandAmount !== null && initial?.demandAmount !== undefined ? String(initial.demandAmount) : '');
-    setCapacityTotal(initial?.capacityTotal !== null && initial?.capacityTotal !== undefined ? String(initial.capacityTotal) : '');
-    setCapacityUnit(initial?.capacityUnit ?? 'GB');
-    setCapacityRemark('');
-    setRemark(initial?.remark ?? '');
-    setAttrs((initial?.attrs ?? {}) as Record<string, unknown>);
-    setErrors({});
-    setFormError('');
-    setFormIssues([]);
-  }, [open, initial, defaultType]);
 
   // 字段定义来自资源类型字典，新增/改名后自动生效
   const fields = dict.attrFields(type) as AttrFieldDef[];

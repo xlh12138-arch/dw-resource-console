@@ -632,10 +632,12 @@ export function ProjectDetailPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              title="编辑槽位类型、名称和备注"
+                              title="编辑槽位"
+                              aria-label={`编辑槽位 ${slot.slotRole}`}
                               onClick={() => setEditSlot({ env, slot })}
                             >
                               <Pencil size={13} />
+                              编辑
                             </Button>
                           )}
                           {canWrite && (
@@ -769,6 +771,7 @@ export function ProjectDetailPage() {
       />
 
       <EditSlotModal
+        key={editSlot ? `${editSlot.env.id}:${editSlot.slot.id}` : 'closed'}
         state={editSlot}
         onClose={() => setEditSlot(null)}
         onSaved={() => {
@@ -1597,18 +1600,10 @@ function EditSlotModal({
 }) {
   const dict = useDict();
   const { push } = useToast();
-  const [resourceType, setResourceType] = useState('');
-  const [slotRole, setSlotRole] = useState('');
-  const [remark, setRemark] = useState('');
+  const [resourceType, setResourceType] = useState(state?.slot.resourceType ?? '');
+  const [slotRole, setSlotRole] = useState(state?.slot.slotRole ?? '');
+  const [remark, setRemark] = useState(state?.slot.remark ?? '');
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!state) return;
-    setResourceType(state.slot.resourceType);
-    setSlotRole(state.slot.slotRole);
-    setRemark(state.slot.remark ?? '');
-    setError('');
-  }, [state]);
 
   const mutation = useMutation({
     mutationFn: () =>

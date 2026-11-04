@@ -772,6 +772,7 @@ export function ResourcesPage() {
       </Card>
 
       <ResourceFormModal
+        key={formState.open ? `${formState.initial?.id ?? 'new'}:${formState.type}` : 'closed'}
         open={formState.open}
         initial={formState.initial}
         defaultType={formState.type}

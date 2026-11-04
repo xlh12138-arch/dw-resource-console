@@ -213,6 +213,31 @@ try {
     return dialog.querySelector('select')?.value ?? '__missing__';
   `);
   ok(defaultType === '', '新增资源不再默认选中资源类型', defaultType);
+  const selectedType = await evaluate(`
+    const dialog = document.querySelector('[role="dialog"]');
+    const select = dialog.querySelector('select');
+    const option = [...select.options].find((item) => item.value && !item.disabled);
+    if (!option) return '__missing__';
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+    setter.call(select, option.value);
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return option.value;
+  `);
+  await sleep(300);
+  const typeAfterOneSelection = await evaluate(`
+    const dialog = document.querySelector('[role="dialog"]');
+    return {
+      value: dialog.querySelector('select')?.value ?? '__missing__',
+      attrsTitle: [...dialog.querySelectorAll('p')].find((node) => node.innerText.includes('专属属性'))?.innerText ?? '',
+    };
+  `);
+  ok(
+    selectedType !== '__missing__' &&
+      typeAfterOneSelection.value === selectedType &&
+      typeAfterOneSelection.attrsTitle.includes('专属属性'),
+    '新增资源时资源类型选择一次即可生效',
+    { selectedType, actual: typeAfterOneSelection },
+  );
   await evaluate(`
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     return true;
@@ -336,8 +361,53 @@ try {
   `);
   await waitFor(`return document.querySelector('[role="dialog"]')?.innerText.includes('槽位列表')`, '槽位列表');
   ok(
-    await evaluate(`return [...document.querySelectorAll('button[title="编辑槽位类型、名称和备注"]')].length > 0`),
+    await evaluate(`return [...document.querySelectorAll('button[title="编辑槽位"]')].length > 0`),
     '环境槽位提供编辑入口',
+  );
+  await evaluate(`
+    const button = document.querySelector('button[title="编辑槽位"]');
+    button?.click();
+    return true;
+  `);
+  await waitFor(
+    `return [...document.querySelectorAll('[role="dialog"]')].some((node) => node.querySelector('h3')?.innerText.startsWith('编辑槽位'));`,
+    '槽位编辑弹窗',
+  );
+  const slotRoleBefore = await evaluate(`
+    const dialog = [...document.querySelectorAll('[role="dialog"]')]
+      .find((node) => node.querySelector('h3')?.innerText.startsWith('编辑槽位'));
+    const label = [...dialog.querySelectorAll('label')].find((node) => node.innerText.includes('槽位名称'));
+    return label?.querySelector('input')?.value ?? '__missing__';
+  `);
+  const slotRoleAfter = `${slotRoleBefore}-回归`;
+  await evaluate(`
+    const dialog = [...document.querySelectorAll('[role="dialog"]')]
+      .find((node) => node.querySelector('h3')?.innerText.startsWith('编辑槽位'));
+    const label = [...dialog.querySelectorAll('label')].find((node) => node.innerText.includes('槽位名称'));
+    const input = label.querySelector('input');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    setter.call(input, ${JSON.stringify(slotRoleAfter)});
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  `);
+  await evaluate(`
+    const dialog = [...document.querySelectorAll('[role="dialog"]')]
+      .find((node) => node.querySelector('h3')?.innerText.startsWith('编辑槽位'));
+    [...dialog.querySelectorAll('button')].find((button) => button.textContent.includes('保存修改'))?.click();
+    return true;
+  `);
+  await waitFor(
+    `return ![...document.querySelectorAll('[role="dialog"] h3')].some((node) => node.innerText.startsWith('编辑槽位'));`,
+    '槽位编辑保存完成',
+  );
+  await waitFor(
+    `return document.body.innerText.includes(${JSON.stringify(slotRoleAfter)});`,
+    '槽位名称刷新',
+  );
+  ok(
+    await evaluate(`return document.body.innerText.includes(${JSON.stringify(slotRoleAfter)});`),
+    '编辑槽位名称后保存并刷新列表',
   );
   await evaluate(`
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
