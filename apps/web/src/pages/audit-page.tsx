@@ -52,9 +52,9 @@ export function AuditPage() {
 
   return (
     <div className="space-y-4">
-      <div className="page-heading">
-        <h1>变更审计</h1>
-        <p>所有资源与用户的增删改都会留痕，支持按对象与操作人追溯</p>
+      <div>
+        <h1 className="text-lg font-semibold text-slate-900">变更审计</h1>
+        <p className="text-xs text-slate-500">所有资源与用户的增删改都会留痕，支持按对象与操作人追溯</p>
       </div>
 
       <Card>

@@ -19,20 +19,20 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: ButtonSize }) {
   const variants: Record<ButtonVariant, string> = {
-    primary: 'border border-brand-600 bg-brand-600 text-white hover:border-brand-700 hover:bg-brand-700 disabled:border-brand-300 disabled:bg-brand-300',
-    outline: 'border border-[#cbd3d7] bg-white text-[#46575f] hover:border-[#aab7bd] hover:bg-[#f6f8f8]',
-    ghost: 'border border-transparent text-[#5d6e75] hover:bg-[#e9edef] hover:text-[#283a41]',
-    danger: 'border border-rose-600 bg-rose-600 text-white hover:border-rose-700 hover:bg-rose-700 disabled:border-rose-300 disabled:bg-rose-300',
+    primary: 'bg-brand-600 text-white hover:bg-brand-700 disabled:bg-brand-400',
+    outline: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+    ghost: 'text-slate-600 hover:bg-slate-100',
+    danger: 'bg-rose-600 text-white hover:bg-rose-700 disabled:bg-rose-300',
   };
   const sizes: Record<ButtonSize, string> = {
-    sm: 'h-7 px-2.5 text-[11px]',
-    md: 'h-8 px-3.5 text-xs',
+    sm: 'h-8 px-3 text-xs',
+    md: 'h-9 px-4 text-sm',
   };
   return (
     <button
       className={cn(
-        'inline-flex shrink-0 items-center justify-center gap-1.5 rounded font-medium transition-colors',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:opacity-60',
         variants[variant],
         sizes[size],
         className,
@@ -59,30 +59,30 @@ export function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-[11px] font-medium text-[#56676e]">
+      <span className="text-xs font-medium text-slate-700">
         {label}
         {required && <span className="ml-0.5 text-rose-500">*</span>}
       </span>
       {children}
       {error ? (
-        <span className="block text-[11px] text-rose-600">{error}</span>
+        <span className="block text-xs text-rose-600">{error}</span>
       ) : hint ? (
-        <span className="block text-[11px] leading-4 text-[#87949a]">{hint}</span>
+        <span className="block text-xs text-slate-400">{hint}</span>
       ) : null}
     </label>
   );
 }
 
 const controlBase =
-  'w-full rounded border border-[#cbd3d7] bg-white px-2.5 text-[13px] text-[#26363d] placeholder:text-[#9aa6ab] ' +
-  'transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:bg-[#f3f5f5] disabled:text-[#78868c]';
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 ' +
+  'focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:bg-slate-50';
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(controlBase, 'h-8 py-0', className)} {...props} />;
+  return <input className={cn(controlBase, className)} {...props} />;
 }
 
 export function Textarea({ className, ...props }: InputHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn(controlBase, 'min-h-24 resize-y py-2', className)} {...props} />;
+  return <textarea className={cn(controlBase, 'min-h-24 resize-y', className)} {...props} />;
 }
 
 /** 下拉项：value 允许数字，组件内部统一转字符串后再与 DOM 对齐 */
@@ -138,7 +138,7 @@ export function Select({
   return (
     <select
       ref={ref}
-      className={cn(controlBase, 'h-8 py-0 pr-8', className)}
+      className={cn(controlBase, 'h-9 py-0 pr-8', className)}
       value={current}
       title={rest.title ?? currentLabel}
       {...rest}
@@ -177,8 +177,8 @@ export function Switch({
       disabled={disabled}
       onClick={() => !disabled && onChange(!checked)}
       className={cn(
-        'group inline-flex items-center gap-2 rounded text-xs transition-opacity',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300',
+        'group inline-flex items-center gap-2 rounded-lg text-xs transition-opacity',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400',
         disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
       )}
     >
@@ -204,15 +204,15 @@ export function Switch({
 /* ------------------------------- 展示组件 ------------------------------- */
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <section className={cn('rounded border border-[#d7dde0] bg-white shadow-none', className)}>{children}</section>;
+  return <section className={cn('rounded-xl border border-slate-200 bg-white shadow-sm', className)}>{children}</section>;
 }
 
 export function CardHeader({ title, desc, action }: { title: string; desc?: string; action?: ReactNode }) {
   return (
-    <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e1e5e7] px-4 py-3">
-      <div className="min-w-0">
-        <h3 className="text-[13px] font-semibold text-[#28383f]">{title}</h3>
-        {desc && <p className="mt-0.5 text-[11px] leading-4 text-[#7a888e]">{desc}</p>}
+    <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        {desc && <p className="mt-0.5 text-xs text-slate-500">{desc}</p>}
       </div>
       {action}
     </header>
@@ -220,12 +220,12 @@ export function CardHeader({ title, desc, action }: { title: string; desc?: stri
 }
 
 const tones = {
-  gray: 'bg-[#f2f4f5] text-[#5f6f76] ring-[#dfe3e5]',
+  gray: 'bg-slate-100 text-slate-600 ring-slate-200',
   blue: 'bg-brand-50 text-brand-700 ring-brand-100',
-  green: 'bg-[#edf6f2] text-[#29735c] ring-[#d4e8df]',
-  amber: 'bg-[#fbf5e9] text-[#8a6327] ring-[#eadfc8]',
-  red: 'bg-[#fbf0ef] text-[#a54b45] ring-[#edd9d7]',
-  violet: 'bg-[#f4f1f7] text-[#72538b] ring-[#e4dce9]',
+  green: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+  amber: 'bg-amber-50 text-amber-700 ring-amber-100',
+  red: 'bg-rose-50 text-rose-700 ring-rose-100',
+  violet: 'bg-violet-50 text-violet-700 ring-violet-100',
 } as const;
 
 export function Badge({
@@ -240,7 +240,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-[3px] px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset',
+        'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
         tones[tone],
         className,
       )}
@@ -276,8 +276,8 @@ export function ClickableBadge({
         onClick();
       }}
       className={cn(
-        'inline-flex items-center rounded-[3px] px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset transition-colors',
-        'hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300',
+        'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset transition-colors',
+        'hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400',
         tones[tone],
         className,
       )}
@@ -299,9 +299,9 @@ export function Spinner({ className }: { className?: string }) {
 
 export function EmptyState({ title, desc, action }: { title: string; desc?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-      <p className="text-[13px] font-medium text-[#52636a]">{title}</p>
-      {desc && <p className="max-w-sm text-[11px] leading-5 text-[#849198]">{desc}</p>}
+    <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
+      <p className="text-sm font-medium text-slate-700">{title}</p>
+      {desc && <p className="max-w-sm text-xs text-slate-500">{desc}</p>}
       {action}
     </div>
   );
@@ -309,7 +309,7 @@ export function EmptyState({ title, desc, action }: { title: string; desc?: stri
 
 export function ErrorBanner({ message, issues }: { message: string; issues?: { field: string; message: string }[] }) {
   return (
-    <div className="space-y-1 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+    <div className="space-y-1 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
       <p>{message}</p>
       {issues && issues.length > 0 ? (
         <ul className="ml-1 list-disc space-y-0.5 pl-4 text-xs text-rose-600">
@@ -476,11 +476,11 @@ export function Modal({
   return (
     <div
       ref={layerRef}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#101b20]/45 p-4 sm:p-8"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-8"
     >
       <ModalGuardContext.Provider value={guard}>
       <div
-        className={cn('w-full rounded-md border border-[#d5dcdf] bg-white shadow-[0_18px_50px_rgba(19,35,42,0.18)]', width)}
+        className={cn('w-full rounded-xl bg-white shadow-xl', width)}
         role="dialog"
         aria-modal="true"
         // 捕获表单里的输入 / 选择 / 开关，用于关闭时的「未保存」提示
@@ -491,29 +491,29 @@ export function Modal({
           if (el?.closest?.('[role="switch"], [data-dirty="1"]')) setTouched(true);
         }}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-[#e0e5e7] px-4 py-3">
+        <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
           <div>
-            <h3 className="text-[14px] font-semibold text-[#24353c]">{title}</h3>
-            {desc && <p className="mt-0.5 text-[11px] leading-4 text-[#7b898f]">{desc}</p>}
+            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+            {desc && <p className="mt-0.5 text-xs text-slate-500">{desc}</p>}
           </div>
           <button
             type="button"
             onClick={requestClose}
-            className="rounded p-1 text-[#8d999e] hover:bg-[#edf0f1] hover:text-[#4e6068]"
+            className="text-slate-400 hover:text-slate-600"
             aria-label="关闭"
             title="关闭（ESC）"
           >
             ✕
           </button>
         </header>
-        <div className="px-4 py-4">{children}</div>
-        {footer && <footer className="flex justify-end gap-2 border-t border-[#e0e5e7] bg-[#fafbfb] px-4 py-3">{footer}</footer>}
+        <div className="px-5 py-4">{children}</div>
+        {footer && <footer className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">{footer}</footer>}
       </div>
       </ModalGuardContext.Provider>
 
       {confirming && touched && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#101b20]/55 p-4">
-          <div className="w-full max-w-sm rounded-md border border-[#d5dcdf] bg-white p-5 shadow-[0_18px_50px_rgba(19,35,42,0.2)]" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl" role="dialog" aria-modal="true">
             <h4 className="text-sm font-semibold text-slate-900">有未保存的修改</h4>
             <p className="mt-1.5 text-xs text-slate-600">
               「{title}」中的内容已修改，关闭前请选择是否保存。
@@ -559,7 +559,7 @@ export function Pagination({
   onChange: (page: number) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e0e5e7] bg-[#fafbfb] px-4 py-2.5 text-[11px] text-[#7b898f]">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
       <span>
         共 {total} 条 · 每页 {pageSize} 条
       </span>
@@ -578,33 +578,21 @@ export function Pagination({
   );
 }
 
-export function Table({
-  head,
-  children,
-  minWidthClass = 'min-w-[780px]',
-}: {
-  head: ReactNode;
-  children: ReactNode;
-  minWidthClass?: string;
-}) {
+export function Table({ head, children }: { head: ReactNode; children: ReactNode }) {
   return (
-    <div className="overflow-x-auto border-t border-[#e7eaec]">
-      <table className={cn('w-full text-left text-[13px]', minWidthClass)}>
-        <thead className="bg-[#f4f6f7] text-[#69787f]">{head}</thead>
-        <tbody className="divide-y divide-[#e8ebed]">{children}</tbody>
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[720px] text-left text-sm">
+        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">{head}</thead>
+        <tbody className="divide-y divide-slate-100">{children}</tbody>
       </table>
     </div>
   );
 }
 
 export function Th({ children, className }: { children?: ReactNode; className?: string }) {
-  return (
-    <th className={cn('whitespace-nowrap border-b border-[#e0e5e7] px-3 py-2.5 text-[11px] font-semibold tracking-[0.025em]', className)}>
-      {children}
-    </th>
-  );
+  return <th className={cn('whitespace-nowrap px-4 py-2.5 font-medium', className)}>{children}</th>;
 }
 
 export function Td({ children, className }: { children?: ReactNode; className?: string }) {
-  return <td className={cn('px-3 py-2.5 align-middle text-[#46585f]', className)}>{children}</td>;
+  return <td className={cn('px-4 py-2.5 align-middle text-slate-700', className)}>{children}</td>;
 }

@@ -222,15 +222,13 @@ try {
       clientHeight: list?.clientHeight ?? 0,
       scrollHeight: list?.scrollHeight ?? 0,
       overflowY: list ? getComputedStyle(list).overflowY : '',
-      maxHeight: list ? getComputedStyle(list).maxHeight : '',
     };
   `);
   ok(
-    typeListLayout.clientHeight > 0 &&
+    typeListLayout.scrollHeight > typeListLayout.clientHeight &&
       typeListLayout.clientHeight <= 208 &&
-      typeListLayout.overflowY === 'auto' &&
-      typeListLayout.maxHeight === '208px',
-    '资源类型列表限制高度并配置内部滚动',
+      typeListLayout.overflowY === 'auto',
+    '资源类型列表限制高度并在内部滚动',
     typeListLayout,
   );
   const typeButton = await evaluate(`

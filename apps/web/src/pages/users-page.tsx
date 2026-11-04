@@ -80,19 +80,17 @@ export function UsersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="page-head">
-        <div className="page-heading">
-          <h1>用户管理</h1>
-          <p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900">用户管理</h1>
+          <p className="text-xs text-slate-500">
             RBAC：管理员（全部权限 + 用户管理 + 变更审计） / 普通用户（除用户管理与审计外的全部权限） / 只读用户（仅查看，可见范围与普通用户一致）
           </p>
         </div>
-        <div className="page-actions">
-          <Button onClick={() => setOpen(true)}>
-            <UserPlus size={14} />
-            新建用户
-          </Button>
-        </div>
+        <Button onClick={() => setOpen(true)}>
+          <UserPlus size={14} />
+          新建用户
+        </Button>
       </div>
 
       <Card>

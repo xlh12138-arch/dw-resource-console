@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../lib/auth';
 import { friendlyMessage } from '../lib/api';
-import { Button, ErrorBanner, Field, Input } from '../components/ui';
+import { Button, Card, ErrorBanner, Field, Input } from '../components/ui';
 
 const DEMO_ACCOUNTS = [
   { username: 'admin', password: 'Admin@12345', label: '管理员（全部权限 + 用户管理 + 审计）' },
@@ -34,39 +34,17 @@ export function LoginPage() {
   };
 
   return (
-    <div className="login-shell">
-      <aside className="login-brand-panel">
-        <div className="sidebar-brand" style={{ minHeight: 'auto', padding: 0, border: 0 }}>
-          <div className="sidebar-brand-mark">
-            <Database size={17} />
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 via-white to-brand-50 p-6">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center gap-2">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
+            <Database size={20} />
           </div>
-          <div>
-            <p className="sidebar-brand-title">DW Resource Console</p>
-            <p className="sidebar-brand-meta">Data Infrastructure</p>
-          </div>
+          <h1 className="text-lg font-semibold text-slate-900">数据仓库资源管理平台</h1>
+          <p className="text-xs text-slate-500">批量调度 · 采集交换 · NAS · GDS 统一台账</p>
         </div>
 
-        <div className="login-brand-heading">
-          <div className="login-form-eyebrow" style={{ color: '#769097' }}>RESOURCE GOVERNANCE</div>
-          <h1>数据仓库<br />资源管理平台</h1>
-          <p>面向数据平台团队的基础设施资产控制台，统一维护批量调度、采集交换、NAS 与 GDS 资源。</p>
-          <div className="login-capability-list">
-            <div><strong>01 / ASSET</strong>资源台账</div>
-            <div><strong>02 / ENV</strong>环境编排</div>
-            <div><strong>03 / AUDIT</strong>变更审计</div>
-          </div>
-        </div>
-
-        <p className="login-brand-footnote">INTERNAL SYSTEM · RESOURCE CONTROL</p>
-      </aside>
-
-      <main className="login-form-panel">
-        <div className="login-form-wrap">
-          <p className="login-form-eyebrow">ACCESS CONSOLE</p>
-          <h2>登录管理控制台</h2>
-          <p className="login-form-intro">使用内部账号进入工作区。</p>
-
-          <div className="login-form-card">
+        <Card className="p-6">
           <form className="space-y-4" onSubmit={submit}>
             {error && <ErrorBanner message={error} />}
             <Field label="用户名" required>
@@ -99,14 +77,14 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-5 border-t border-[#e4e8ea] pt-4">
-            <p className="login-demo-heading">演示账号（点击填充）</p>
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <p className="mb-2 text-xs font-medium text-slate-500">演示账号（点击填充）</p>
             <div className="space-y-1.5">
               {DEMO_ACCOUNTS.map((acc) => (
                 <button
                   key={acc.username}
                   type="button"
-                  className="w-full rounded-lg border border-[#dfe4e6] px-3 py-2 text-left text-xs text-slate-600 transition-colors hover:border-brand-300 hover:bg-brand-50"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-xs text-slate-600 transition-colors hover:border-brand-300 hover:bg-brand-50"
                   onClick={() => {
                     setUsername(acc.username);
                     setPassword(acc.password);
@@ -118,9 +96,8 @@ export function LoginPage() {
               ))}
             </div>
           </div>
-          </div>
-        </div>
-      </main>
+        </Card>
+      </div>
     </div>
   );
 }
