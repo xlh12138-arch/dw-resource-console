@@ -25,6 +25,25 @@ type Errors = Record<string, string>;
 
 const IP_KEYS = ['ip', 'mgmtIp'];
 
+function attrsWithDefaults(
+  fields: AttrFieldDef[],
+  attrs: Record<string, unknown>,
+): Record<string, unknown> {
+  const next = { ...attrs };
+  for (const field of fields) {
+    if (Object.prototype.hasOwnProperty.call(next, field.key)) continue;
+    const raw = field.defaultValue;
+    if (raw === undefined || raw === null || raw === '') continue;
+    next[field.key] =
+      field.kind === 'switch'
+        ? ['true', '1', 'yes'].includes(raw.toLowerCase())
+        : field.kind === 'number'
+          ? Number(raw)
+          : raw;
+  }
+  return next;
+}
+
 export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved }: Props) {
   const { push } = useToast();
   const dict = useDict();
@@ -75,6 +94,12 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
   // 字段定义来自资源类型字典，新增/改名后自动生效
   const fields = dict.attrFields(type) as AttrFieldDef[];
 
+  // 字典异步加载完成后补齐字段默认值；已有值和用户主动清空的值不被覆盖。
+  useEffect(() => {
+    if (!open) return;
+    setAttrs((prev) => attrsWithDefaults(fields, prev));
+  }, [open, type, fields]);
+
   // 父资源候选：同类型、非自身，用于「子资源申请容量」
   const parentOptions = useQuery({
     queryKey: ['resource-parent-options', type],
@@ -94,6 +119,13 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
     parentCandidates.find((r) => String(r.id) === parentId) ?? (parentDetail.data ?? undefined);
   // 只要填了父资源就算子资源：编辑时类型不可改，parentId 一定有效；新增时切换类型会自动清空 parentId
   const isChild = Boolean(parentId);
+  /** 当前父资源的剩余容量已包含本资源的旧申请量，编辑场景要加回去再展示。 */
+  const availableForParent = (parent: ResourceDto): number => {
+    const base = parent.capacityAvailable ?? 0;
+    return initial?.parentId === parent.id && initial?.demandAmount !== null && initial?.demandAmount !== undefined
+      ? base + initial.demandAmount
+      : base;
+  };
   /** 子资源只能补充非必填属性：必填项一律由父资源继承（表单只读，提交时剔除） */
   const requiredKeys = new Set(fields.filter((f) => f.required).map((f) => f.key));
   const editableAttrs = isChild
@@ -132,6 +164,11 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const currentCapacity = initial?.capacityTotal ?? null;
+      const nextCapacity = capacityTotal.trim() === '' ? null : Number(capacityTotal);
+      const capacityTotalChanged = !isEdit || nextCapacity !== currentCapacity;
+      const nextCapacityUnit = capacityTotal.trim() === '' ? null : capacityUnit || null;
+      const capacityUnitChanged = !isEdit || nextCapacityUnit !== (initial?.capacityUnit ?? null);
       const payload = {
         type,
         name,
@@ -149,12 +186,10 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
         ...(isChild
           ? { parentId: Number(parentId), demandAmount: Number(demandAmount) }
           : { parentId: null, demandAmount: null }),
-        ...(isChild
-          ? {}
-          : {
-              capacityTotal: capacityTotal.trim() === '' ? null : Number(capacityTotal),
-              capacityUnit: capacityTotal.trim() === '' ? null : capacityUnit || null,
-            }),
+        ...(!isChild && capacityTotalChanged ? { capacityTotal: nextCapacity } : {}),
+        ...(!isChild && (capacityTotalChanged || capacityUnitChanged)
+          ? { capacityUnit: nextCapacityUnit }
+          : {}),
         ...(isEdit && capacityRemark.trim() ? { capacityRemark: capacityRemark.trim() } : {}),
         ...(projectId ? { projectId: Number(projectId) } : { projectId: null }),
       };
@@ -183,6 +218,7 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
 
   const submit = () => {
     const next: Errors = {};
+    if (!type) next['type'] = '请选择资源类型';
     if (!name.trim()) next['name'] = '请填写资源名称';
     for (const f of fields) {
       // 子资源的必填属性全部继承父资源，无需（也不允许）在表单里修改
@@ -194,8 +230,8 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
     }
     if (isChild) {
       if (!demandAmount.trim() || Number(demandAmount) <= 0) next['demandAmount'] = '请填写向父资源申请的容量';
-      else if (pickedParent?.capacityAvailable !== null && pickedParent?.capacityAvailable !== undefined && Number(demandAmount) > pickedParent.capacityAvailable) {
-        next['demandAmount'] = `超出父资源剩余可用容量 ${pickedParent.capacityAvailable}`;
+      else if (pickedParent && Number(demandAmount) > availableForParent(pickedParent)) {
+        next['demandAmount'] = `超出父资源剩余可用容量 ${availableForParent(pickedParent)}`;
       }
     }
     // 父资源容量不能被调到「已占用」以下，否则剩余容量为负
@@ -239,14 +275,16 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
         {formError && <ErrorBanner message={formError} issues={formIssues} />}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="资源类型" required>
+          <Field label="资源类型" required error={errors['type']}>
             <Select
               value={type}
               disabled={isEdit}
+              placeholder="请选择资源类型"
               // 编辑时保留停用类型，避免存量数据的类型显示为空白
               options={dict.typeOptions({ includeDisabled: isEdit })}
               onChange={(e) => {
                 setType(e.target.value);
+                setAttrs({});
                 // 类型变了，原来的父资源不再同类型，清空避免挂错层级
                 setParentId('');
                 setDemandAmount('');
@@ -307,7 +345,7 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
                     label:
                       `${r.code} · ${r.name}` +
                       (r.capacityTotal !== null
-                        ? `（剩余 ${r.capacityAvailable ?? 0}${r.capacityUnit ?? ''}）`
+                        ? `（剩余 ${availableForParent(r)}${r.capacityUnit ?? ''}）`
                         : '（未设容量）'),
                   })),
                   // 当前父资源不在候选里（跨类型 / 超出分页）时补一项，保证下拉能回显
@@ -330,7 +368,7 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
                   pickedParent
                     ? pickedParent.capacityTotal === null
                       ? '父资源未启用容量管理，无法申请'
-                      : `父资源剩余可用 ${pickedParent.capacityAvailable ?? 0}${pickedParent.capacityUnit ? ` ${pickedParent.capacityUnit}` : ''}`
+                      : `父资源剩余可用 ${availableForParent(pickedParent)}${pickedParent.capacityUnit ? ` ${pickedParent.capacityUnit}` : ''}`
                     : undefined
                 }
               >

@@ -163,6 +163,7 @@ export function toAttrFieldDefs(fields: RuntimeField[]): AttrFieldDef[] {
     label: f.label,
     kind: kindOf(f.fieldType),
     required: f.required,
+    defaultValue: f.defaultValue ?? undefined,
     placeholder: f.placeholder ?? undefined,
     unit: f.unit ?? undefined,
     options: f.options.length > 0 ? f.options : undefined,

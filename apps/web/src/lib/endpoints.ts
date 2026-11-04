@@ -46,7 +46,17 @@ export interface ResourceQuery {
   unassigned?: boolean;
   page?: number;
   pageSize?: number;
-  sortBy?: 'updatedAt' | 'createdAt' | 'name' | 'code';
+  sortBy?:
+    | 'updatedAt'
+    | 'createdAt'
+    | 'name'
+    | 'code'
+    | 'type'
+    | 'environment'
+    | 'status'
+    | 'datacenter'
+    | 'owner'
+    | `attr:${string}`;
   sortOrder?: 'asc' | 'desc';
 }
 
@@ -236,7 +246,18 @@ export const metaApi = {
       environments: { value: string; label: string; tone: string }[];
       statuses: { value: string; label: string }[];
       roles: { value: string; label: string }[];
-      attrFields: Record<string, { key: string; label: string; kind: string; required?: boolean; unit?: string; options?: { value: string; label: string }[] }[]>;
+        attrFields: Record<
+          string,
+          {
+            key: string;
+            label: string;
+            kind: string;
+            required?: boolean;
+            defaultValue?: string;
+            unit?: string;
+            options?: { value: string; label: string }[];
+          }[]
+        >;
       typeColumns: Record<string, string[]>;
     }>('/meta'),
 };

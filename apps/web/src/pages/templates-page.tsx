@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Boxes, Copy, Pencil, Plus, Rocket, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   type EnvTemplateDto,
@@ -276,6 +276,7 @@ function TemplateFormModal({
   const [description, setDescription] = useState('');
   const [items, setItems] = useState<TemplateItemInput[]>([]);
   const [error, setError] = useState('');
+  const hydratedTemplateId = useRef<number | null>(null);
 
   const detail = useQuery({
     queryKey: ['template', initial?.id],
@@ -285,22 +286,27 @@ function TemplateFormModal({
 
   useEffect(() => {
     if (!open) return;
-    const source = detail.data;
+    hydratedTemplateId.current = null;
     setCode(initial?.code ?? '');
     setName(initial?.name ?? '');
     setDescription(initial?.description ?? '');
-    setItems(
-      source
-        ? source.items.map((i) => ({
-            resourceType: i.resourceType,
-            slotRole: i.slotRole,
-            quantity: i.quantity,
-            required: i.required,
-            remark: i.remark ?? undefined,
-          }))
-        : [{ resourceType: 'BATCH_SCHED_SERVER', slotRole: DEFAULT_ROLE.BATCH_SCHED_SERVER, quantity: 1, required: true }],
-    );
+    setItems(initial ? [] : [{ resourceType: 'BATCH_SCHED_SERVER', slotRole: DEFAULT_ROLE.BATCH_SCHED_SERVER, quantity: 1, required: true }]);
     setError('');
+  }, [open, initial]);
+
+  // 详情只回填一次，避免查询刷新覆盖用户刚添加或删除的资源行。
+  useEffect(() => {
+    if (!open || !initial || !detail.data || hydratedTemplateId.current === initial.id) return;
+    hydratedTemplateId.current = initial.id;
+    setItems(
+      detail.data.items.map((item) => ({
+        resourceType: item.resourceType,
+        slotRole: item.slotRole,
+        quantity: item.quantity,
+        required: item.required,
+        remark: item.remark ?? undefined,
+      })),
+    );
   }, [open, initial, detail.data]);
 
   const totalSlots = items.reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
@@ -375,6 +381,8 @@ function TemplateFormModal({
             <Button
               size="sm"
               variant="outline"
+              type="button"
+              disabled={isEdit && detail.isLoading}
               onClick={() =>
                 setItems((prev) => [
                   ...prev,
@@ -387,7 +395,11 @@ function TemplateFormModal({
             </Button>
           </div>
           <div className="divide-y divide-slate-100">
-            {items.map((item, index) => (
+            {isEdit && detail.isLoading ? (
+              <div className="flex h-24 items-center justify-center">
+                <Spinner className="h-5 w-5" />
+              </div>
+            ) : items.map((item, index) => (
               <div key={index} className="flex flex-wrap items-end gap-3 px-4 py-3">
                 <div className="w-52">
                   <Field label="资源类型">

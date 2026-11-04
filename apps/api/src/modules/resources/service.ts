@@ -19,7 +19,7 @@ import {
 } from '../projects/repository.js';
 import { environmentRepository } from '../dict/repository.js';
 import { dictGuard, environmentLabelOf } from '../dict/service.js';
-import { getTypeMeta, type RuntimeField } from '../dict/validator.js';
+import { getTypeMeta, normalizeAttrs, type RuntimeField } from '../dict/validator.js';
 import { parseCsv, toCsv } from './csv.js';
 import { withTransaction } from '../../db/index.js';
 import {
@@ -90,7 +90,10 @@ async function resolveProjectRef(input: { projectId?: number | null; projectEnvI
  */
 async function validateAttrs(type: string, attrs: Record<string, unknown>, row?: number) {
   const meta = await dictGuard.assertType(type);
-  const result = meta.schema.safeParse(attrs);
+  // 字段默认值属于资源类型定义的一部分：新增资源和旧数据编辑时都要先补齐，
+  // 否则表单、详情和列表会看不到字典中配置的默认值。
+  const normalized = normalizeAttrs(attrs, meta.fields).value;
+  const result = meta.schema.safeParse(normalized);
   if (!result.success) {
     const details = result.error.issues.map((i) => ({
       field: `attrs.${i.path.join('.')}`,
@@ -994,8 +997,10 @@ export const resourceService = {
 
     // 调容量前先核算现有占用（槽位 + 子资源），避免下调后装不下已有申请：
     // 顶层资源校验「新总容量 ≥ 已占用」，子资源校验「新申请量 ≥ 其下级已占用」
-    if (patch.capacityTotal !== undefined && !nextParent) {
-      await assertCapacityAdjustable(before, patch.capacityTotal);
+    const capacityChanged =
+      patch.capacityTotal !== undefined && patch.capacityTotal !== before.capacityTotal;
+    if (capacityChanged && !nextParent) {
+      await assertCapacityAdjustable(before, patch.capacityTotal ?? null);
     }
     if (patch.demandAmount !== undefined) {
       await assertCapacityAdjustable(before, before.capacityTotal, patch.demandAmount);
@@ -1049,7 +1054,7 @@ export const resourceService = {
             capacityUnit: nextParent ? (nextParent.capacityUnit ?? null) : before.capacityUnit,
           }
         : {}),
-      ...(patch.capacityTotal !== undefined && !nextParent
+      ...(capacityChanged && !nextParent
         ? {
             capacityTotal: patch.capacityTotal,
             // 取消容量核算时一并清掉单位，避免残留「0 / GB」这类歧义展示

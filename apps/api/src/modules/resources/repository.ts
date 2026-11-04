@@ -13,6 +13,11 @@ const SORT_COLUMNS = {
   createdAt: resources.createdAt,
   name: resources.name,
   code: resources.code,
+  type: resources.type,
+  environment: resources.environment,
+  status: resources.status,
+  datacenter: resources.datacenter,
+  owner: resources.owner,
 } as const;
 
 export interface Paged<T> {
@@ -73,6 +78,12 @@ function buildWhere(q: ResourceQuery, scope?: ResourceScope) {
 export const resourceRepository = {
   async list(q: ResourceQuery, scope?: ResourceScope): Promise<Paged<ResourceRow>> {
     const where = buildWhere(q, scope);
+    const attrKey = q.sortBy.startsWith('attr:') ? q.sortBy.slice(5) : null;
+    const sortExpression = attrKey
+      ? config.db.driver === 'postgres'
+        ? sql`${resources.attrs} ->> ${attrKey}`
+        : sql`json_extract(${resources.attrs}, ${`$.${attrKey}`})`
+      : SORT_COLUMNS[q.sortBy as keyof typeof SORT_COLUMNS];
     const [{ value: total }] = await db
       .select({ value: count() })
       .from(resources)
@@ -81,7 +92,7 @@ export const resourceRepository = {
       .select()
       .from(resources)
       .where(where)
-      .orderBy(q.sortOrder === 'asc' ? asc(SORT_COLUMNS[q.sortBy]) : desc(SORT_COLUMNS[q.sortBy]))
+      .orderBy(q.sortOrder === 'asc' ? asc(sortExpression) : desc(sortExpression))
       .limit(q.pageSize)
       .offset((q.page - 1) * q.pageSize);
     const totalPages = Math.max(1, Math.ceil(total / q.pageSize));

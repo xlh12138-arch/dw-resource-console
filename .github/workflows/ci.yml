@@ -56,6 +56,7 @@ jobs:
           exit 1
       - name: API smoke tests
         run: npm run smoke
+      - run: npm run smoke:regression-fixes
       - uses: browser-actions/setup-chrome@v1
         id: setup-chrome
       - name: Browser UI tests
@@ -63,6 +64,11 @@ jobs:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           SMOKE_WEB_BASE: http://127.0.0.1:5173/
         run: npm run ui:check
+      - name: UI regression fixes
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          SMOKE_WEB_BASE: http://127.0.0.1:5173/
+        run: npm run ui:regression-fixes
       - name: Rate-limit bypass test
         run: npm run test:rate-limit
       - name: Service logs
@@ -123,6 +129,7 @@ jobs:
           cat /tmp/api-pg.log
           exit 1
       - run: npm run smoke
+      - run: npm run smoke:regression-fixes
       - run: npm run test:rate-limit
       - name: Service logs
         if: failure()

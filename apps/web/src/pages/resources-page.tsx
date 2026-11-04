@@ -1,5 +1,19 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, FolderTree, Link2, Pencil, Plus, Search, Tag, Trash2, Upload, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
+  Download,
+  FolderTree,
+  Link2,
+  Pencil,
+  Plus,
+  Search,
+  Tag,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
@@ -40,6 +54,36 @@ function statusTone(status: ResourceStatus): 'gray' | 'green' | 'amber' | 'red' 
   if (status === 'MAINTAINING') return 'amber';
   if (status === 'RETIRED') return 'red';
   return 'gray';
+}
+
+function SortableTh({
+  label,
+  sortKey,
+  currentSort,
+  currentOrder,
+  onSort,
+}: {
+  label: string;
+  sortKey: string;
+  currentSort: string;
+  currentOrder: 'asc' | 'desc';
+  onSort: (key: string) => void;
+}) {
+  const active = currentSort === sortKey;
+  const Icon = !active ? ChevronsUpDown : currentOrder === 'asc' ? ChevronUp : ChevronDown;
+  return (
+    <Th>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 hover:text-brand-700"
+        aria-sort={active ? (currentOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+        onClick={() => onSort(sortKey)}
+      >
+        {label}
+        <Icon size={12} className={active ? 'text-brand-600' : 'text-slate-400'} />
+      </button>
+    </Th>
+  );
 }
 
 /** 单个筛选条件标签：点 × 只移除这一项，不影响其他筛选 */
@@ -95,8 +139,8 @@ export function ResourcesPage() {
     return {
       page: num('page') ?? 1,
       pageSize: PAGE_SIZE,
-      sortBy: 'updatedAt',
-      sortOrder: 'desc',
+      sortBy: (p.get('sortBy') ?? 'updatedAt') as ResourceQuery['sortBy'],
+      sortOrder: (p.get('sortOrder') as 'asc' | 'desc' | null) ?? 'desc',
       q: p.get('q') || undefined,
       type: p.get('type') ?? undefined,
       environment: p.get('environment') ?? undefined,
@@ -140,7 +184,7 @@ export function ResourcesPage() {
   const [formState, setFormState] = useState<{ open: boolean; initial: ResourceDto | null; type: string }>({
     open: false,
     initial: null,
-    type: 'BATCH_SCHED_SERVER',
+    type: '',
   });
   const [detail, setDetail] = useState<ResourceDto | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ResourceDto | null>(null);
@@ -208,12 +252,21 @@ export function ResourcesPage() {
     onError: (err) => push('error', friendlyMessage(err)),
   });
 
-  const columns = useMemo(
-    () => (formState.type ? dict.typeColumns(formState.type) : []),
-    [formState.type, dict],
-  );
-
   const rows = list.data?.items ?? [];
+  const primaryAttrKey = query.type ? dict.typeColumns(query.type)[0] : undefined;
+  const sortBy: NonNullable<ResourceQuery['sortBy']> = query.sortBy ?? 'updatedAt';
+  const sortOrder: 'asc' | 'desc' = query.sortOrder ?? 'desc';
+  const sortColumn = (key: string) => {
+    const defaultOrder: 'asc' | 'desc' = key.startsWith('attr:') || key === 'name' || key === 'code' || key === 'type' || key === 'environment' || key === 'status' || key === 'owner'
+      ? 'asc'
+      : 'desc';
+    setFilter({
+      sortBy: key,
+      sortOrder: sortBy === key && sortOrder === defaultOrder
+        ? (defaultOrder === 'asc' ? 'desc' : 'asc')
+        : defaultOrder,
+    });
+  };
   /** 按 id 精确定位时，列表里就是这一条，用它的编码回显筛选标签 */
   const focused = query.id ? rows.find((r) => r.id === query.id) : undefined;
   /** 按父资源筛选时，用首行的父信息回显「父资源」标签 */
@@ -256,7 +309,7 @@ export function ResourcesPage() {
                 <Upload size={14} />
                 批量导入
               </Button>
-              <Button onClick={() => setFormState({ open: true, initial: null, type: formState.type })}>
+              <Button onClick={() => setFormState({ open: true, initial: null, type: query.type ?? '' })}>
                 <Plus size={14} />
                 新增资源
               </Button>
@@ -469,7 +522,7 @@ export function ResourcesPage() {
             desc="调整筛选条件，或新增一条资源记录"
             action={
               canWrite && (
-                <Button size="sm" onClick={() => setFormState({ open: true, initial: null, type: 'BATCH_SCHED_SERVER' })}>
+                <Button size="sm" onClick={() => setFormState({ open: true, initial: null, type: query.type ?? '' })}>
                   新增资源
                 </Button>
               )
@@ -488,17 +541,27 @@ export function ResourcesPage() {
                     onChange={(e) => setSelected(e.target.checked ? rows.map((r) => r.id) : [])}
                   />
                 </Th>
-                <Th>编码</Th>
-                <Th>名称</Th>
-                <Th>类型</Th>
-                <Th>关键属性</Th>
+                <SortableTh label="编码" sortKey="code" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
+                <SortableTh label="名称" sortKey="name" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
+                <SortableTh label="类型" sortKey="type" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
+                {primaryAttrKey ? (
+                  <SortableTh
+                    label="关键属性"
+                    sortKey={`attr:${primaryAttrKey}`}
+                    currentSort={sortBy}
+                    currentOrder={sortOrder}
+                    onSort={sortColumn}
+                  />
+                ) : (
+                  <Th>关键属性</Th>
+                )}
                 <Th>所属项目</Th>
                 <Th>标签</Th>
-                <Th>环境</Th>
+                <SortableTh label="环境" sortKey="environment" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
                 <Th>容量</Th>
-                <Th>状态</Th>
-                <Th>负责人</Th>
-                <Th>更新时间</Th>
+                <SortableTh label="状态" sortKey="status" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
+                <SortableTh label="负责人" sortKey="owner" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
+                <SortableTh label="更新时间" sortKey="updatedAt" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
                 <Th className="text-right">操作</Th>
               </tr>
             }
@@ -571,11 +634,20 @@ export function ResourcesPage() {
                   </ClickableBadge>
                 </Td>
                 <Td className="max-w-64">
-                  <span className="text-xs text-slate-600">
-                    {(dict.typeColumns(r.type) ?? [])
-                      .map((k) => `${k}=${String(r.attrs[k] ?? '—')}`)
-                      .join(' · ')}
-                  </span>
+                  {(() => {
+                    const keys = dict.typeColumns(r.type) ?? [];
+                    if (keys.length === 0) {
+                      return <span className="text-xs text-slate-400">未设置关键属性</span>;
+                    }
+                    const labels = new Map(dict.attrFields(r.type).map((field) => [field.key, field.label]));
+                    return (
+                      <span className="text-xs text-slate-600">
+                        {keys
+                          .map((key) => `${labels.get(key) ?? key}=${String(r.attrs[key] ?? '—')}`)
+                          .join(' · ')}
+                      </span>
+                    );
+                  })()}
                 </Td>
                 <Td>
                   {r.projectName && r.projectId ? (
@@ -703,7 +775,7 @@ export function ResourcesPage() {
         open={formState.open}
         initial={formState.initial}
         defaultType={formState.type}
-        onClose={() => setFormState((s) => ({ ...s, open: false }))}
+        onClose={() => setFormState({ open: false, initial: null, type: '' })}
         onSaved={() => {
           void queryClient.invalidateQueries({ queryKey: ['resources'] });
           void queryClient.invalidateQueries({ queryKey: ['stats'] });
@@ -787,8 +859,7 @@ export function ResourcesPage() {
       <ImportModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        defaultType={query.type ?? 'BATCH_SCHED_SERVER'}
-        columns={columns}
+        defaultType={query.type ?? ''}
         onDone={() => {
           void queryClient.invalidateQueries({ queryKey: ['resources'] });
           void queryClient.invalidateQueries({ queryKey: ['stats'] });
@@ -803,13 +874,11 @@ function ImportModal({
   open,
   onClose,
   defaultType,
-  columns,
   onDone,
 }: {
   open: boolean;
   onClose: () => void;
   defaultType: string;
-  columns: string[];
   onDone: () => void;
 }) {
   const dict = useDict();
@@ -817,6 +886,7 @@ function ImportModal({
   const [type, setType] = useState<string>(defaultType);
   const [csv, setCsv] = useState('');
   const [onConflict, setOnConflict] = useState<'skip' | 'overwrite'>('skip');
+  const columns = dict.attrFields(type).map((field) => field.key);
 
   useEffect(() => {
     if (open) {
@@ -849,7 +919,7 @@ function ImportModal({
       footer={
         <>
           <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
-          <Button disabled={!csv.trim() || mutation.isPending} onClick={() => mutation.mutate()}>
+          <Button disabled={!type || !csv.trim() || mutation.isPending} onClick={() => mutation.mutate()}>
             {mutation.isPending ? '导入中…' : '开始导入'}
           </Button>
         </>
@@ -858,7 +928,12 @@ function ImportModal({
       <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="资源类型" required>
-            <Select value={type} options={dict.typeOptions({ includeDisabled: false })} onChange={(e) => setType(e.target.value)} />
+            <Select
+              value={type}
+              placeholder="请选择资源类型"
+              options={dict.typeOptions({ includeDisabled: false })}
+              onChange={(e) => setType(e.target.value)}
+            />
           </Field>
           <Field label="重复数据处理">
             <Select

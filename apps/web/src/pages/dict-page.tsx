@@ -475,6 +475,26 @@ export function ResourceTypePanel() {
     enabled: Boolean(refTarget),
   });
 
+  const moveType = useMutation({
+    mutationFn: async ({ code, offset }: { code: string; offset: -1 | 1 }) => {
+      const rows = list.data ?? [];
+      const from = rows.findIndex((item) => item.code === code);
+      const to = from + offset;
+      if (from < 0 || to < 0 || to >= rows.length) return;
+      const current = rows[from]!;
+      const target = rows[to]!;
+      await Promise.all([
+        dictApi.updateType(current.code, { sortOrder: target.sortOrder }),
+        dictApi.updateType(target.code, { sortOrder: current.sortOrder }),
+      ]);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['dict'] });
+      dict.refresh();
+    },
+    onError: (err) => push('error', friendlyMessage(err)),
+  });
+
   const otherTypes = useMemo(
     () => (list.data ?? []).filter((t) => t.code !== deleting?.code),
     [list.data, deleting],
@@ -532,7 +552,7 @@ export function ResourceTypePanel() {
               </tr>
             }
           >
-            {list.data.map((t) => (
+            {list.data.map((t, index) => (
               <tr key={t.code} className="hover:bg-slate-50">
                 <Td className="font-medium">{t.label}</Td>
                 <Td className="font-mono text-xs text-slate-500">{t.code}</Td>
@@ -559,6 +579,28 @@ export function ResourceTypePanel() {
                 </Td>
                 <Td className="text-right">
                   <div className="flex justify-end gap-1">
+                    {canWrite && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="上移"
+                          disabled={index === 0 || moveType.isPending}
+                          onClick={() => moveType.mutate({ code: t.code, offset: -1 })}
+                        >
+                          <ArrowUp size={13} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="下移"
+                          disabled={index === list.data!.length - 1 || moveType.isPending}
+                          onClick={() => moveType.mutate({ code: t.code, offset: 1 })}
+                        >
+                          <ArrowDown size={13} />
+                        </Button>
+                      </>
+                    )}
                     {canWrite && (
                       <Button variant="ghost" size="sm" onClick={() => void openEdit(t.code)}>
                         <Pencil size={13} />
@@ -858,6 +900,26 @@ export function EnvironmentPanel() {
     enabled: Boolean(refTarget),
   });
 
+  const moveEnvironment = useMutation({
+    mutationFn: async ({ code, offset }: { code: string; offset: -1 | 1 }) => {
+      const rows = list.data ?? [];
+      const from = rows.findIndex((item) => item.code === code);
+      const to = from + offset;
+      if (from < 0 || to < 0 || to >= rows.length) return;
+      const current = rows[from]!;
+      const target = rows[to]!;
+      await Promise.all([
+        dictApi.updateEnvironment(current.code, { sortOrder: target.sortOrder }),
+        dictApi.updateEnvironment(target.code, { sortOrder: current.sortOrder }),
+      ]);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['dict'] });
+      dict.refresh();
+    },
+    onError: (err) => push('error', friendlyMessage(err)),
+  });
+
   if (list.isLoading) {
     return (
       <div className="flex h-40 items-center justify-center">
@@ -910,7 +972,7 @@ export function EnvironmentPanel() {
               </tr>
             }
           >
-            {list.data.map((e) => (
+            {list.data.map((e, index) => (
               <tr key={e.code} className="hover:bg-slate-50">
                 <Td className="font-medium">{e.label}</Td>
                 {/* 标识色直接作为编码的底色，不再单独占一列 */}
@@ -936,6 +998,28 @@ export function EnvironmentPanel() {
                 </Td>
                 <Td className="text-right">
                   <div className="flex justify-end gap-1">
+                    {canWrite && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="上移"
+                          disabled={index === 0 || moveEnvironment.isPending}
+                          onClick={() => moveEnvironment.mutate({ code: e.code, offset: -1 })}
+                        >
+                          <ArrowUp size={13} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="下移"
+                          disabled={index === list.data!.length - 1 || moveEnvironment.isPending}
+                          onClick={() => moveEnvironment.mutate({ code: e.code, offset: 1 })}
+                        >
+                          <ArrowDown size={13} />
+                        </Button>
+                      </>
+                    )}
                     {canWrite && (
                       <Button variant="ghost" size="sm" onClick={() => openEdit(e)}>
                         <Pencil size={13} />

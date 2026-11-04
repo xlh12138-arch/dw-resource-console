@@ -203,7 +203,14 @@ export const resourceQuerySchema = z.object({
     .optional(),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(20),
-  sortBy: z.enum(['updatedAt', 'createdAt', 'name', 'code']).default('updatedAt'),
+    /** 公共列或动态属性列（attr:<字段 key>） */
+    sortBy: z
+      .string()
+      .regex(
+        /^(updatedAt|createdAt|name|code|type|environment|status|datacenter|owner|attr:[A-Za-z][A-Za-z0-9_]*)$/,
+        '不支持按该列排序',
+      )
+      .default('updatedAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
@@ -1129,6 +1136,7 @@ export type AttrFieldDef = {
   label: string;
   kind: 'text' | 'textarea' | 'number' | 'select' | 'switch';
   required?: boolean;
+  defaultValue?: string;
   placeholder?: string;
   unit?: string;
   options?: { value: string; label: string }[];
