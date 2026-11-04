@@ -18,6 +18,7 @@ export default defineConfig({
   optimizeDeps: { exclude: ['@dw/shared'] },
   server: {
     port: Number(process.env.WEB_PORT ?? 5173),
+    host: process.env.WEB_HOST ?? undefined,
     // 开发态用同源代理访问后端，避免 CORS 与跨域 Cookie 问题
     proxy: {
       '/api': { target: apiTarget, changeOrigin: true },

@@ -51,6 +51,7 @@ jobs:
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           SMOKE_WEB_BASE: http://127.0.0.1:5173/
+          WEB_HOST: 127.0.0.1
         run: |
           set -euo pipefail
           cleanup() {
