@@ -207,36 +207,58 @@ try {
     button?.click();
     return true;
   `);
-  await waitFor(`return !!document.querySelector('[role="dialog"] select')`, '新增资源弹窗');
+  await waitFor(
+    `return document.querySelectorAll('[role="dialog"] button[data-resource-type]').length > 0;`,
+    '新增资源弹窗',
+  );
   const defaultType = await evaluate(`
     const dialog = document.querySelector('[role="dialog"]');
-    return dialog.querySelector('select')?.value ?? '__missing__';
+    return [...dialog.querySelectorAll('button[data-resource-type]')]
+      .filter((button) => button.getAttribute('aria-checked') === 'true')
+      .map((button) => button.getAttribute('data-resource-type'));
   `);
-  ok(defaultType === '', '新增资源不再默认选中资源类型', defaultType);
-  const selectedType = await evaluate(`
+  ok(defaultType.length === 0, '新增资源不再默认选中资源类型', defaultType);
+  const typeButton = await evaluate(`
     const dialog = document.querySelector('[role="dialog"]');
-    const select = dialog.querySelector('select');
-    const option = [...select.options].find((item) => item.value && !item.disabled);
-    if (!option) return '__missing__';
-    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
-    setter.call(select, option.value);
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    return option.value;
+    const button = dialog.querySelector('button[data-resource-type]');
+    if (!button) return null;
+    const rect = button.getBoundingClientRect();
+    return {
+      type: button.getAttribute('data-resource-type'),
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
   `);
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: typeButton.x, y: typeButton.y });
+  await send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: typeButton.x,
+    y: typeButton.y,
+    button: 'left',
+    clickCount: 1,
+  });
+  await send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: typeButton.x,
+    y: typeButton.y,
+    button: 'left',
+    clickCount: 1,
+  });
   await sleep(300);
   const typeAfterOneSelection = await evaluate(`
     const dialog = document.querySelector('[role="dialog"]');
+    const selected = dialog.querySelector('button[data-resource-type][aria-checked="true"]');
     return {
-      value: dialog.querySelector('select')?.value ?? '__missing__',
+      value: selected?.getAttribute('data-resource-type') ?? '__missing__',
       attrsTitle: [...dialog.querySelectorAll('p')].find((node) => node.innerText.includes('专属属性'))?.innerText ?? '',
     };
   `);
   ok(
-    selectedType !== '__missing__' &&
-      typeAfterOneSelection.value === selectedType &&
+    typeButton?.type !== '__missing__' &&
+      typeAfterOneSelection.value === typeButton?.type &&
       typeAfterOneSelection.attrsTitle.includes('专属属性'),
     '新增资源时资源类型选择一次即可生效',
-    { selectedType, actual: typeAfterOneSelection },
+    { selectedType: typeButton?.type, actual: typeAfterOneSelection },
   );
   await evaluate(`
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));

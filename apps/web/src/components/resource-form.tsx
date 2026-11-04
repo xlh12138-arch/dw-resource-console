@@ -11,7 +11,19 @@ import { useDict } from '../lib/dict';
 import { projectsApi, resourcesApi } from '../lib/endpoints';
 import { fieldIssues, friendlyMessage, type FieldIssue } from '../lib/api';
 import { useToast } from './toast';
-import { Badge, Button, ErrorBanner, Field, Input, Modal, ModalCancelButton, Select, Switch, Textarea } from './ui';
+import {
+  Badge,
+  Button,
+  cn,
+  ErrorBanner,
+  Field,
+  Input,
+  Modal,
+  ModalCancelButton,
+  Select,
+  Switch,
+  Textarea,
+} from './ui';
 
 interface Props {
   open: boolean;
@@ -76,6 +88,14 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState('');
   const [formIssues, setFormIssues] = useState<FieldIssue[]>([]);
+
+  const changeType = (nextType: string) => {
+    setType(nextType);
+    setAttrs({});
+    // 类型变了，原来的父资源不再同类型，清空避免挂错层级
+    setParentId('');
+    setDemandAmount('');
+  };
 
   // 字段定义来自资源类型字典，新增/改名后自动生效
   const fields = dict.attrFields(type) as AttrFieldDef[];
@@ -261,22 +281,58 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
         {formError && <ErrorBanner message={formError} issues={formIssues} />}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="资源类型" required error={errors['type']}>
-            <Select
-              value={type}
-              disabled={isEdit}
-              placeholder="请选择资源类型"
-              // 编辑时保留停用类型，避免存量数据的类型显示为空白
-              options={dict.typeOptions({ includeDisabled: isEdit })}
-              onChange={(e) => {
-                setType(e.target.value);
-                setAttrs({});
-                // 类型变了，原来的父资源不再同类型，清空避免挂错层级
-                setParentId('');
-                setDemandAmount('');
-              }}
-            />
-          </Field>
+          {isEdit ? (
+            <Field label="资源类型" required error={errors['type']}>
+              <Select
+                value={type}
+                disabled
+                // 编辑时保留停用类型，避免存量数据的类型显示为空白
+                options={dict.typeOptions({ includeDisabled: true })}
+              />
+            </Field>
+          ) : (
+            <div className="space-y-1.5 sm:col-span-2">
+              <span className="text-xs font-medium text-slate-700">
+                资源类型<span className="ml-0.5 text-rose-500">*</span>
+              </span>
+              <div
+                className="grid gap-2 sm:grid-cols-2"
+                role="radiogroup"
+                aria-label="资源类型"
+                aria-invalid={Boolean(errors['type'])}
+              >
+                {dict
+                  .typeOptions()
+                  .filter((option) => !option.disabled)
+                  .map((option) => {
+                    const selected = type === String(option.value);
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        data-resource-type={option.value}
+                        onClick={() => changeType(String(option.value))}
+                        className={cn(
+                          'rounded-lg border px-3 py-2 text-left transition-colors',
+                          selected
+                            ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-100'
+                            : 'border-slate-300 bg-white hover:border-brand-300 hover:bg-brand-50/50',
+                        )}
+                      >
+                        <span className={cn('block text-sm font-medium', selected ? 'text-brand-800' : 'text-slate-800')}>
+                          {option.label}
+                        </span>
+                        <span className="mt-0.5 block font-mono text-[11px] text-slate-400">{option.value}</span>
+                      </button>
+                    );
+                  })}
+              </div>
+              {type ? null : <span className="block text-xs text-slate-400">请选择一种资源类型</span>}
+              {errors['type'] && <span className="block text-xs text-rose-600">{errors['type']}</span>}
+            </div>
+          )}
           <Field label="资源名称" required error={errors['name']}>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="如：调度主节点-01" />
           </Field>
