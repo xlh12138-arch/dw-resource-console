@@ -471,7 +471,16 @@ export const importResultSchema = z.object({
   created: z.number().int(),
   updated: z.number().int(),
   skipped: z.number().int(),
-  errors: z.array(z.object({ row: z.number().int(), message: z.string() })),
+  errors: z.array(
+    z.object({
+      row: z.number().int(),
+      message: z.string(),
+      /** 出问题的具体字段（供 Excel 导入逐列提示）；无法定位到字段时为空数组 */
+      fields: z
+        .array(z.object({ field: z.string(), label: z.string(), message: z.string() }))
+        .default([]),
+    }),
+  ),
 });
 
 /* ------------------------------------------------------------------ *

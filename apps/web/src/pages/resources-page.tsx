@@ -1,9 +1,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertCircle,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
   Download,
+  FileSpreadsheet,
   FolderTree,
   Link2,
   Pencil,
@@ -14,7 +17,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import {
   RESOURCE_STATUSES,
@@ -24,6 +27,15 @@ import {
   type ResourceStatus,
 } from '@dw/shared';
 import { useDict } from '../lib/dict';
+import {
+  buildImportColumns,
+  columnLetter,
+  downloadImportTemplate,
+  importRowsToCsv,
+  parseImportFile,
+  type ImportIssue,
+  type ParsedImport,
+} from '../lib/import-template';
 import { projectsApi, resourcesApi, type ResourceQuery } from '../lib/endpoints';
 import { friendlyMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -875,6 +887,10 @@ export function ResourcesPage() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         defaultType={query.type ?? ''}
+        onChanged={() => {
+          void queryClient.invalidateQueries({ queryKey: ['resources'] });
+          void queryClient.invalidateQueries({ queryKey: ['stats'] });
+        }}
         onDone={() => {
           void queryClient.invalidateQueries({ queryKey: ['resources'] });
           void queryClient.invalidateQueries({ queryKey: ['stats'] });
@@ -885,62 +901,253 @@ export function ResourcesPage() {
   );
 }
 
+/** 字段级问题清单：定位到 Excel 行号 / 列标 / 字段名 */
+function ImportIssueList({ issues }: { issues: ImportIssue[] }) {
+  if (issues.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <p className="flex items-center gap-1.5 text-xs font-medium text-rose-700">
+        <AlertCircle size={14} />
+        发现 {issues.length} 处字段问题，请修正 Excel 后重新上传
+      </p>
+      <div className="max-h-52 overflow-y-auto rounded-lg border border-rose-200 bg-rose-50">
+        <table className="w-full table-fixed text-left text-xs">
+          <thead className="sticky top-0 bg-rose-100 text-rose-800">
+            <tr>
+              <th className="w-12 px-3 py-1.5 font-medium">行</th>
+              <th className="w-12 font-medium">列</th>
+              <th className="w-40 font-medium">字段</th>
+              <th className="font-medium">问题</th>
+            </tr>
+          </thead>
+          <tbody>
+            {issues.slice(0, 200).map((issue, i) => (
+              <tr key={`${issue.row}-${issue.field}-${i}`} className="border-t border-rose-100 text-rose-700">
+                <td className="px-3 py-1.5 font-mono">{issue.row}</td>
+                <td className="font-mono">{issue.column || '—'}</td>
+                <td className="truncate" title={`${issue.label}（${issue.field}）`}>
+                  {issue.label ? `${issue.label}（${issue.field}）` : issue.field || '整行'}
+                </td>
+                <td className="py-1.5 pr-3">{issue.message}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {issues.length > 200 && (
+          <p className="border-t border-rose-100 px-3 py-1.5 text-xs text-rose-600">
+            …另有 {issues.length - 200} 处问题未展示
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ImportModal({
   open,
   onClose,
   defaultType,
+  onChanged,
   onDone,
 }: {
   open: boolean;
   onClose: () => void;
   defaultType: string;
+  /** 部分行导入成功时刷新列表，但不关闭弹窗 */
+  onChanged: () => void;
   onDone: () => void;
 }) {
   const dict = useDict();
   const { push } = useToast();
+  const [mode, setMode] = useState<'excel' | 'csv'>('excel');
   const [type, setType] = useState<string>(defaultType);
   const [csv, setCsv] = useState('');
   const [onConflict, setOnConflict] = useState<'skip' | 'overwrite'>('skip');
-  const columns = dict.attrFields(type).map((field) => field.key);
+  const [parsed, setParsed] = useState<ParsedImport | null>(null);
+  const [serverIssues, setServerIssues] = useState<ImportIssue[]>([]);
+  const [serverSummary, setServerSummary] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'template' | 'parse' | null>(null);
+  const [localError, setLocalError] = useState('');
+
+  const columns = useMemo(() => buildImportColumns(type, dict), [type, dict]);
+  const requiredColumns = columns.filter((c) => c.required);
+  const optionalColumns = columns.filter((c) => !c.required);
+
+  const resetParsed = () => {
+    setParsed(null);
+    setServerIssues([]);
+    setServerSummary(null);
+    setLocalError('');
+  };
 
   useEffect(() => {
     if (open) {
       setType(defaultType);
       setCsv('');
+      setMode('excel');
+      setOnConflict('skip');
+      resetParsed();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultType]);
 
+  // 资源类型变了，模板列与必填规则也变了，旧的解析结果必须作废
+  useEffect(() => {
+    resetParsed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type]);
+
   const mutation = useMutation({
-    mutationFn: () => resourcesApi.importCsv({ type, csv, onConflict }),
+    mutationFn: (payload: { type: string; csv: string; onConflict: 'skip' | 'overwrite' }) =>
+      resourcesApi.importCsv(payload),
     onSuccess: (result) => {
-      push(
-        result.errors.length ? 'info' : 'success',
-        `导入完成：新增 ${result.created} 条，更新 ${result.updated} 条，跳过 ${result.skipped} 条，失败 ${result.errors.length} 条`,
-      );
-      onDone();
+      const issues: ImportIssue[] = result.errors.flatMap((error) => {
+        const row =
+          mode === 'excel' && parsed ? (parsed.rowNumbers[error.row - 2] ?? error.row) : error.row;
+        if (error.fields.length === 0) {
+          return [{ row, column: '', field: '', label: '', message: error.message }];
+        }
+        return error.fields.map((field) => {
+          const index = mode === 'excel' ? (parsed?.headers.indexOf(field.field) ?? -1) : -1;
+          return {
+            row,
+            column: index >= 0 ? columnLetter(index) : '',
+            field: field.field,
+            label: field.label,
+            message: field.message,
+          };
+        });
+      });
+
+      if (result.errors.length > 0) {
+        setServerIssues(issues);
+        setServerSummary(
+          `本轮：新增 ${result.created} 条，更新 ${result.updated} 条，跳过 ${result.skipped} 条，失败 ${result.errors.length} 行。请按下方提示修正后重新上传。`,
+        );
+        push('info', `有 ${result.errors.length} 行未通过校验，请查看字段级提示`);
+        onChanged();
+      } else {
+        push(
+          'success',
+          `导入完成：新增 ${result.created} 条，更新 ${result.updated} 条，跳过 ${result.skipped} 条`,
+        );
+        onDone();
+      }
     },
     onError: (err) => push('error', friendlyMessage(err)),
   });
 
-  const sample = ['name,environment,status,owner,' + columns.join(','), '示例资源,PROD,IN_USE,张三,'].join('\n');
+  const downloadTemplate = async () => {
+    if (!type) {
+      push('error', '请先选择资源类型');
+      return;
+    }
+    setBusy('template');
+    try {
+      await downloadImportTemplate(type, dict.typeLabel(type), columns);
+      push(
+        'success',
+        `已下载「${dict.typeLabel(type)}」导入模板：${requiredColumns.length} 个必填列、${optionalColumns.length} 个选填列`,
+      );
+    } catch (err) {
+      push('error', `模板下载失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // 允许连续上传同一个文件
+    event.target.value = '';
+    if (!file) return;
+    resetParsed();
+    if (!/\.xlsx$/i.test(file.name)) {
+      setLocalError('请上传 .xlsx 文件；如果是 .xls，请先在 Excel 中另存为 .xlsx');
+      return;
+    }
+    if (!type) {
+      setLocalError('请先选择资源类型再上传文件');
+      return;
+    }
+    setBusy('parse');
+    try {
+      const result = await parseImportFile(file, columns);
+      setParsed(result);
+      if (result.rows.length === 0) setLocalError('没有读到数据行，请从表头下方一行开始填写');
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const csvPayload =
+    mode === 'excel'
+      ? parsed && parsed.issues.length === 0
+        ? importRowsToCsv(parsed.rows, columns)
+        : ''
+      : csv;
+  const blockedByIssues = mode === 'excel' && (parsed?.issues.length ?? 0) > 0;
+  const canImport =
+    Boolean(type) &&
+    Boolean(csvPayload.trim()) &&
+    !blockedByIssues &&
+    !mutation.isPending &&
+    busy === null;
+
+  const doImport = () => {
+    if (!canImport) return;
+    setServerIssues([]);
+    setServerSummary(null);
+    mutation.mutate({ type, csv: csvPayload, onConflict });
+  };
+
+  const sample = [
+    'name,environment,status,owner,' + columns.filter((c) => c.group === 'attr').map((c) => c.key).join(','),
+    '示例资源,PROD,IN_USE,张三,',
+  ].join('\n');
 
   return (
     <Modal
       open={open}
       title="批量导入资源"
-      desc="粘贴 CSV 文本，首行为表头；按「名称 + 环境」判定重复"
+      desc="选择资源类型 → 下载标注了必填/选填的 Excel 模板 → 填写后上传校验导入"
+      width="max-w-3xl"
       onClose={onClose}
-      onSave={() => mutation.mutate()}
+      onSave={doImport}
       footer={
         <>
           <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
-          <Button disabled={!type || !csv.trim() || mutation.isPending} onClick={() => mutation.mutate()}>
-            {mutation.isPending ? '导入中…' : '开始导入'}
+          <Button disabled={!canImport} onClick={doImport}>
+            <Upload size={14} />
+            {mutation.isPending ? '导入中…' : mode === 'excel' ? '校验并导入' : '开始导入'}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
+        <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+          <button
+            type="button"
+            className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              mode === 'excel' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+            onClick={() => setMode('excel')}
+          >
+            Excel 模板导入
+          </button>
+          <button
+            type="button"
+            className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              mode === 'csv' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+            onClick={() => setMode('csv')}
+          >
+            粘贴 CSV（原有方式）
+          </button>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="资源类型" required>
             <Select
@@ -961,14 +1168,114 @@ function ImportModal({
             />
           </Field>
         </div>
-        <Field label="CSV 内容" required hint={`公共列：name,environment,status,datacenter,owner,tags,remark；类型专属列：${columns.join(', ')}`}>
-          <Textarea
-            className="min-h-40 font-mono text-xs"
-            value={csv}
-            onChange={(e) => setCsv(e.target.value)}
-            placeholder={sample}
-          />
-        </Field>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="font-medium text-slate-700">
+              {type ? `「${dict.typeLabel(type)}」模板列` : '请先选择资源类型'}
+            </span>
+            <span className="text-slate-500">
+              共 {columns.length} 列 · 必填 {requiredColumns.length} · 选填 {optionalColumns.length}
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {columns.map((c) => (
+              <span
+                key={c.key}
+                className={`rounded px-1.5 py-0.5 text-[11px] ${
+                  c.required
+                    ? 'bg-rose-100 font-medium text-rose-700'
+                    : 'bg-white text-slate-600 ring-1 ring-slate-200'
+                }`}
+                title={`${c.key}${c.options?.length ? `｜允许值：${c.options.map((o) => o.value).join(' / ')}` : ''}`}
+              >
+                {c.required ? '*' : ''}
+                {c.label}
+              </span>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+            红色带 * 为必填，其余为选填；列与必填规则取自该资源类型的字典属性定义，字典改了模板会同步变化。
+          </p>
+        </div>
+
+        {mode === 'excel' ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2.5">
+              <div>
+                <p className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                  <FileSpreadsheet size={14} className="text-brand-600" />
+                  第 1 步 · 下载 Excel 模板
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  含「资源数据」与「填写说明」两个工作表，必填标红、下拉列已内置可选值
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!type || busy === 'template'}
+                onClick={() => void downloadTemplate()}
+              >
+                <Download size={14} />
+                {busy === 'template' ? '生成中…' : '下载模板'}
+              </Button>
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-slate-200 px-3 py-2.5">
+              <div>
+                <p className="text-xs font-medium text-slate-700">第 2 步 · 填写后上传 .xlsx 文件</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  上传后会先逐行逐列校验；有问题会列出行号、列标和字段，全部通过后才写入数据库
+                </p>
+              </div>
+              <input
+                type="file"
+                accept=".xlsx"
+                onChange={(e) => void onFile(e)}
+                className="block w-full cursor-pointer text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+              />
+              {busy === 'parse' && <p className="text-xs text-slate-500">正在解析并校验 Excel…</p>}
+              {parsed && (
+                <p className="flex items-center gap-1.5 text-xs text-emerald-700">
+                  <CheckCircle2 size={14} />
+                  已解析「{parsed.fileName}」：{parsed.rows.length} 行数据、{parsed.headers.length} 列
+                  {parsed.issues.length === 0 && parsed.rows.length > 0 ? '，校验通过，可以导入' : ''}
+                </p>
+              )}
+              {parsed && parsed.unknownColumns.length > 0 && (
+                <p className="text-[11px] text-amber-700">
+                  以下列未识别，导入时会被忽略：{parsed.unknownColumns.join('、')}
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <Field
+            label="CSV 内容"
+            required
+            hint={`公共列：name,environment,status,datacenter,owner,tags,remark；类型专属列：${columns
+              .filter((c) => c.group === 'attr')
+              .map((c) => c.key)
+              .join(', ')}`}
+          >
+            <Textarea
+              className="min-h-40 font-mono text-xs"
+              value={csv}
+              onChange={(e) => setCsv(e.target.value)}
+              placeholder={sample}
+            />
+          </Field>
+        )}
+
+        {localError && <ErrorBanner message={localError} />}
+        {serverSummary && <ErrorBanner message={serverSummary} />}
+        <ImportIssueList issues={mode === 'excel' ? [...(parsed?.issues ?? []), ...serverIssues] : serverIssues} />
+        {blockedByIssues && (
+          <p className="text-[11px] text-slate-500">
+            修正 Excel 后重新上传即可再次校验；为避免产生半批数据，存在字段问题时不会提交导入。
+          </p>
+        )}
       </div>
     </Modal>
   );

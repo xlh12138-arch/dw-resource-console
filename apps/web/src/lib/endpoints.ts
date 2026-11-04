@@ -85,10 +85,18 @@ export const resourcesApi = {
     ),
   exportCsv: (query: ResourceQuery) => api.text(`/resources/export${toQuery(query)}`),
   importCsv: (body: { type: string; csv: string; onConflict: 'skip' | 'overwrite' }) =>
-    api.post<{ total: number; created: number; updated: number; skipped: number; errors: { row: number; message: string }[] }>(
-      '/resources/import',
-      body,
-    ),
+    api.post<{
+      total: number;
+      created: number;
+      updated: number;
+      skipped: number;
+      errors: {
+        row: number;
+        message: string;
+        /** 出问题字段；空数组表示无法定位到具体列 */
+        fields: { field: string; label: string; message: string }[];
+      }[];
+    }>('/resources/import', body),
   audit: (id: number) =>
     api.get<{ action: string; actorName: string; createdAt: string; changes: unknown }[]>(`/resources/${id}/audit`),
   /** 子资源清单 */

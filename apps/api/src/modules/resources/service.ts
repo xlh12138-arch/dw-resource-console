@@ -8,7 +8,7 @@ import type {
   ResourceTimeline,
 } from '@dw/shared';
 import { peakOf, peakWithin, type CapacitySegment } from '../../lib/capacity.js';
-import { conflict, notFound, validationError } from '../../lib/errors.js';
+import { AppError, conflict, notFound, validationError } from '../../lib/errors.js';
 import { notStartedOf, overdueDaysOf, occupancyStateOf, overlapRange } from '../../lib/occupancy.js';
 import { auditRepository, type AuditChange } from '../audit/repository.js';
 import {
@@ -19,7 +19,7 @@ import {
 } from '../projects/repository.js';
 import { environmentRepository } from '../dict/repository.js';
 import { dictGuard, environmentLabelOf } from '../dict/service.js';
-import { getTypeMeta, normalizeAttrs, type RuntimeField } from '../dict/validator.js';
+import { getTypeMeta, normalizeAttrs, type RuntimeField, type TypeMeta } from '../dict/validator.js';
 import { parseCsv, toCsv } from './csv.js';
 import { withTransaction } from '../../db/index.js';
 import {
@@ -1154,7 +1154,17 @@ export const resourceService = {
     const { header, rows } = parseCsv(input.csv);
     const typeMeta = await dictGuard.assertType(input.type);
     const defaultEnv = await defaultEnvironmentCode();
-    const result = { total: rows.length, created: 0, updated: 0, skipped: 0, errors: [] as { row: number; message: string }[] };
+    const result = {
+      total: rows.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [] as {
+        row: number;
+        message: string;
+        fields: { field: string; label: string; message: string }[];
+      }[],
+    };
     if (header.length === 0) throw validationError('CSV 缺少表头');
 
     for (let i = 0; i < rows.length; i += 1) {
@@ -1207,7 +1217,11 @@ export const resourceService = {
         if (outcome === 'updated') result.updated += 1;
         if (outcome === 'created') result.created += 1;
       } catch (err) {
-        result.errors.push({ row: lineNo, message: err instanceof Error ? err.message : String(err) });
+        result.errors.push({
+          row: lineNo,
+          message: err instanceof Error ? err.message : String(err),
+          fields: importErrorFields(err, typeMeta),
+        });
       }
     }
     return result;
@@ -1305,6 +1319,60 @@ export const resourceService = {
     return { updated: targetIds.length, ids: targetIds };
   },
 };
+
+const COMMON_FIELD_LABELS: Record<string, string> = {
+  name: '资源名称',
+  environment: '环境',
+  status: '状态',
+  datacenter: '机房/可用区',
+  owner: '负责人',
+  tags: '标签',
+  remark: '备注',
+};
+
+/**
+ * 从业务错误里提取「具体是哪个字段有问题」。
+ * - 属性校验错误：details 为 [{ field: 'attrs.xxx', message }]
+ * - IP 占用等冲突：details 为 { field, ... }
+ * - 数据库等无法定位到字段的错误：返回空数组，前端只展示行级信息
+ */
+function friendlyImportMessage(message: string): string {
+  if (/received undefined|Invalid input: expected/i.test(message)) return '必填项不能为空';
+  if (/^Invalid input$/i.test(message)) return '格式不正确';
+  if (/Too small|too_small/i.test(message)) return '数值超出允许范围';
+  if (/Too big|too_big/i.test(message)) return '数值超出允许范围';
+  return message;
+}
+
+function importErrorFields(
+  err: unknown,
+  typeMeta: TypeMeta,
+): { field: string; label: string; message: string }[] {
+  if (!(err instanceof AppError)) return [];
+  const details = err.details;
+  const items = Array.isArray(details)
+    ? details
+    : details && typeof details === 'object'
+      ? [details]
+      : [];
+  const fields: { field: string; label: string; message: string }[] = [];
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+    const raw = item as Record<string, unknown>;
+    const field = String(raw.field ?? '').replace(/^attrs\./, '');
+    if (!field) continue;
+    const label =
+      COMMON_FIELD_LABELS[field] ??
+      typeMeta.fields.find((f) => f.key === field)?.label ??
+      field;
+    fields.push({
+      field,
+      label,
+      message: friendlyImportMessage(String(raw.message ?? err.message)),
+    });
+  }
+  return fields;
+}
 
 /** 依据字段定义把 CSV 里的字符串转成数字 / 布尔 */
 function coerce(fields: RuntimeField[], key: string, value: string): unknown {
