@@ -55,6 +55,7 @@ const chrome = spawn(
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-extensions',
+    ...(process.platform === 'linux' ? ['--no-sandbox', '--disable-dev-shm-usage'] : []),
     '--window-size=1440,900',
     'about:blank',
   ],

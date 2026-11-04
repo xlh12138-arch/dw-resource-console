@@ -45,6 +45,8 @@ jobs:
       - run: npm run test:transaction
       - uses: browser-actions/setup-chrome@v1
         id: setup-chrome
+        with:
+          install-dependencies: true
       - name: Run SQLite integration tests
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
