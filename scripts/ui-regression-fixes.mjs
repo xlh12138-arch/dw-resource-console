@@ -213,11 +213,24 @@ try {
   );
   const defaultType = await evaluate(`
     const dialog = document.querySelector('[role="dialog"]');
-    return [...dialog.querySelectorAll('button[data-resource-type]')]
-      .filter((button) => button.getAttribute('aria-checked') === 'true')
-      .map((button) => button.getAttribute('data-resource-type'));
+    return dialog.querySelector('[data-selected-resource-type]')?.getAttribute('data-selected-resource-type') ?? '';
   `);
-  ok(defaultType.length === 0, '新增资源不再默认选中资源类型', defaultType);
+  ok(defaultType === '', '新增资源不再默认选中资源类型', defaultType);
+  const typeListLayout = await evaluate(`
+    const list = document.querySelector('[role="dialog"] [role="listbox"]');
+    return {
+      clientHeight: list?.clientHeight ?? 0,
+      scrollHeight: list?.scrollHeight ?? 0,
+      overflowY: list ? getComputedStyle(list).overflowY : '',
+    };
+  `);
+  ok(
+    typeListLayout.scrollHeight > typeListLayout.clientHeight &&
+      typeListLayout.clientHeight <= 208 &&
+      typeListLayout.overflowY === 'auto',
+    '资源类型列表限制高度并在内部滚动',
+    typeListLayout,
+  );
   const typeButton = await evaluate(`
     const dialog = document.querySelector('[role="dialog"]');
     const button = dialog.querySelector('button[data-resource-type]');
@@ -247,9 +260,9 @@ try {
   await sleep(300);
   const typeAfterOneSelection = await evaluate(`
     const dialog = document.querySelector('[role="dialog"]');
-    const selected = dialog.querySelector('button[data-resource-type][aria-checked="true"]');
+    const selected = dialog.querySelector('[data-selected-resource-type]');
     return {
-      value: selected?.getAttribute('data-resource-type') ?? '__missing__',
+      value: selected?.getAttribute('data-selected-resource-type') ?? '__missing__',
       attrsTitle: [...dialog.querySelectorAll('p')].find((node) => node.innerText.includes('专属属性'))?.innerText ?? '',
     };
   `);
