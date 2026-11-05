@@ -8,7 +8,6 @@ import {
   LogOut,
   Server,
   Settings2,
-  ShieldCheck,
   Users,
 } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
@@ -81,10 +80,7 @@ export function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <ShieldCheck size={15} className="text-brand-600" />
-            批量调度 / 采集交换 / NAS / GDS 资源统一管理 · 按项目组织多套环境
-          </div>
+          <div />
           <div className="flex items-center gap-3">
             <Badge tone="blue">{ROLE_LABELS[(user?.role ?? 'USER') as Role]}</Badge>
             <Button

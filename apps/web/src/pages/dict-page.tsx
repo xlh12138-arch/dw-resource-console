@@ -1254,9 +1254,6 @@ export function DictPage() {
             <Settings2 size={18} className="text-brand-600" />
             字典配置
           </h1>
-          <p className="text-xs text-slate-500">
-            资源类型与环境均可在页面维护；修改已被引用的字典项时会提示引用明细，并支持一键同步
-          </p>
         </div>
         <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
           <button

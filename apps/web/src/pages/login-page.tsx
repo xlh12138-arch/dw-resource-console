@@ -41,7 +41,6 @@ export function LoginPage() {
             <Database size={20} />
           </div>
           <h1 className="text-lg font-semibold text-slate-900">数据仓库资源管理平台</h1>
-          <p className="text-xs text-slate-500">批量调度 · 采集交换 · NAS · GDS 统一台账</p>
         </div>
 
         <Card className="p-6">

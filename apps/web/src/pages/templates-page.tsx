@@ -77,9 +77,6 @@ export function TemplatesPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">项目环境模板</h1>
-          <p className="text-xs text-slate-500">
-            自由组合批量调度服务器 / 平台IP / NAS / GDS 等资源类型，新建项目环境时可一键套用
-          </p>
         </div>
         {canWrite && (
           <Button onClick={() => setForm({ open: true, initial: null })}>

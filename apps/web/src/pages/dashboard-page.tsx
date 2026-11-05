@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Boxes, Clock, FolderTree, HardDrive, RefreshCcw, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Boxes, Clock, FolderTree, RefreshCcw, TrendingUp } from 'lucide-react';
 import { RESOURCE_STATUS_LABELS, type ResourceStatus } from '@dw/shared';
 import { useNavigate } from 'react-router';
 import { useDict } from '../lib/dict';
@@ -28,7 +28,7 @@ function StatCard({
   hint?: string;
 }) {
   const body = (
-    <Card className={`p-5 ${onClick ? 'transition-colors hover:border-brand-300' : ''}`}>
+    <Card className={`h-full p-5 ${onClick ? 'transition-colors hover:border-brand-300' : ''}`}>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs text-slate-500">{title}</p>
@@ -45,7 +45,11 @@ function StatCard({
   );
   if (!onClick) return body;
   return (
-    <button type="button" onClick={onClick} className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
+    <button
+      type="button"
+      onClick={onClick}
+      className="h-full w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+    >
       {body}
     </button>
   );
@@ -115,7 +119,6 @@ export function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">资源概览</h1>
-          <p className="text-xs text-slate-500">数据仓库基础设施台账总览 · 最近 7 天新增 {data.createdLast7Days} 条</p>
           {data.ipConflict.count > 0 ? (
             <p className="mt-1 inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-0.5 text-[11px] text-rose-600">
               <AlertTriangle size={11} />
@@ -133,7 +136,7 @@ export function DashboardPage() {
         </button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <StatCard
           title="资源总数"
           value={data.total}
@@ -163,16 +166,6 @@ export function DashboardPage() {
             navigate(first?.projectId ? `/projects/${first.projectId}` : '/projects');
           }}
           hint={data.slotPeriod.expiredCount ? '查看超期明细 →' : undefined}
-        />
-        <StatCard
-          title="NAS 容量使用率"
-          value={data.nasCapacity.usageRate}
-          unit="%"
-          desc={`${Math.round(data.nasCapacity.usedGb)} / ${Math.round(data.nasCapacity.capacityGb)} GB（${data.nasCapacity.count} 套）`}
-          icon={<HardDrive size={17} className="text-violet-600" />}
-          tone="bg-violet-50"
-          onClick={() => navigate('/resources?type=NAS')}
-          hint="查看 NAS 资源 →"
         />
       </div>
 

@@ -308,9 +308,6 @@ export function ResourcesPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">资源台账</h1>
-          <p className="text-xs text-slate-500">
-            批量调度服务器 / 调度平台IP / 采集交换平台IP / NAS / GDS 服务器
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button

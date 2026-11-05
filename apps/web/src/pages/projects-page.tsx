@@ -71,7 +71,6 @@ export function ProjectsPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">需求项目</h1>
-          <p className="text-xs text-slate-500">按需求项目组织多套环境（DEV / UAT / PROD），资源可归属到项目</p>
         </div>
         {canWrite && (
           <Button onClick={() => setForm({ open: true, initial: null })}>
