@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FIELD_TYPES, FIELD_TYPE_LABELS, type DictReferences, type EnvironmentDto, type ResourceTypeDetail } from '@dw/shared';
+import {
+  FIELD_TYPES,
+  FIELD_TYPE_LABELS,
+  type DictReferences,
+  type EnvironmentDto,
+  type ResourceTypeDetail,
+  type ResourceTypeDto,
+} from '@dw/shared';
 import {
   AlertTriangle,
   ArrowDown,
@@ -305,6 +312,7 @@ export function ResourceTypePanel() {
   const [conflict, setConflict] = useState<ConflictState | null>(null);
   const [refTarget, setRefTarget] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<ResourceTypeDetail | null>(null);
+  const [syncingCodes, setSyncingCodes] = useState<ResourceTypeDto | null>(null);
   const [migrateTo, setMigrateTo] = useState('');
   const [pendingSync, setPendingSync] = useState<{ code: string; count: number } | null>(null);
 
@@ -412,7 +420,14 @@ export function ResourceTypePanel() {
         : dictApi.createType(payload as Parameters<typeof dictApi.createType>[0]);
     },
     onSuccess: (res) => {
-      push('success', editing ? '资源类型已更新' : '资源类型已创建');
+      push(
+        'success',
+        editing
+          ? res.resourceCodeSynced > 0
+            ? `资源类型已更新，并同步修改 ${res.resourceCodeSynced} 个资源编码`
+            : '资源类型已更新'
+          : '资源类型已创建',
+      );
       setOpen(false);
       if (res.pendingAttrSync > 0) {
         setPendingSync({ code: res.detail.code, count: res.pendingAttrSync });
@@ -457,6 +472,24 @@ export function ResourceTypePanel() {
       }
       push('error', friendlyMessage(err));
     },
+  });
+
+  const syncResourceCodes = useMutation({
+    mutationFn: (type: ResourceTypeDto) => dictApi.syncTypeResourceCodes(type.code),
+    onSuccess: (result) => {
+      push(
+        result.updated > 0 ? 'success' : 'info',
+        result.updated > 0
+          ? `已将 ${result.updated} 个历史资源编码同步为 ${result.prefix} 前缀`
+          : '没有需要同步的自动编码',
+      );
+      setSyncingCodes(null);
+      void queryClient.invalidateQueries({ queryKey: ['resources'] });
+      void queryClient.invalidateQueries({ queryKey: ['stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['dict'] });
+      dict.refresh();
+    },
+    onError: (err) => push('error', friendlyMessage(err)),
   });
 
   const syncAttrs = useMutation({
@@ -602,6 +635,17 @@ export function ResourceTypePanel() {
                       </>
                     )}
                     {canWrite && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title={`同步历史资源编码到 ${t.prefix} 前缀`}
+                        aria-label={`同步 ${t.label} 的历史资源编码`}
+                        onClick={() => setSyncingCodes(t)}
+                      >
+                        <RefreshCw size={13} className="text-brand-600" />
+                      </Button>
+                    )}
+                    {canWrite && (
                       <Button variant="ghost" size="sm" onClick={() => void openEdit(t.code)}>
                         <Pencil size={13} />
                       </Button>
@@ -655,7 +699,11 @@ export function ResourceTypePanel() {
             <Field label="类型名称" required>
               <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="GDS 服务器" />
             </Field>
-            <Field label="资源编码前缀" required hint="用于自动生成 GDS-0001">
+            <Field
+              label="资源编码前缀"
+              required
+              hint="用于自动生成 GDS-0001；修改后会同步更新该类型已有资源编码"
+            >
               <Input value={form.prefix} onChange={(e) => setForm({ ...form, prefix: e.target.value })} placeholder="GDS" />
             </Field>
             <Field label="排序">
@@ -686,6 +734,39 @@ export function ResourceTypePanel() {
             listColumns={form.listColumns}
             onListColumnsChange={(listColumns) => setForm({ ...form, listColumns })}
           />
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(syncingCodes)}
+        width="max-w-lg"
+        title="同步历史资源编码"
+        desc="用于修复修改前缀前已生成的历史自动编码"
+        onClose={() => setSyncingCodes(null)}
+        footer={
+          <>
+            <ModalCancelButton onClick={() => setSyncingCodes(null)}>取消</ModalCancelButton>
+            <Button
+              disabled={!syncingCodes || syncResourceCodes.isPending}
+              onClick={() => syncingCodes && syncResourceCodes.mutate(syncingCodes)}
+            >
+              <RefreshCw size={14} />
+              {syncResourceCodes.isPending ? '同步中…' : '开始同步'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3 text-sm text-slate-700">
+          <p>
+            资源类型 <span className="font-medium">{syncingCodes?.label}</span> 的当前编码前缀为{' '}
+            <span className="font-mono font-medium">{syncingCodes?.prefix}</span>。
+          </p>
+          <p className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs text-brand-800">
+            系统会把该类型下所有形如 <span className="font-mono">XXX-0001</span> 或{' '}
+            <span className="font-mono">XXX_0001</span> 的自动编码统一改为当前前缀，保留分隔符和序号。
+            不匹配该格式的自定义编码不会被修改。
+          </p>
+          <p className="text-xs text-slate-500">同步操作会更新资源更新时间并写入审计日志。</p>
         </div>
       </Modal>
 

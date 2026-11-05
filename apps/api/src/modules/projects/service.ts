@@ -1276,7 +1276,18 @@ export const projectEnvService = {
     if (!env) throw notFound(`项目环境 ${envId} 不存在`);
     const slot = await slotRepository.findById(slotId);
     if (!slot || slot.environmentId !== envId) throw notFound(`槽位 ${slotId} 不存在`);
+    const resource = slot.resourceId ? await resourceRepository.findById(slot.resourceId) : null;
     await slotRepository.remove(slotId);
+
+    // 删除已分配槽位等同解除占用：若该资源仅因本项目槽位被自动归属到项目，则一并撤销归属
+    if (resource && resource.projectId === env.projectId) {
+      const envIds = (await projectEnvRepository.listByProject(env.projectId)).map((e) => e.id);
+      const refs = await slotRepository.resourceIdsByEnvs(envIds);
+      if (!refs.includes(resource.id)) {
+        await resourceProjectRepository.setProject([resource.id], null, null);
+      }
+    }
+
     await auditRepository.record({
       actorId: actor.id,
       actorName: actor.username,
@@ -1284,7 +1295,19 @@ export const projectEnvService = {
       targetType: 'ENVIRONMENT',
       targetId: String(envId),
       targetName: env.name,
-      changes: [{ field: `slot.${slotId}`, label: `删除槽位「${slot.slotRole}」`, from: slot.slotRole, to: null }],
+      changes: [
+        {
+          field: `slot.${slotId}`,
+          label: `删除槽位「${slot.slotRole}」`,
+          from: {
+            slotRole: slot.slotRole,
+            resourceCode: resource?.code ?? null,
+            resourceName: resource?.name ?? null,
+            demandAmount: slot.demandAmount ?? null,
+          },
+          to: null,
+        },
+      ],
       requestId,
     });
     return buildEnvDetail(env);

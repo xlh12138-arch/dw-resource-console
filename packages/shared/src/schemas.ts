@@ -149,7 +149,13 @@ const baseResourceShape = {
 /** 子资源：挂到父资源下，并向父资源申请一段容量（父资源必须设置了容量） */
 const parentRefShape = {
   parentId: z.coerce.number().int().positive().nullable().optional().describe('父资源'),
-  demandAmount: z.coerce.number().positive().max(1e9).nullable().optional().describe('向父资源申请的容量'),
+  demandAmount: z.coerce
+    .number()
+    .min(0)
+    .max(1e9)
+    .nullable()
+    .optional()
+    .describe('向父资源申请的容量，可为 0'),
 };
 
 export const resourceCreateSchema = z.object({
@@ -1048,6 +1054,17 @@ export const bulkAssignResultSchema = z.object({
   ids: z.array(z.number().int()),
 });
 
+/** 资源批量删除 */
+export const bulkDeleteSchema = z.object({
+  ids: z.array(z.coerce.number().int().positive()).min(1).max(200),
+});
+export type BulkDeleteInput = z.infer<typeof bulkDeleteSchema>;
+
+export const bulkDeleteResultSchema = z.object({
+  deleted: z.number().int(),
+  ids: z.array(z.number().int()),
+});
+
 /* ------------------------------------------------------------------ *
  * 统计概览
  * ------------------------------------------------------------------ */
@@ -1455,6 +1472,14 @@ export const resourceTypeDetailSchema = resourceTypeSchema.extend({
 });
 export type ResourceTypeDetail = z.infer<typeof resourceTypeDetailSchema>;
 
+/** 资源类型前缀同步：把历史自动编码统一到当前前缀 */
+export const resourceTypeCodeSyncResultSchema = z.object({
+  code: z.string(),
+  prefix: z.string(),
+  updated: z.number().int(),
+});
+export type ResourceTypeCodeSyncResult = z.infer<typeof resourceTypeCodeSyncResultSchema>;
+
 /** 环境标识色：统一存 #rrggbb，前端调色板与 RGB 输入都会先规范化再提交 */
 const envColorSchema = z
   .string()
@@ -1547,6 +1572,8 @@ export type DictSyncResult = z.infer<typeof dictSyncResultSchema>;
 export const resourceTypeMutationSchema = z.object({
   detail: resourceTypeDetailSchema,
   sync: dictSyncResultSchema.nullable(),
+  /** 本次因前缀修改而更新的存量资源编码数量 */
+  resourceCodeSynced: z.number().int().default(0),
   /** 存量资源中待同步属性字段的数量（>0 时前端提示可一键同步） */
   pendingAttrSync: z.number().int(),
   references: dictReferencesSchema.nullable(),

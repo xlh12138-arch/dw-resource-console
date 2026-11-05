@@ -125,6 +125,11 @@ export const resourceRepository = {
     return db.select().from(resources).where(inArray(resources.id, ids));
   },
 
+  async listChildrenByParentIds(parentIds: number[]): Promise<ResourceRow[]> {
+    if (parentIds.length === 0) return [];
+    return db.select().from(resources).where(inArray(resources.parentId, parentIds));
+  },
+
   async create(values: typeof resources.$inferInsert): Promise<ResourceRow> {
     const rows = await db.insert(resources).values(values).returning();
     return rows[0]!;
@@ -141,6 +146,11 @@ export const resourceRepository = {
 
   async remove(id: number): Promise<void> {
     await db.delete(resources).where(eq(resources.id, id));
+  },
+
+  async removeMany(ids: number[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db.delete(resources).where(inArray(resources.id, ids));
   },
 
   /** 按 IP 精查（attrs JSON 文本匹配），用于 IP 占用检测 */

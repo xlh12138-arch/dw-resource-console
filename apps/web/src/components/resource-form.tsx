@@ -203,7 +203,10 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
         attrs: editableAttrs,
         // 子资源：容量上限由「向父资源申请的额度」决定，不再单独设置总容量
         ...(isChild
-          ? { parentId: Number(parentId), demandAmount: Number(demandAmount) }
+          ? {
+              parentId: Number(parentId),
+              demandAmount: demandAmount.trim() === '' ? null : Number(demandAmount),
+            }
           : { parentId: null, demandAmount: null }),
         ...(!isChild && capacityTotalChanged ? { capacityTotal: nextCapacity } : {}),
         ...(!isChild && (capacityTotalChanged || capacityUnitChanged)
@@ -217,7 +220,17 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
         : resourcesApi.create(payload);
     },
     onSuccess: () => {
-      push('success', isEdit ? '资源已更新' : isChild ? '子资源已创建，并已从父资源申请容量' : '资源已创建');
+      const applied = Number(demandAmount) > 0;
+      push(
+        'success',
+        isEdit
+          ? '资源已更新'
+          : isChild
+            ? applied
+              ? '子资源已创建，并已从父资源申请容量'
+              : '子资源已创建，未申请父资源容量'
+            : '资源已创建',
+      );
       onSaved();
       onClose();
     },
@@ -248,8 +261,14 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
       }
     }
     if (isChild) {
-      if (!demandAmount.trim() || Number(demandAmount) <= 0) next['demandAmount'] = '请填写向父资源申请的容量';
-      else if (pickedParent && Number(demandAmount) > availableForParent(pickedParent)) {
+      const demand = demandAmount.trim() === '' ? 0 : Number(demandAmount);
+      if (!Number.isFinite(demand) || demand < 0) {
+        next['demandAmount'] = '申请容量必须大于或等于 0';
+      } else if (
+        pickedParent &&
+        pickedParent.capacityTotal !== null &&
+        demand > availableForParent(pickedParent)
+      ) {
         next['demandAmount'] = `超出父资源剩余可用容量 ${availableForParent(pickedParent)}`;
       }
     }
@@ -439,13 +458,13 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
             {isChild && (
               <Field
                 label="申请容量"
-                required
+                required={pickedParent?.capacityTotal !== null}
                 error={errors['demandAmount']}
                 hint={
                   pickedParent
                     ? pickedParent.capacityTotal === null
-                      ? '父资源未启用容量管理，无法申请'
-                      : `父资源剩余可用 ${availableForParent(pickedParent)}${pickedParent.capacityUnit ? ` ${pickedParent.capacityUnit}` : ''}`
+                      ? '父资源未设置容量，本资源无需申请'
+                      : `父资源剩余可用 ${availableForParent(pickedParent)}${pickedParent.capacityUnit ? ` ${pickedParent.capacityUnit}` : ''}；可填 0`
                     : undefined
                 }
               >
@@ -454,7 +473,7 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
                   min={0}
                   value={demandAmount}
                   onChange={(e) => setDemandAmount(e.target.value)}
-                  placeholder="如：256"
+                  placeholder="如：256；可填 0"
                 />
               </Field>
             )}

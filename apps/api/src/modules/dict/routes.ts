@@ -10,6 +10,7 @@ import {
   environmentDictUpdateSchema,
   environmentMutationSchema,
   resourceTypeCreateSchema,
+  resourceTypeCodeSyncResultSchema,
   resourceTypeDetailSchema,
   resourceTypeMutationSchema,
   resourceTypeSchema,
@@ -62,6 +63,7 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
       return reply.code(201).send({
         detail,
         sync: null,
+        resourceCodeSynced: 0,
         pendingAttrSync: 0,
         references: await resourceTypeService.references(detail.code),
       });
@@ -87,7 +89,7 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: { params: idParams, body: resourceTypeUpdateSchema, response: { 200: resourceTypeMutationSchema } },
     },
     async (request) => {
-      const { detail, sync, pendingAttrSync } = await withTransaction(() =>
+      const { detail, sync, resourceCodeSynced, pendingAttrSync } = await withTransaction(() =>
         resourceTypeService.update(
           request.params.code,
           request.body,
@@ -96,7 +98,7 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
         ),
       );
       const references = await resourceTypeService.references(detail.code);
-      return { detail, sync, pendingAttrSync, references };
+      return { detail, sync, resourceCodeSynced, pendingAttrSync, references };
     },
   );
 
@@ -120,6 +122,18 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
       const pending = await resourceTypeService.pendingAttrSyncCount(request.params.code);
       return { updated, pending };
     },
+  );
+
+  app.post(
+    '/resource-types/:code/sync-resource-codes',
+    {
+      ...write,
+      schema: { params: idParams, response: { 200: resourceTypeCodeSyncResultSchema } },
+    },
+    async (request) =>
+      withTransaction(() =>
+        resourceTypeService.syncResourceCodes(request.params.code, actorOf(request), request.id),
+      ),
   );
 
   app.delete(

@@ -1,4 +1,6 @@
 import {
+  bulkDeleteResultSchema,
+  bulkDeleteSchema,
   importResultSchema,
   ipCheckResultSchema,
   pagedSchema,
@@ -75,6 +77,16 @@ export const resourceRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: { body: resourceImportSchema, response: { 200: importResultSchema } },
     },
     async (request) => resourceService.importCsv(request.body, actorOf(request), request.id),
+  );
+
+  app.post(
+    '/resources/bulk-delete',
+    {
+      preHandler: [app.authenticate, app.authorize('resource:delete')],
+      schema: { body: bulkDeleteSchema, response: { 200: bulkDeleteResultSchema } },
+    },
+    async (request) =>
+      withTransaction(() => resourceService.bulkRemove(request.body.ids, actorOf(request), request.id)),
   );
 
   // 详情：在资源 DTO 之上补充容量明细与「被哪些项目/环境引用」

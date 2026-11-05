@@ -551,18 +551,42 @@ export function Pagination({
   total,
   pageSize,
   onChange,
+  pageSizeOptions,
+  onPageSizeChange,
 }: {
   page: number;
   totalPages: number;
   total: number;
   pageSize: number;
   onChange: (page: number) => void;
+  pageSizeOptions?: number[];
+  onPageSizeChange?: (pageSize: number) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
-      <span>
-        共 {total} 条 · 每页 {pageSize} 条
-      </span>
+      <div className="flex items-center gap-2">
+        <span>共 {total} 条</span>
+        {onPageSizeChange && pageSizeOptions?.length ? (
+          <label className="inline-flex items-center gap-1">
+            <span>每页</span>
+            <select
+              className="h-7 rounded-md border border-slate-200 bg-white px-1.5 text-xs text-slate-700 outline-none focus:border-brand-400"
+              value={pageSize}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+              aria-label="每页显示条数"
+            >
+              {pageSizeOptions.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+            <span>条</span>
+          </label>
+        ) : (
+          <span>· 每页 {pageSize} 条</span>
+        )}
+      </div>
       <div className="flex items-center gap-1">
         <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
           上一页

@@ -478,7 +478,7 @@ export function ProjectDetailPage() {
       {/* 环境槽位详情 */}
       <Modal
         open={activeEnv !== null}
-        width="max-w-4xl"
+        width="max-w-6xl"
         title={env ? `${env.name} · 资源槽位` : '环境详情'}
         desc={env ? `${env.environmentLabel} · 模板 ${env.templateName ?? '自定义'}` : undefined}
         onClose={() => setActiveEnv(null)}
@@ -637,7 +637,6 @@ export function ProjectDetailPage() {
                               onClick={() => setEditSlot({ env, slot })}
                             >
                               <Pencil size={13} />
-                              编辑
                             </Button>
                           )}
                           {canWrite && (

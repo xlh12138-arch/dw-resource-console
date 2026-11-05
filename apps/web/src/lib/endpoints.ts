@@ -79,6 +79,8 @@ export const resourcesApi = {
   create: (body: unknown) => api.post<ResourceDto>('/resources', body),
   update: (id: number, body: unknown) => api.patch<ResourceDto>(`/resources/${id}`, body),
   remove: (id: number) => api.del<{ id: number }>(`/resources/${id}`),
+  bulkRemove: (ids: number[]) =>
+    api.post<{ deleted: number; ids: number[] }>('/resources/bulk-delete', { ids }),
   checkIp: (ip: string) =>
     api.get<{ ip: string; available: boolean; conflicts: { code: string; name: string; typeLabel: string }[] }>(
       `/resources/check-ip${toQuery({ ip })}`,
@@ -340,12 +342,24 @@ export const dictApi = {
   type: (code: string) => api.get<ResourceTypeDetail>(`/resource-types/${code}`),
   typeReferences: (code: string) => api.get<DictReferences>(`/resource-types/${code}/references`),
   createType: (body: ResourceTypeInput) =>
-    api.post<{ detail: ResourceTypeDetail; sync: DictSyncResult | null; pendingAttrSync: number; references: DictReferences | null }>(
+    api.post<{
+      detail: ResourceTypeDetail;
+      sync: DictSyncResult | null;
+      resourceCodeSynced: number;
+      pendingAttrSync: number;
+      references: DictReferences | null;
+    }>(
       '/resource-types',
       body,
     ),
   updateType: (code: string, body: ResourceTypeUpdatePayload) =>
-    api.patch<{ detail: ResourceTypeDetail; sync: DictSyncResult | null; pendingAttrSync: number; references: DictReferences | null }>(
+    api.patch<{
+      detail: ResourceTypeDetail;
+      sync: DictSyncResult | null;
+      resourceCodeSynced: number;
+      pendingAttrSync: number;
+      references: DictReferences | null;
+    }>(
       `/resource-types/${code}`,
       body,
     ),
@@ -353,6 +367,11 @@ export const dictApi = {
     api.del<DictSyncResult>(`/resource-types/${code}`, migrateTo ? { migrateTo } : undefined),
   syncTypeAttrs: (code: string, body: { keyRenames?: { from: string; to: string }[]; dropUnknown?: boolean }) =>
     api.post<{ updated: number; pending: number }>(`/resource-types/${code}/sync-attrs`, body),
+  syncTypeResourceCodes: (code: string) =>
+    api.post<{ code: string; prefix: string; updated: number }>(
+      `/resource-types/${code}/sync-resource-codes`,
+      {},
+    ),
 
   environments: (includeDisabled = true) => api.get<EnvironmentDto[]>(`/environments${toQuery({ includeDisabled })}`),
   environmentOptions: () => api.get<{ value: string; label: string; tone: string }[]>('/environments/options'),

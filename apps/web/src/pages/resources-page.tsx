@@ -45,7 +45,8 @@ import { useToast } from '../components/toast';
 import { Button, Card, ClickableBadge, EmptyState, ErrorBanner, Field, Input, Modal, ModalCancelButton, Pagination, Select, Spinner, Td, Th, Table, Textarea } from '../components/ui';
 import { EnvBadge } from '../components/env-badge';
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 /**
  * 台账容量列与资源详情同口径：优先展示「按时间段的峰值占用」（错峰不累加）。
@@ -148,9 +149,12 @@ export function ResourcesPage() {
       const v = p.get(key);
       return v && !Number.isNaN(Number(v)) ? Number(v) : undefined;
     };
+    const requestedPageSize = num('pageSize');
     return {
       page: num('page') ?? 1,
-      pageSize: PAGE_SIZE,
+      pageSize: PAGE_SIZE_OPTIONS.includes(requestedPageSize ?? DEFAULT_PAGE_SIZE)
+        ? (requestedPageSize ?? DEFAULT_PAGE_SIZE)
+        : DEFAULT_PAGE_SIZE,
       sortBy: (p.get('sortBy') ?? 'updatedAt') as ResourceQuery['sortBy'],
       sortOrder: (p.get('sortOrder') as 'asc' | 'desc' | null) ?? 'desc',
       q: p.get('q') || undefined,
@@ -200,6 +204,7 @@ export function ResourcesPage() {
   });
   const [detail, setDetail] = useState<ResourceDto | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ResourceDto | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
   // 外部跳转（概览 / 详情 / 项目页）带来的关键字变化要同步回输入框
@@ -255,11 +260,25 @@ export function ResourcesPage() {
 
   const removeMutation = useMutation({
     mutationFn: (id: number) => resourcesApi.remove(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       push('success', '资源已删除');
       setPendingDelete(null);
+      setSelected((prev) => prev.filter((selectedId) => selectedId !== id));
       void queryClient.invalidateQueries({ queryKey: ['resources'] });
       void queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+    onError: (err) => push('error', friendlyMessage(err)),
+  });
+
+  const bulkRemove = useMutation({
+    mutationFn: () => resourcesApi.bulkRemove(selected),
+    onSuccess: (result) => {
+      push('success', `已删除 ${result.deleted} 个资源`);
+      setSelected([]);
+      setBulkDeleteOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ['resources'] });
+      void queryClient.invalidateQueries({ queryKey: ['stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
     onError: (err) => push('error', friendlyMessage(err)),
   });
@@ -327,6 +346,12 @@ export function ResourcesPage() {
             <Button variant="outline" onClick={() => setBulkOpen(true)}>
               <Tag size={14} />
               标注项目（{selected.length}）
+            </Button>
+          )}
+          {canDelete && selected.length > 0 && (
+            <Button variant="danger" onClick={() => setBulkDeleteOpen(true)}>
+              <Trash2 size={14} />
+              删除（{selected.length}）
             </Button>
           )}
           {canWrite && (
@@ -793,6 +818,11 @@ export function ResourcesPage() {
             total={list.data.meta.total}
             pageSize={list.data.meta.pageSize}
             onChange={(page) => setFilter({ page }, false)}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            onPageSizeChange={(pageSize) => {
+              setSelected([]);
+              setFilter({ pageSize }, true);
+            }}
           />
         )}
       </Card>
@@ -843,6 +873,37 @@ export function ResourcesPage() {
           确认删除 <span className="font-medium">{pendingDelete?.code}</span>
           {pendingDelete ? `（${pendingDelete.name}）` : ''} 吗？
         </p>
+      </Modal>
+
+      <Modal
+        open={bulkDeleteOpen}
+        title="批量删除资源"
+        desc="仅允许删除完整父子子树；已绑定的环境槽位会同时释放"
+        width="max-w-md"
+        onClose={() => setBulkDeleteOpen(false)}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setBulkDeleteOpen(false)}>
+              取消
+            </Button>
+            <Button
+              variant="danger"
+              disabled={bulkRemove.isPending || selected.length === 0}
+              onClick={() => bulkRemove.mutate()}
+            >
+              {bulkRemove.isPending ? '删除中…' : `确认删除 ${selected.length} 个`}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-2 text-sm text-slate-700">
+          <p>
+            确认删除已勾选的 <span className="font-medium">{selected.length}</span> 个资源吗？
+          </p>
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            若所选资源下还有未勾选的子资源，本次删除会被拒绝。删除后不可恢复，操作会写入审计日志。
+          </p>
+        </div>
       </Modal>
 
       <Modal

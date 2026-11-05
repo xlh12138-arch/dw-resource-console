@@ -10,7 +10,7 @@ import type {
   ResourceTypeUpdateInput,
   EnvironmentDto,
 } from '@dw/shared';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { envSlots, envTemplateItems, projectEnvironments, resources } from '../../db/schema.js';
 import { conflict, notFound, validationError } from '../../lib/errors.js';
@@ -179,7 +179,12 @@ export const resourceTypeService = {
     input: ResourceTypeUpdateInput,
     actor: Actor,
     requestId?: string,
-  ): Promise<{ detail: ResourceTypeDetail; sync: DictSyncResult | null; pendingAttrSync: number }> {
+  ): Promise<{
+    detail: ResourceTypeDetail;
+    sync: DictSyncResult | null;
+    resourceCodeSynced: number;
+    pendingAttrSync: number;
+  }> {
     const before = await resourceTypeRepository.findByCode(code);
     if (!before) throw notFound(`资源类型 ${code} 不存在`);
 
@@ -219,7 +224,13 @@ export const resourceTypeService = {
       sortOrder: input.sortOrder,
     });
 
-    // 3) 字段定义全量替换
+    // 3) 编码前缀变化：同步该类型下仍使用旧前缀的存量资源编码
+    const prefixChanged = input.prefix !== undefined && input.prefix !== before.prefix;
+    const resourceCodeSynced = prefixChanged
+      ? await this.syncResourceCodePrefix(newCode, input.prefix!, before.prefix)
+      : 0;
+
+    // 4) 字段定义全量替换
     if (input.fields) {
       await resourceTypeFieldRepository.replaceAll(
         newCode,
@@ -241,7 +252,7 @@ export const resourceTypeService = {
 
     invalidateDictCache();
 
-    // 4) 属性字段同步到存量资源
+    // 5) 属性字段同步到存量资源
     let attrSynced = 0;
     if (input.keyRenames.length > 0 || input.dropUnknownFields) {
       attrSynced = await this.syncAttrs(newCode, {
@@ -269,13 +280,101 @@ export const resourceTypeService = {
         ...(input.label && input.label !== before.label
           ? [{ field: 'label', label: '类型名称', from: before.label, to: input.label }]
           : []),
+        ...(prefixChanged
+          ? [
+              {
+                field: 'prefix',
+                label: '资源编码前缀',
+                from: before.prefix,
+                to: input.prefix,
+              },
+            ]
+          : []),
+        ...(resourceCodeSynced > 0
+          ? [{ field: 'resourceCode', label: '同步资源编码', from: null, to: `${resourceCodeSynced} 条资源` }]
+          : []),
         ...(input.fields ? [{ field: 'fields', label: '属性字段', from: null, to: `${input.fields.length} 个字段` }] : []),
         ...(attrSynced > 0 ? [{ field: 'attrs', label: '同步资源属性', from: null, to: `${attrSynced} 条资源` }] : []),
       ],
       requestId,
     });
 
-    return { detail, sync, pendingAttrSync };
+    return { detail, sync, resourceCodeSynced, pendingAttrSync };
+  },
+
+  /**
+   * 同步资源编码前缀：
+   * - 自动更新时传入 oldPrefix，只处理仍使用该旧前缀的资源
+   * - 手动同步时不传 oldPrefix，处理该类型下所有「前缀 + -/_ + 数字」的自动编码
+   * 保留原分隔符和序号，跳过自定义编码；目标编码冲突时抛 409。
+   */
+  async syncResourceCodePrefix(
+    typeCode: string,
+    newPrefix: string,
+    oldPrefix?: string,
+  ): Promise<number> {
+    if (oldPrefix === newPrefix) return 0;
+    const rows = await db
+      .select({ id: resources.id, code: resources.code })
+      .from(resources)
+      .where(eq(resources.type, typeCode));
+    const changes = rows.flatMap((row) => {
+      const matched = /^(.+)([-_])(\d+)$/.exec(row.code);
+      if (!matched) return [];
+      const [, existingPrefix, separator, sequence] = matched;
+      if (oldPrefix && existingPrefix.toLowerCase() !== oldPrefix.toLowerCase()) return [];
+      const nextCode = `${newPrefix}${separator}${sequence}`;
+      return nextCode === row.code ? [] : [{ id: row.id, from: row.code, to: nextCode }];
+    });
+    if (changes.length === 0) return 0;
+
+    const changeIds = new Set(changes.map((change) => change.id));
+    const targets = await db
+      .select({ id: resources.id, code: resources.code })
+      .from(resources)
+      .where(
+        inArray(
+          resources.code,
+          changes.map((change) => change.to),
+        ),
+      );
+    const occupied = targets.find((row) => !changeIds.has(row.id));
+    if (occupied) {
+      throw conflict(`资源编码 ${occupied.code} 已存在，无法同步新的编码前缀 ${newPrefix}`);
+    }
+
+    for (const change of changes) {
+      await db
+        .update(resources)
+        .set({ code: change.to, updatedAt: new Date() })
+        .where(eq(resources.id, change.id));
+    }
+    return changes.length;
+  },
+
+  /** 手动把某资源类型下的历史自动编码统一到当前前缀 */
+  async syncResourceCodes(code: string, actor: Actor, requestId?: string) {
+    const type = await resourceTypeRepository.findByCode(code);
+    if (!type) throw notFound(`资源类型 ${code} 不存在`);
+    const updated = await this.syncResourceCodePrefix(code, type.prefix);
+    await auditRepository.record({
+      actorId: actor.id,
+      actorName: actor.username,
+      action: 'UPDATE',
+      targetType: 'DICT',
+      targetId: code,
+      targetName: `资源类型 ${type.label}`,
+      changes: [
+        {
+          field: 'resourceCode',
+          label: `手动同步历史资源编码到前缀 ${type.prefix}`,
+          from: null,
+          to: `${updated} 条资源`,
+        },
+      ],
+      requestId,
+    });
+    return { code, prefix: type.prefix, updated };
   },
 
   /** 编码变更：把资源 / 模板条目 / 环境槽位上的旧编码批量改为新编码 */

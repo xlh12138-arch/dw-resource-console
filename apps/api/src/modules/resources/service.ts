@@ -282,7 +282,8 @@ function slotReferenceDetails(
 
 /**
  * 校验子资源向父资源申请的容量：
- * 父资源必须已设置容量，且「父资源现有槽位占用 + 其它子资源申请 + 本次申请」不得超过父资源总容量。
+ * - 父资源未设置容量：子资源无需申请，直接通过
+ * - 父资源设置了容量：申请量可为 0，但「父资源槽位占用 + 其它子资源申请 + 本次申请」不得超过总容量
  */
 export async function assertParentCapacityAvailable(
   parent: ResourceRow,
@@ -290,16 +291,13 @@ export async function assertParentCapacityAvailable(
   excludeChildId?: number,
 ): Promise<void> {
   const unitSuffix = parent.capacityUnit ? ` ${parent.capacityUnit}` : '';
-  if (parent.capacityTotal === null) {
-    throw validationError(
-      `父资源 ${parent.code} 未设置容量，无法创建子资源并申请容量。请先为父资源启用容量管理`,
-      { field: 'parentId', code: 'PARENT_CAPACITY_REQUIRED', parentId: parent.id },
-    );
-  }
-  if (demand === null || demand === undefined || demand <= 0) {
-    throw validationError(`挂载到父资源 ${parent.code} 时必须填写申请的容量`, {
+  if (parent.capacityTotal === null) return;
+
+  const requested = demand ?? 0;
+  if (!Number.isFinite(requested) || requested < 0) {
+    throw validationError(`向父资源 ${parent.code} 申请的容量必须大于或等于 0`, {
       field: 'demandAmount',
-      code: 'DEMAND_REQUIRED',
+      code: 'DEMAND_INVALID',
       parentId: parent.id,
     });
   }
@@ -313,13 +311,13 @@ export async function assertParentCapacityAvailable(
   const used = round2(parentSlotAllocated + siblingDemand);
   const available = round2(parent.capacityTotal - used);
 
-  if (demand > available + 1e-9) {
+  if (requested > available + 1e-9) {
     throw conflict(
-      `申请容量 ${demand}${unitSuffix} 超出父资源 ${parent.code} 的剩余可用容量 ${available}${unitSuffix}（总容量 ${parent.capacityTotal}${unitSuffix}，槽位已占 ${round2(parentSlotAllocated)}${unitSuffix}，其他子资源已占 ${round2(siblingDemand)}${unitSuffix}）`,
+      `申请容量 ${requested}${unitSuffix} 超出父资源 ${parent.code} 的剩余可用容量 ${available}${unitSuffix}（总容量 ${parent.capacityTotal}${unitSuffix}，槽位已占 ${round2(parentSlotAllocated)}${unitSuffix}，其他子资源已占 ${round2(siblingDemand)}${unitSuffix}）`,
       {
         field: 'demandAmount',
         code: 'CAPACITY_EXCEEDED',
-        requested: demand,
+        requested,
         available,
         total: parent.capacityTotal,
         slotAllocated: round2(parentSlotAllocated),
@@ -1117,6 +1115,59 @@ export const resourceService = {
       requestId,
     });
     return { id };
+  },
+
+  /**
+   * 批量删除资源：允许一次删除完整父子子树。
+   * 只要仍有未勾选的子资源，就拒绝整批操作，避免留下悬空层级或误删父节点。
+   */
+  async bulkRemove(ids: number[], actor: Actor, requestId?: string) {
+    const uniqueIds = [...new Set(ids)];
+    const rows = await resourceRepository.findByIds(uniqueIds);
+    const selectedIds = new Set(rows.map((row) => row.id));
+    const children = await resourceRepository.listChildrenByParentIds([...selectedIds]);
+    const outside = children.filter((child) => child.parentId !== null && !selectedIds.has(child.id));
+    if (outside.length > 0) {
+      const byParent = new Map<number, ResourceRow[]>();
+      for (const child of outside) {
+        if (child.parentId === null) continue;
+        byParent.set(child.parentId, [...(byParent.get(child.parentId) ?? []), child]);
+      }
+      const blocked = rows
+        .filter((row) => byParent.has(row.id))
+        .map((row) => ({
+          resourceId: row.id,
+          code: row.code,
+          children: (byParent.get(row.id) ?? []).map((child) => ({
+            id: child.id,
+            code: child.code,
+            name: child.name,
+          })),
+        }));
+      throw conflict('所选资源下仍有未勾选的子资源，请一并勾选后再批量删除', {
+        reason: 'HAS_UNSELECTED_CHILDREN',
+        resources: blocked,
+      });
+    }
+    if (rows.length === 0) return { deleted: 0, ids: [] as number[] };
+
+    await resourceRepository.removeMany(rows.map((row) => row.id));
+    await auditRepository.record({
+      actorId: actor.id,
+      actorName: actor.username,
+      action: 'DELETE',
+      targetType: 'RESOURCE',
+      targetId: 'bulk',
+      targetName: `批量删除 ${rows.length} 个资源`,
+      changes: rows.map((row) => ({
+        field: '*',
+        label: `删除资源 ${row.code} ${row.name}`,
+        from: toResourceDto(row),
+        to: null,
+      })),
+      requestId,
+    });
+    return { deleted: rows.length, ids: rows.map((row) => row.id) };
   },
 
   /** IP 占用查询：新建资源前的前置校验接口 */
