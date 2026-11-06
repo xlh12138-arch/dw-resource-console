@@ -39,6 +39,19 @@ export const userRoutes: FastifyPluginAsyncZod = async (app) => {
       ),
   );
 
+  app.delete(
+    '/users/:id',
+    {
+      ...adminGuard,
+      schema: {
+        params: idParams,
+        response: { 200: z.object({ id: z.number().int().positive() }) },
+      },
+    },
+    async (request) =>
+      withTransaction(() => userService.remove(request.params.id, actorOf(request), request.id)),
+  );
+
   app.post(
     '/users/:id/reset-password',
     { ...adminGuard, schema: { params: idParams, response: { 200: resetPasswordResultSchema } } },

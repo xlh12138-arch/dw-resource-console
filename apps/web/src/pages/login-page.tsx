@@ -14,8 +14,9 @@ const DEMO_ACCOUNTS = [
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('Admin@12345');
+  const showDemoAccounts = import.meta.env.DEV;
+  const [username, setUsername] = useState(showDemoAccounts ? 'admin' : '');
+  const [password, setPassword] = useState(showDemoAccounts ? 'Admin@12345' : '');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -76,25 +77,27 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-5 border-t border-slate-100 pt-4">
-            <p className="mb-2 text-xs font-medium text-slate-500">演示账号（点击填充）</p>
-            <div className="space-y-1.5">
-              {DEMO_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.username}
-                  type="button"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-xs text-slate-600 transition-colors hover:border-brand-300 hover:bg-brand-50"
-                  onClick={() => {
-                    setUsername(acc.username);
-                    setPassword(acc.password);
-                  }}
-                >
-                  <span className="font-medium text-slate-800">{acc.username}</span>
-                  <span className="ml-2 text-slate-500">{acc.label}</span>
-                </button>
-              ))}
+          {showDemoAccounts ? (
+            <div className="mt-5 border-t border-slate-100 pt-4">
+              <p className="mb-2 text-xs font-medium text-slate-500">演示账号（点击填充）</p>
+              <div className="space-y-1.5">
+                {DEMO_ACCOUNTS.map((acc) => (
+                  <button
+                    key={acc.username}
+                    type="button"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-xs text-slate-600 transition-colors hover:border-brand-300 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                    onClick={() => {
+                      setUsername(acc.username);
+                      setPassword(acc.password);
+                    }}
+                  >
+                    <span className="font-medium text-slate-800">{acc.username}</span>
+                    <span className="ml-2 text-slate-500">{acc.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
         </Card>
       </div>
     </div>

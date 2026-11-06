@@ -266,12 +266,21 @@ function FieldEditor({
                 }
               />
               <div className="ml-auto flex items-center gap-1">
-                <Button variant="ghost" size="sm" onClick={() => move(i, -1)} disabled={i === 0}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="上移字段"
+                  title="上移字段"
+                  onClick={() => move(i, -1)}
+                  disabled={i === 0}
+                >
                   <ArrowUp size={13} />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
+                  aria-label="下移字段"
+                  title="下移字段"
                   onClick={() => move(i, 1)}
                   disabled={i === fields.length - 1}
                 >
@@ -280,6 +289,8 @@ function FieldEditor({
                 <Button
                   variant="ghost"
                   size="sm"
+                  aria-label="删除字段"
+                  title="删除字段"
                   onClick={() => onChange(fields.filter((x) => x.uid !== f.uid))}
                 >
                   <Trash2 size={13} className="text-rose-500" />
@@ -618,6 +629,7 @@ export function ResourceTypePanel() {
                           variant="ghost"
                           size="sm"
                           title="上移"
+                          aria-label={`上移资源类型 ${t.label}`}
                           disabled={index === 0 || moveType.isPending}
                           onClick={() => moveType.mutate({ code: t.code, offset: -1 })}
                         >
@@ -627,6 +639,7 @@ export function ResourceTypePanel() {
                           variant="ghost"
                           size="sm"
                           title="下移"
+                          aria-label={`下移资源类型 ${t.label}`}
                           disabled={index === list.data!.length - 1 || moveType.isPending}
                           onClick={() => moveType.mutate({ code: t.code, offset: 1 })}
                         >
@@ -646,7 +659,13 @@ export function ResourceTypePanel() {
                       </Button>
                     )}
                     {canWrite && (
-                      <Button variant="ghost" size="sm" onClick={() => void openEdit(t.code)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`编辑资源类型 ${t.label}`}
+                        title={`编辑资源类型 ${t.label}`}
+                        onClick={() => void openEdit(t.code)}
+                      >
                         <Pencil size={13} />
                       </Button>
                     )}
@@ -654,6 +673,8 @@ export function ResourceTypePanel() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        aria-label={`删除资源类型 ${t.label}`}
+                        title={`删除资源类型 ${t.label}`}
                         onClick={() => {
                           setDeleting(null);
                           // 换删除对象时清空迁移目标，避免上一次的选择残留成无效值
@@ -1085,6 +1106,7 @@ export function EnvironmentPanel() {
                           variant="ghost"
                           size="sm"
                           title="上移"
+                          aria-label={`上移环境 ${e.label}`}
                           disabled={index === 0 || moveEnvironment.isPending}
                           onClick={() => moveEnvironment.mutate({ code: e.code, offset: -1 })}
                         >
@@ -1094,6 +1116,7 @@ export function EnvironmentPanel() {
                           variant="ghost"
                           size="sm"
                           title="下移"
+                          aria-label={`下移环境 ${e.label}`}
                           disabled={index === list.data!.length - 1 || moveEnvironment.isPending}
                           onClick={() => moveEnvironment.mutate({ code: e.code, offset: 1 })}
                         >
@@ -1102,7 +1125,13 @@ export function EnvironmentPanel() {
                       </>
                     )}
                     {canWrite && (
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(e)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`编辑环境 ${e.label}`}
+                        title={`编辑环境 ${e.label}`}
+                        onClick={() => openEdit(e)}
+                      >
                         <Pencil size={13} />
                       </Button>
                     )}
@@ -1110,6 +1139,8 @@ export function EnvironmentPanel() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        aria-label={`删除环境 ${e.label}`}
+                        title={`删除环境 ${e.label}`}
                         onClick={() => {
                           setMigrateTo('');
                           setDeleting(e);

@@ -462,6 +462,7 @@ export function ProjectDetailPage() {
                         variant="ghost"
                         size="sm"
                         title={slotCount > 0 ? '移出项目（需同时解除槽位引用才会从列表消失）' : '取消项目标注'}
+                        aria-label={slotCount > 0 ? `将 ${r.name} 移出项目` : `取消 ${r.name} 的项目标注`}
                         onClick={() => setPendingDetach(r)}
                       >
                         <Unlink size={13} className="text-slate-500" />
@@ -644,6 +645,7 @@ export function ProjectDetailPage() {
                               variant="ghost"
                               size="sm"
                               title={slot.resourceId ? '更换资源（原资源的占用容量自动释放）' : '分配资源'}
+                              aria-label={slot.resourceId ? `更换槽位 ${slot.slotRole} 的资源` : `为槽位 ${slot.slotRole} 分配资源`}
                               onClick={() => setAssignSlot({ env, slot })}
                             >
                               <Link2 size={13} />
@@ -654,6 +656,7 @@ export function ProjectDetailPage() {
                               variant="ghost"
                               size="sm"
                               title="续期（顺延或指定新的结束时间）"
+                              aria-label={`为槽位 ${slot.slotRole} 续期`}
                               onClick={() => setRenewTarget({ env, slot })}
                             >
                               <CalendarClock size={13} className={slot.overdueDays > 0 ? 'text-rose-600' : 'text-slate-600'} />
@@ -664,6 +667,7 @@ export function ProjectDetailPage() {
                               variant="ghost"
                               size="sm"
                               title="释放占用（回收容量，槽位保留）"
+                              aria-label={`释放槽位 ${slot.slotRole} 的占用`}
                               onClick={() => setPendingRelease({ env, slot })}
                             >
                               <Unlink size={13} className="text-slate-500" />
@@ -674,6 +678,7 @@ export function ProjectDetailPage() {
                               variant="ghost"
                               size="sm"
                               title="删除槽位"
+                              aria-label={`删除槽位 ${slot.slotRole}`}
                               onClick={() => setPendingDeleteSlot(slot)}
                             >
                               <Trash2 size={13} className="text-rose-600" />

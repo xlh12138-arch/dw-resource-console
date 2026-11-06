@@ -1,6 +1,6 @@
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
 
 export function cn(...inputs: (string | false | null | undefined)[]): string {
@@ -411,6 +411,12 @@ export function Modal({
   /** 本弹窗在全局栈里的唯一标识 */
   const [modalId] = useState(() => (modalSeq += 1));
   const layerRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const confirmRef = useRef<HTMLDivElement | null>(null);
+  const titleId = useId();
+  const descId = useId();
+  const confirmTitleId = useId();
+  const confirmDescId = useId();
 
   // 打开时入栈、关闭时出栈：栈内位置决定层叠顺序与 ESC 归属
   useEffect(() => {
@@ -423,6 +429,21 @@ export function Modal({
       if (at >= 0) modalStack.splice(at, 1);
     };
   }, [open, modalId]);
+
+  // 打开时锁住背景滚动并把焦点移入弹窗；关闭后恢复原来的焦点位置。
+  useEffect(() => {
+    if (!open) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const frame = window.requestAnimationFrame(() => dialogRef.current?.focus());
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [open]);
 
   // 保存成功后复位：内容已落库，不应再提示「有未保存的修改」
   useEffect(() => {
@@ -462,6 +483,47 @@ export function Modal({
     return () => window.removeEventListener('keydown', handler, true);
   }, [open, closeOnEsc, confirming, requestClose, modalId]);
 
+  // Tab 只在最上层弹窗内循环；未保存确认框打开时只在其按钮之间循环。
+  useEffect(() => {
+    if (!open) return;
+    const handleTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || modalStack[modalStack.length - 1] !== modalId) return;
+      const scope = confirming ? confirmRef.current : dialogRef.current;
+      if (!scope) return;
+      const focusable = Array.from(
+        scope.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) {
+        event.preventDefault();
+        scope.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === scope)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleTab, true);
+    return () => window.removeEventListener('keydown', handleTab, true);
+  }, [open, confirming, modalId]);
+
+  useEffect(() => {
+    if (!confirming) return;
+    const frame = window.requestAnimationFrame(() => confirmRef.current?.focus());
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (dialogRef.current?.isConnected) dialogRef.current.focus();
+    };
+  }, [confirming]);
+
   /** 注意：所有 Hook 必须在提前 return 之前调用，否则开合切换会「钩子数量不一致」而崩 */
   const guard = useMemo(() => ({ requestClose }), [requestClose]);
 
@@ -476,13 +538,17 @@ export function Modal({
   return (
     <div
       ref={layerRef}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-8"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-slate-900/40 p-4 sm:p-8"
     >
       <ModalGuardContext.Provider value={guard}>
       <div
+        ref={dialogRef}
         className={cn('w-full rounded-xl bg-white shadow-xl', width)}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={desc ? descId : undefined}
+        tabIndex={-1}
         // 捕获表单里的输入 / 选择 / 开关，用于关闭时的「未保存」提示
         onInputCapture={() => setTouched(true)}
         onChangeCapture={() => setTouched(true)}
@@ -493,13 +559,13 @@ export function Modal({
       >
         <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
           <div>
-            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-            {desc && <p className="mt-0.5 text-xs text-slate-500">{desc}</p>}
+            <h3 id={titleId} className="text-base font-semibold text-slate-900">{title}</h3>
+            {desc && <p id={descId} className="mt-0.5 text-xs text-slate-500">{desc}</p>}
           </div>
           <button
             type="button"
             onClick={requestClose}
-            className="text-slate-400 hover:text-slate-600"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
             aria-label="关闭"
             title="关闭（ESC）"
           >
@@ -512,10 +578,18 @@ export function Modal({
       </ModalGuardContext.Provider>
 
       {confirming && touched && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl" role="dialog" aria-modal="true">
-            <h4 className="text-sm font-semibold text-slate-900">有未保存的修改</h4>
-            <p className="mt-1.5 text-xs text-slate-600">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center overscroll-contain bg-slate-900/50 p-4">
+          <div
+            ref={confirmRef}
+            className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl focus:outline-none"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={confirmTitleId}
+            aria-describedby={confirmDescId}
+            tabIndex={-1}
+          >
+            <h4 id={confirmTitleId} className="text-sm font-semibold text-slate-900">有未保存的修改</h4>
+            <p id={confirmDescId} className="mt-1.5 text-xs text-slate-600">
               「{title}」中的内容已修改，关闭前请选择是否保存。
               {dirtyHint ? <span className="mt-1 block text-slate-500">{dirtyHint}</span> : null}
             </p>
@@ -602,10 +676,20 @@ export function Pagination({
   );
 }
 
-export function Table({ head, children }: { head: ReactNode; children: ReactNode }) {
+export function Table({
+  head,
+  children,
+  containerClassName,
+  tableClassName,
+}: {
+  head: ReactNode;
+  children: ReactNode;
+  containerClassName?: string;
+  tableClassName?: string;
+}) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] text-left text-sm">
+    <div className={cn('overflow-x-auto overscroll-x-contain', containerClassName)}>
+      <table className={cn('w-full min-w-[720px] text-left text-sm', tableClassName)}>
         <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">{head}</thead>
         <tbody className="divide-y divide-slate-100">{children}</tbody>
       </table>
@@ -613,8 +697,20 @@ export function Table({ head, children }: { head: ReactNode; children: ReactNode
   );
 }
 
-export function Th({ children, className }: { children?: ReactNode; className?: string }) {
-  return <th className={cn('whitespace-nowrap px-4 py-2.5 font-medium', className)}>{children}</th>;
+export function Th({
+  children,
+  className,
+  ariaSort,
+}: {
+  children?: ReactNode;
+  className?: string;
+  ariaSort?: 'ascending' | 'descending' | 'none' | 'other';
+}) {
+  return (
+    <th scope="col" aria-sort={ariaSort} className={cn('whitespace-nowrap px-4 py-2.5 font-medium', className)}>
+      {children}
+    </th>
+  );
 }
 
 export function Td({ children, className }: { children?: ReactNode; className?: string }) {

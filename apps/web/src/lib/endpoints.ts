@@ -255,6 +255,7 @@ export const usersApi = {
     api.post<UserDto>('/users', body),
   update: (id: number, body: { displayName?: string; role?: string; status?: string }) =>
     api.patch<UserDto>(`/users/${id}`, body),
+  remove: (id: number) => api.del<{ id: number }>(`/users/${id}`),
   /** 应由管理员调用；返回重置后的明文密码，仅本次可见 */
   resetPassword: (id: number) =>
     api.post<{ user: UserDto; password: string }>(`/users/${id}/reset-password`, undefined),

@@ -138,19 +138,43 @@ export function TemplatesPage() {
                   <div className="flex justify-end gap-1">
                     {canWrite && (
                       <>
-                        <Button variant="ghost" size="sm" onClick={() => setInstantiate(t)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`套用环境模板 ${t.name}`}
+                          title={`套用环境模板 ${t.name}`}
+                          onClick={() => setInstantiate(t)}
+                        >
                           <Rocket size={13} className="text-brand-600" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setForm({ open: true, initial: t })}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`编辑环境模板 ${t.name}`}
+                          title={`编辑环境模板 ${t.name}`}
+                          onClick={() => setForm({ open: true, initial: t })}
+                        >
                           <Pencil size={13} />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => clone.mutate(t.id)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`复制环境模板 ${t.name}`}
+                          title={`复制环境模板 ${t.name}`}
+                          onClick={() => clone.mutate(t.id)}
+                        >
                           <Copy size={13} />
                         </Button>
                       </>
                     )}
                     {canDelete && (
-                      <Button variant="ghost" size="sm" onClick={() => setPendingDelete(t)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`删除环境模板 ${t.name}`}
+                        title={`删除环境模板 ${t.name}`}
+                        onClick={() => setPendingDelete(t)}
+                      >
                         <Trash2 size={13} className="text-rose-600" />
                       </Button>
                     )}
@@ -436,6 +460,8 @@ function TemplateFormModal({
                   <Button
                     variant="ghost"
                     size="sm"
+                    aria-label="删除模板槽位"
+                    title="删除模板槽位"
                     disabled={items.length === 1}
                     onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== index))}
                   >

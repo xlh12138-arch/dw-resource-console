@@ -1,5 +1,5 @@
 import type { Role, UserStatus } from '@dw/shared';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { db, firstRow } from '../../db/index.js';
 import { users, type UserRow } from '../../db/schema.js';
 
@@ -43,6 +43,14 @@ export const userRepository = {
   async count(): Promise<number> {
     const rows = await db.select().from(users);
     return rows.length;
+  },
+
+  async removeDisabled(id: number): Promise<boolean> {
+    const rows = await db
+      .delete(users)
+      .where(and(eq(users.id, id), eq(users.status, 'DISABLED')))
+      .returning({ id: users.id });
+    return rows.length > 0;
   },
 
   async updatePassword(id: number, passwordHash: string): Promise<UserRow> {

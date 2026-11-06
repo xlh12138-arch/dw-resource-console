@@ -65,6 +65,37 @@ export const userService = {
     return toUserDto(user);
   },
 
+  async remove(
+    id: number,
+    actor: { id: number | null; username: string },
+    requestId?: string,
+  ): Promise<{ id: number }> {
+    const before = await userRepository.findById(id);
+    if (!before) throw notFound('用户不存在');
+    if (id === actor.id) throw conflict('不能删除当前登录账号');
+    if (before.status !== 'DISABLED') {
+      throw conflict('该用户仍处于启用状态，请先停用后再删除');
+    }
+
+    // 删除用户后刷新令牌会随用户记录级联清除；这里显式吊销，便于在事务内表达会话回收意图。
+    await authService.revokeAllRefreshTokens(id);
+    if (!(await userRepository.removeDisabled(id))) {
+      throw conflict('用户状态已发生变化，请刷新后重试');
+    }
+
+    await auditRepository.record({
+      actorId: actor.id,
+      actorName: actor.username,
+      action: 'DELETE',
+      targetType: 'USER',
+      targetId: String(id),
+      targetName: before.username,
+      changes: [{ field: 'status', label: '状态', from: before.status, to: '已删除' }],
+      requestId,
+    });
+    return { id };
+  },
+
   /**
    * 管理员重置密码：生成新口令、落库、并吊销该用户全部刷新令牌（强制重新登录）。
    * 明文密码只在本次响应里返回一次，不写日志、不入库、不进审计明细。

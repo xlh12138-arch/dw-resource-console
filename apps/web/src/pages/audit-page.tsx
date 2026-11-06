@@ -26,6 +26,28 @@ import {
   Table,
 } from '../components/ui';
 
+function formatAuditValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '空';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (Array.isArray(value)) return value.map(formatAuditValue).join('、');
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    for (const key of ['label', 'name', 'title', 'username', 'code']) {
+      const preferred = record[key];
+      if (typeof preferred === 'string' || typeof preferred === 'number') return String(preferred);
+    }
+    try {
+      const text = JSON.stringify(value);
+      return text.length > 120 ? `${text.slice(0, 117)}…` : text;
+    } catch {
+      return '对象';
+    }
+  }
+  return String(value);
+}
+
 export function AuditPage() {
   const [filters, setFilters] = useState<{
     action: string;
@@ -148,7 +170,7 @@ export function AuditPage() {
                   {log.changes && log.changes.length > 0
                     ? log.changes
                         .slice(0, 3)
-                        .map((c) => `${c.label ?? c.field}: ${String(c.from ?? '空')} → ${String(c.to ?? '空')}`)
+                        .map((c) => `${c.label ?? c.field}: ${formatAuditValue(c.from)} → ${formatAuditValue(c.to)}`)
                         .join('；')
                     : '—'}
                 </Td>

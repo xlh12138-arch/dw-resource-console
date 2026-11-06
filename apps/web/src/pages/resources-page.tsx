@@ -85,11 +85,10 @@ function SortableTh({
   const active = currentSort === sortKey;
   const Icon = !active ? ChevronsUpDown : currentOrder === 'asc' ? ChevronUp : ChevronDown;
   return (
-    <Th>
+    <Th ariaSort={active ? (currentOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
       <button
         type="button"
         className="inline-flex items-center gap-1 hover:text-brand-700"
-        aria-sort={active ? (currentOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
         onClick={() => onSort(sortKey)}
       >
         {label}
@@ -578,9 +577,10 @@ export function ResourcesPage() {
           />
         ) : (
           <Table
+            containerClassName="resource-table-scroll"
             head={
               <tr>
-                <Th className="w-10">
+                <Th className="sticky left-0 z-20 w-12 bg-slate-50 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.55)]">
                   <input
                     type="checkbox"
                     className="h-3.5 w-3.5 accent-brand-600"
@@ -610,13 +610,15 @@ export function ResourcesPage() {
                 <SortableTh label="状态" sortKey="status" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
                 <SortableTh label="负责人" sortKey="owner" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
                 <SortableTh label="更新时间" sortKey="updatedAt" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
-                <Th className="text-right">操作</Th>
+                <Th className="sticky right-0 z-20 w-24 bg-slate-50 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.55)]">
+                  操作
+                </Th>
               </tr>
             }
           >
             {rows.map((r) => (
-              <tr key={r.id} className="hover:bg-slate-50">
-                <Td>
+              <tr key={r.id} className="group hover:bg-slate-50">
+                <Td className="sticky left-0 z-10 bg-white transition-colors group-hover:bg-slate-50">
                   <input
                     type="checkbox"
                     className="h-3.5 w-3.5 accent-brand-600"
@@ -789,15 +791,27 @@ export function ResourcesPage() {
                 <Td className="whitespace-nowrap text-xs text-slate-500">
                   {new Date(r.updatedAt).toLocaleString('zh-CN')}
                 </Td>
-                <Td className="text-right">
+                <Td className="sticky right-0 z-10 bg-white text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.55)] transition-colors group-hover:bg-slate-50">
                   <div className="flex justify-end gap-1">
                     {canWrite && (
-                      <Button variant="ghost" size="sm" onClick={() => setFormState({ open: true, initial: r, type: r.type })}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`编辑资源 ${r.name}`}
+                        title={`编辑资源 ${r.name}`}
+                        onClick={() => setFormState({ open: true, initial: r, type: r.type })}
+                      >
                         <Pencil size={13} />
                       </Button>
                     )}
                     {canDelete && (
-                      <Button variant="ghost" size="sm" onClick={() => setPendingDelete(r)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`删除资源 ${r.name}`}
+                        title={`删除资源 ${r.name}`}
+                        onClick={() => setPendingDelete(r)}
+                      >
                         <Trash2 size={13} className="text-rose-600" />
                       </Button>
                     )}

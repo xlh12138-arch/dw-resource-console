@@ -170,12 +170,24 @@ export function ProjectsPage() {
                 <Td className="text-right">
                   <div className="flex justify-end gap-1">
                     {canWrite && (
-                      <Button variant="ghost" size="sm" onClick={() => setForm({ open: true, initial: p })}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`编辑项目 ${p.name}`}
+                        title={`编辑项目 ${p.name}`}
+                        onClick={() => setForm({ open: true, initial: p })}
+                      >
                         <Pencil size={13} />
                       </Button>
                     )}
                     {canDelete && (
-                      <Button variant="ghost" size="sm" onClick={() => setPendingDelete(p)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`删除项目 ${p.name}`}
+                        title={`删除项目 ${p.name}`}
+                        onClick={() => setPendingDelete(p)}
+                      >
                         <Trash2 size={13} className="text-rose-600" />
                       </Button>
                     )}

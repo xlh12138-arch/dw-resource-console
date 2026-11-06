@@ -28,6 +28,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {items.map((t) => (
           <div
             key={t.id}
+            role={t.tone === 'error' ? 'alert' : 'status'}
+            aria-live={t.tone === 'error' ? 'assertive' : 'polite'}
+            aria-atomic="true"
             className={cn(
               'pointer-events-auto rounded-lg px-4 py-2 text-sm text-white shadow-lg',
               t.tone === 'success' && 'bg-emerald-600',

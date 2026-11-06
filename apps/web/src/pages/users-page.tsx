@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, KeyRound, UserPlus } from 'lucide-react';
+import { Copy, KeyRound, Trash2, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { ROLES, ROLE_LABELS, USER_STATUS_LABELS, type Role, type UserDto, type UserStatus } from '@dw/shared';
 import { usersApi } from '../lib/endpoints';
 import { friendlyMessage } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { useToast } from '../components/toast';
 import {
   Badge,
@@ -24,9 +25,12 @@ import {
 
 export function UsersPage() {
   const { push } = useToast();
+  const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ username: '', password: '', displayName: '', role: 'USER' as Role });
+  const [roleTarget, setRoleTarget] = useState<{ user: UserDto; role: Role } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserDto | null>(null);
 
   /** 待重置密码的用户；null 表示未打开重置流程 */
   const [resetTarget, setResetTarget] = useState<UserDto | null>(null);
@@ -51,9 +55,13 @@ export function UsersPage() {
       usersApi.update(vars.id, vars.patch),
     onSuccess: () => {
       push('success', '已更新');
+      setRoleTarget(null);
       void queryClient.invalidateQueries({ queryKey: ['users'] });
     },
-    onError: (err) => push('error', friendlyMessage(err)),
+    onError: (err) => {
+      setRoleTarget(null);
+      push('error', friendlyMessage(err));
+    },
   });
 
   const resetMutation = useMutation({
@@ -61,6 +69,16 @@ export function UsersPage() {
     onSuccess: (res) => {
       setResetTarget(null);
       setResetResult({ username: res.user.username, password: res.password });
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (err) => push('error', friendlyMessage(err)),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => usersApi.remove(id),
+    onSuccess: () => {
+      setDeleteTarget(null);
+      push('success', '用户已删除');
       void queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (err) => push('error', friendlyMessage(err)),
@@ -121,8 +139,12 @@ export function UsersPage() {
                   <Select
                     className="h-8 w-32 text-xs"
                     value={u.role}
+                    aria-label={`修改 ${u.displayName} 的角色`}
                     options={ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }))}
-                    onChange={(e) => updateMutation.mutate({ id: u.id, patch: { role: e.target.value as Role } })}
+                    onChange={(e) => {
+                      const role = e.target.value as Role;
+                      if (role !== u.role) setRoleTarget({ user: u, role });
+                    }}
                   />
                 </Td>
                 <Td>
@@ -149,6 +171,35 @@ export function UsersPage() {
                       }
                     >
                       {u.status === 'ACTIVE' ? '停用' : '启用'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={u.status !== 'DISABLED' || u.id === currentUser?.id}
+                      aria-label={
+                        u.id === currentUser?.id
+                          ? `不能删除当前登录账号 ${u.username}`
+                          : u.status !== 'DISABLED'
+                            ? `用户 ${u.username} 需要先停用才能删除`
+                            : `删除用户 ${u.username}`
+                      }
+                      title={
+                        u.id === currentUser?.id
+                          ? '不能删除当前登录账号'
+                          : u.status !== 'DISABLED'
+                            ? '请先停用用户后再删除'
+                            : `删除用户 ${u.username}`
+                      }
+                      onClick={() => setDeleteTarget(u)}
+                    >
+                      <Trash2
+                        size={13}
+                        className={
+                          u.status === 'DISABLED' && u.id !== currentUser?.id
+                            ? 'text-rose-600'
+                            : 'text-slate-400'
+                        }
+                      />
                     </Button>
                   </div>
                 </Td>
@@ -199,6 +250,39 @@ export function UsersPage() {
             />
           </Field>
         </div>
+      </Modal>
+
+      <Modal
+        open={roleTarget !== null}
+        title="修改用户角色"
+        desc="角色变更会立即生效，并影响该账号可访问的功能和数据操作范围"
+        width="max-w-md"
+        onClose={() => setRoleTarget(null)}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setRoleTarget(null)}>
+              取消
+            </Button>
+            <Button
+              disabled={updateMutation.isPending}
+              onClick={() =>
+                roleTarget &&
+                updateMutation.mutate({ id: roleTarget.user.id, patch: { role: roleTarget.role } })
+              }
+            >
+              {updateMutation.isPending ? '修改中…' : '确认修改'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm leading-relaxed text-slate-600">
+          将账号 <span className="font-medium text-slate-900">{roleTarget?.user.displayName ?? ''}</span> 的角色从{' '}
+          <span className="font-medium text-slate-900">
+            {roleTarget ? ROLE_LABELS[roleTarget.user.role] : ''}
+          </span>{' '}
+          修改为{' '}
+          <span className="font-medium text-brand-700">{roleTarget ? ROLE_LABELS[roleTarget.role] : ''}</span>。
+        </p>
       </Modal>
 
       {/* 第一步：确认 */}
@@ -257,6 +341,37 @@ export function UsersPage() {
             />
           </Field>
           <p className="text-xs text-slate-500">建议提醒用户登录后尽快修改为自己的密码。</p>
+        </div>
+      </Modal>
+
+      <Modal
+        open={deleteTarget !== null}
+        title="删除用户"
+        desc="仅已停用的账号可以删除"
+        width="max-w-md"
+        onClose={() => setDeleteTarget(null)}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              取消
+            </Button>
+            <Button
+              variant="danger"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              {deleteMutation.isPending ? '删除中…' : '确认删除'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-2 text-sm text-slate-700">
+          <p>
+            确认删除账号 <span className="font-medium">{deleteTarget?.username ?? ''}</span> 吗？
+          </p>
+          <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            删除后不可恢复，该账号的登录会话与刷新令牌会一并清除。
+          </p>
         </div>
       </Modal>
     </div>

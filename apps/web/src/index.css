@@ -25,6 +25,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+::selection {
+  background: #dbe6ff;
+  color: #172554;
+}
+
+.resource-table-scroll {
+  scrollbar-gutter: stable;
+}
+
 /* 细滚动条，表格区域更清爽 */
 *::-webkit-scrollbar {
   width: 8px;
