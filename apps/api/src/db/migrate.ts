@@ -1,16 +1,10 @@
 /**
- * 迁移入口：npm run db:migrate
- * 迁移文件由 drizzle-kit 生成（db:generate），可回滚版本化，禁止手工改库。
+ * 显式迁移入口：npm run db:migrate
+ * PostgreSQL/DWS 使用 DB_SCHEMA；SQLite 继续使用 Drizzle 原生迁移。
  */
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import { db } from './index.js';
+import { runAllMigrations } from './auto-migrate.js';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const folder = resolve(here, '../../drizzle');
-
-migrate(db, { migrationsFolder: folder });
+await runAllMigrations();
 // eslint-disable-next-line no-console
 console.log('[db] 迁移完成');
 process.exit(0);

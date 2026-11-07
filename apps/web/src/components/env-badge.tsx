@@ -1,8 +1,8 @@
-import { ENVIRONMENT_TONES, hexToRgb } from '@dw/shared';
+import { hexToRgb } from '@dw/shared';
 import { useDict } from '../lib/dict';
 import { cn } from './ui';
 
-/** 预设色调 → 兜底十六进制（内置环境在字典里一定有 color，这里只防御自定义环境未填色） */
+/** 预设色调 → 兜底十六进制（环境字典未配置自定义标识色时使用） */
 const TONE_HEX: Record<string, string> = {
   gray: '#475569',
   blue: '#2563eb',
@@ -10,7 +10,7 @@ const TONE_HEX: Record<string, string> = {
   amber: '#d97706',
   red: '#dc2626',
   purple: '#7c3aed',
-  violet: '#7c3aed',
+  violet: '#a63a1a',
 };
 
 function rgba(hex: string, alpha: number): string {
@@ -56,9 +56,12 @@ export function EnvBadge({
 }) {
   const dict = useDict();
   const raw = dict.envColor(code);
-  const tone = ENVIRONMENT_TONES[code as keyof typeof ENVIRONMENT_TONES] ?? 'gray';
+  const tone = dict.envTone(code);
   const hex = raw ?? TONE_HEX[tone] ?? TONE_HEX.gray;
   const text = luminance(hex) > 0.62 ? darken(hex, 0.45) : hex;
+  const resolvedLabel = label ?? dict.envLabel(code);
+  const duplicateLabel = dict.environments.filter((item) => item.label === resolvedLabel).length > 1;
+  const displayLabel = duplicateLabel ? `${resolvedLabel}（${code}）` : resolvedLabel;
 
   return (
     <span
@@ -75,7 +78,7 @@ export function EnvBadge({
       }}
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: hex }} />
-      {label ?? dict.envLabel(code)}
+      {displayLabel}
     </span>
   );
 }

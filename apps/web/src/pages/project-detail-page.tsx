@@ -45,6 +45,7 @@ import {
   Input,
   Modal,
   ModalCancelButton,
+  PageHeader,
   Select,
   Spinner,
   Table,
@@ -207,34 +208,40 @@ export function ProjectDetailPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link
-            to="/projects"
-            className="mb-1 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-brand-700"
-          >
-            <ArrowLeft size={13} />
-            返回项目列表
-          </Link>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-slate-900">{data.name}</h1>
+      <Link
+        to="/projects"
+        className="mb-3 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-brand-700"
+      >
+        <ArrowLeft size={13} />
+        返回项目列表
+      </Link>
+      <PageHeader
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            {data.name}
             <Badge tone={data.status === 'ACTIVE' ? 'green' : 'gray'}>
               {data.status === 'ACTIVE' ? '进行中' : '已归档'}
             </Badge>
-          </div>
-          <p className="mt-1 text-xs text-slate-500">
-            <span className="font-mono">{data.code}</span>
-            {data.owner ? ` · 负责人 ${data.owner}` : ''} · {data.envCount} 套环境 · {data.resourceCount} 个资源
-          </p>
-          {data.description && <p className="mt-1 max-w-2xl text-xs text-slate-500">{data.description}</p>}
-        </div>
-        {canWrite && (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus size={14} />
-            新建环境
-          </Button>
-        )}
-      </div>
+          </span>
+        }
+        meta={
+          <>
+            <p>
+              <span className="font-mono">{data.code}</span>
+              {data.owner ? ` · 负责人 ${data.owner}` : ''} · {data.envCount} 套环境 · {data.resourceCount} 个资源
+            </p>
+            {data.description && <p className="mt-1 max-w-2xl">{data.description}</p>}
+          </>
+        }
+        actions={
+          canWrite ? (
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus size={14} />
+              新建环境
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* 超期资源：过期不自动释放，此处列出本项目超期的资源明细并引导逐个续期或释放 */}
       {(data.overdueCount ?? 0) > 0 && (
@@ -1032,7 +1039,7 @@ function EditEnvModal({ env, onClose, onSaved }: { env: ProjectEnvDto | null; on
   const dict = useDict();
   const { push } = useToast();
   const [name, setName] = useState('');
-  const [environment, setEnvironment] = useState('DEV');
+  const [environment, setEnvironment] = useState('');
   const [status, setStatus] = useState<EnvRunStatus>('PLANNING');
   const [owner, setOwner] = useState('');
   const [description, setDescription] = useState('');
@@ -1148,7 +1155,7 @@ function CreateEnvModal({
   const { push } = useToast();
   const [name, setName] = useState('');
   const [nameTouched, setNameTouched] = useState(false);
-  const [environment, setEnvironment] = useState<string>('DEV');
+  const [environment, setEnvironment] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [owner, setOwner] = useState(defaultOwner);
   const [status, setStatus] = useState<EnvRunStatus>('PLANNING');
@@ -1158,10 +1165,10 @@ function CreateEnvModal({
   // 打开弹窗时按当前环境字典回填默认名称，让项目环境名称与字典保持一致
   useEffect(() => {
     if (!open) return;
-    const first = dict.activeEnvironments[0]?.code ?? 'DEV';
+    const first = dict.activeEnvironments[0]?.code ?? '';
     setEnvironment(first);
     setNameTouched(false);
-    setName(`${dict.envLabel(first)}环境`);
+    setName(first ? `${dict.envLabel(first)}环境` : '');
     setError('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, dict.activeEnvironments.map((e) => `${e.code}:${e.label}`).join(',')]);
@@ -1204,7 +1211,7 @@ function CreateEnvModal({
       footer={
         <>
           <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
-          <Button disabled={!name || mutation.isPending} onClick={() => mutation.mutate()}>
+          <Button disabled={!name || !environment || mutation.isPending} onClick={() => mutation.mutate()}>
             {mutation.isPending ? '创建中…' : '创建环境'}
           </Button>
         </>
@@ -1226,7 +1233,8 @@ function CreateEnvModal({
           <Field label="环境类型" required>
             <Select
               value={environment}
-              options={dict.envOptions()}
+              placeholder="请选择环境"
+              options={dict.envOptions({ includeDisabled: false })}
               onChange={(e) => {
                 setEnvironment(e.target.value);
                 if (!nameTouched) setName(`${dict.envLabel(e.target.value)}环境`);

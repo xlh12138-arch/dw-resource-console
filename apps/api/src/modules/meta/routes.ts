@@ -1,11 +1,4 @@
-import {
-  ATTR_FIELDS,
-  RESOURCE_STATUSES,
-  RESOURCE_STATUS_LABELS,
-  ROLES,
-  ROLE_LABELS,
-  TYPE_COLUMNS,
-} from '@dw/shared';
+import { RESOURCE_STATUSES, RESOURCE_STATUS_LABELS, ROLES, ROLE_LABELS } from '@dw/shared';
 import { z } from 'zod';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { environmentService, resourceTypeService } from '../dict/service.js';
@@ -22,7 +15,7 @@ const metaSchema = z.object({
 
 /**
  * 元数据接口：前端下拉框与动态表单的单一数据源。
- * 资源类型与环境均取自字典（可在「字典配置」页面维护），内置常量仅作兜底。
+ * 资源类型与环境均取自字典（可在「字典配置」页面维护）。
  */
 export const metaRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
@@ -38,14 +31,8 @@ export const metaRoutes: FastifyPluginAsyncZod = async (app) => {
       const typeColumns: Record<string, string[]> = {};
       for (const t of types) {
         const meta = await getTypeMeta(t.code);
-        attrFields[t.code] =
-          meta.fields.length > 0
-            ? toAttrFieldDefs(meta.fields)
-            : ((ATTR_FIELDS as unknown as Record<string, unknown[]>)[t.code] ?? []);
-        typeColumns[t.code] =
-          meta.listColumns.length > 0
-            ? meta.listColumns
-            : ((TYPE_COLUMNS as unknown as Record<string, string[]>)[t.code] ?? []);
+        attrFields[t.code] = toAttrFieldDefs(meta.fields);
+        typeColumns[t.code] = meta.listColumns;
       }
 
       return {

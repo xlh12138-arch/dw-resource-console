@@ -1,6 +1,4 @@
-# DW Resource Console
-
-**数据仓库资源管理平台**
+# 数据仓库资源控制台
 
 统一管理批量调度服务器、平台 IP、采集交换节点、NAS 存储和 GDS 服务器，并将资源台账、项目环境、环境模板、槽位分配、容量核算、占用期限、权限与审计整合到一个控制台中。
 
@@ -52,6 +50,10 @@
 
 ## 快速开始
 
+如果目标环境是内网且不能下载 npm 依赖，请直接参考
+[离线 Docker 部署手册](docs/DOCKER_OFFLINE_DEPLOY.md)。该方案在联网机器生成镜像，
+内网服务器只需导入镜像并执行 `docker compose up -d --no-build`。
+
 ### 环境要求
 
 - Node.js `>= 20.19`，推荐 Node.js 22 LTS。
@@ -94,16 +96,22 @@ DB_DRIVER=sqlite
 DATABASE_URL=./data/dw-console.db
 ```
 
-#### PostgreSQL
+#### PostgreSQL / 华为 DWS
 
-适合生产或多实例部署：
+适合生产、多实例部署和 PostgreSQL 兼容的华为 DWS：
 
 ```env
 DB_DRIVER=postgres
 DATABASE_URL=postgres://user:password@127.0.0.1:5432/dw
+DB_SCHEMA=public
+DB_CREATE_SCHEMA=true
 DB_SSL=false
 DB_POOL_MAX=10
 ```
+
+`DB_SCHEMA` 控制业务表、外键、索引和原生查询使用的 PostgreSQL schema。
+仅允许小写字母、数字和下划线；如果 schema 由 DBA 预建，可设置
+`DB_CREATE_SCHEMA=false`。
 
 如果密码包含 `@`、`#`、`/`、`:` 等 URL 保留字符，必须先进行 URL 编码。例如 `@` 应写成 `%40`。
 
@@ -237,10 +245,10 @@ flowchart LR
 - 使用 WAL、外键检查和 `BEGIN IMMEDIATE` 事务。
 - 事务由进程内互斥锁串行化，不支持多实例写入。
 
-### PostgreSQL
+### PostgreSQL / DWS
 
 - 使用 `node-postgres` 连接池。
-- 使用独立 PostgreSQL schema 和迁移目录。
+- 使用可配置 PostgreSQL schema 和迁移目录；迁移 SQL 会按 `DB_SCHEMA` 自动切换。
 - 事务直接使用连接池中的原生事务连接。
 - 支持多实例部署和更高的并发能力。
 
@@ -338,6 +346,8 @@ npm run ui:check
 | --- | --- | --- |
 | `DB_DRIVER` | `sqlite` | `sqlite` 或 `postgres` |
 | `DATABASE_URL` | `./data/dw-console.db` | SQLite 文件路径或 PostgreSQL 连接串 |
+| `DB_SCHEMA` | `public` | PostgreSQL/DWS 业务表所在 schema，仅允许小写标识符 |
+| `DB_CREATE_SCHEMA` | `true` | schema 不存在时是否允许应用创建 |
 | `DB_SSL` | `false` | PostgreSQL 是否启用 TLS |
 | `DB_POOL_MAX` | `10` | PostgreSQL 连接池上限 |
 | `AUTO_MIGRATE` | `true` | 启动时自动执行迁移 |

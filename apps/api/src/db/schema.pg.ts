@@ -6,23 +6,28 @@ import {
   integer,
   jsonb,
   pgTable,
+  pgSchema,
   serial,
   text,
   timestamp,
   uniqueIndex,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
+import { config } from '../config/env.js';
 
 /**
  * PostgreSQL schema 与 SQLite schema 保持相同的表名、列名和业务类型。
  * 时间统一存 Unix 毫秒，避免两种驱动之间出现 Date/number 口径差异。
  */
+const appSchema = config.db.schema === 'public' ? null : pgSchema(config.db.schema);
+const appTable = (appSchema ? appSchema.table.bind(appSchema) : pgTable) as typeof pgTable;
+
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
 } as const;
 
-export const resourceTypes = pgTable('resource_types', {
+export const resourceTypes = appTable('resource_types', {
   code: text('code').primaryKey(),
   label: text('label').notNull(),
   prefix: text('prefix').notNull(),
@@ -35,7 +40,7 @@ export const resourceTypes = pgTable('resource_types', {
   ...timestamps,
 });
 
-export const resourceTypeFields = pgTable(
+export const resourceTypeFields = appTable(
   'resource_type_fields',
   {
     id: serial('id').primaryKey(),
@@ -59,7 +64,7 @@ export const resourceTypeFields = pgTable(
   (t) => [uniqueIndex('uq_type_field').on(t.typeCode, t.key), index('idx_type_field_type').on(t.typeCode)],
 );
 
-export const environmentDict = pgTable('environments', {
+export const environmentDict = appTable('environments', {
   code: text('code').primaryKey(),
   label: text('label').notNull(),
   tone: text('tone').notNull().default('gray'),
@@ -71,7 +76,7 @@ export const environmentDict = pgTable('environments', {
   ...timestamps,
 });
 
-export const projects = pgTable(
+export const projects = appTable(
   'projects',
   {
     id: serial('id').primaryKey(),
@@ -92,7 +97,7 @@ export const projects = pgTable(
   ],
 );
 
-export const envTemplates = pgTable(
+export const envTemplates = appTable(
   'env_templates',
   {
     id: serial('id').primaryKey(),
@@ -111,7 +116,7 @@ export const envTemplates = pgTable(
   ],
 );
 
-export const envTemplateItems = pgTable(
+export const envTemplateItems = appTable(
   'env_template_items',
   {
     id: serial('id').primaryKey(),
@@ -128,7 +133,7 @@ export const envTemplateItems = pgTable(
   (t) => [index('idx_template_items_template').on(t.templateId)],
 );
 
-export const projectEnvironments = pgTable(
+export const projectEnvironments = appTable(
   'project_environments',
   {
     id: serial('id').primaryKey(),
@@ -154,7 +159,7 @@ export const projectEnvironments = pgTable(
   ],
 );
 
-export const users = pgTable(
+export const users = appTable(
   'users',
   {
     id: serial('id').primaryKey(),
@@ -170,7 +175,7 @@ export const users = pgTable(
   (t) => [uniqueIndex('uq_users_username').on(t.username)],
 );
 
-export const refreshTokens = pgTable(
+export const refreshTokens = appTable(
   'refresh_tokens',
   {
     id: serial('id').primaryKey(),
@@ -189,7 +194,7 @@ export const refreshTokens = pgTable(
   ],
 );
 
-export const resources = pgTable(
+export const resources = appTable(
   'resources',
   {
     id: serial('id').primaryKey(),
@@ -233,7 +238,7 @@ export const resources = pgTable(
   ],
 );
 
-export const envSlots = pgTable(
+export const envSlots = appTable(
   'env_slots',
   {
     id: serial('id').primaryKey(),
@@ -259,7 +264,7 @@ export const envSlots = pgTable(
   ],
 );
 
-export const auditLogs = pgTable(
+export const auditLogs = appTable(
   'audit_logs',
   {
     id: serial('id').primaryKey(),

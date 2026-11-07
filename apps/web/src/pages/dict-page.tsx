@@ -15,11 +15,10 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Settings2,
   Trash2,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Badge, Button, Card, CardHeader, EmptyState, ErrorBanner, Field, Input, Modal, ModalCancelButton, Select, Spinner, Switch, Table, Td, Th } from '../components/ui';
+import { Badge, Button, Card, CardHeader, EmptyState, ErrorBanner, Field, Input, Modal, ModalCancelButton, PageHeader, Select, Spinner, Switch, Table, Td, Th } from '../components/ui';
 import { ColorPicker } from '../components/color-picker';
 import { EnvBadge } from '../components/env-badge';
 import { useToast } from '../components/toast';
@@ -617,9 +616,6 @@ export function ResourceTypePanel() {
                 </Td>
                 <Td>
                   <Badge tone={t.enabled ? 'green' : 'gray'}>{t.enabled ? '启用' : '停用'}</Badge>
-                  {t.builtin && (
-                    <span className="ml-1 text-[11px] text-slate-400">内置</span>
-                  )}
                 </Td>
                 <Td className="text-right">
                   <div className="flex justify-end gap-1">
@@ -1096,7 +1092,6 @@ export function EnvironmentPanel() {
                 </Td>
                 <Td>
                   <Badge tone={e.enabled ? 'green' : 'gray'}>{e.enabled ? '启用' : '停用'}</Badge>
-                  {e.builtin && <span className="ml-1 text-[11px] text-slate-400">内置</span>}
                 </Td>
                 <Td className="text-right">
                   <div className="flex justify-end gap-1">
@@ -1279,34 +1274,31 @@ export function DictPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-            <Settings2 size={18} className="text-brand-600" />
-            字典配置
-          </h1>
-        </div>
-        <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
-          <button
-            type="button"
-            onClick={() => setTab('type')}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-              tab === 'type' ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            资源类型
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('env')}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-              tab === 'env' ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            环境
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="字典配置"
+        actions={
+          <div className="flex rounded-[8px] border border-slate-200 bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setTab('type')}
+              className={`h-8 rounded-[6px] px-3 text-xs font-medium transition-colors ${
+                tab === 'type' ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              资源类型
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('env')}
+              className={`h-8 rounded-[6px] px-3 text-xs font-medium transition-colors ${
+                tab === 'env' ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              环境
+            </button>
+          </div>
+        }
+      />
 
       {!canWrite && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">

@@ -38,7 +38,7 @@ function RequireAdmin({
   const { user } = useAuth();
   if (user && user.role !== 'ADMIN') {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white">
+      <div className="rounded-[12px] border border-slate-200 bg-white">
         <EmptyState title="无权访问" desc={desc} />
       </div>
     );

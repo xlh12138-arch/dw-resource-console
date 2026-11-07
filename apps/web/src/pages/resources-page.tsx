@@ -42,7 +42,7 @@ import { useAuth } from '../lib/auth';
 import { ResourceDetailModal } from '../components/resource-detail';
 import { ResourceFormModal } from '../components/resource-form';
 import { useToast } from '../components/toast';
-import { Button, Card, ClickableBadge, EmptyState, ErrorBanner, Field, Input, Modal, ModalCancelButton, Pagination, Select, Spinner, Td, Th, Table, Textarea } from '../components/ui';
+import { Button, Card, ClickableBadge, EmptyState, ErrorBanner, Field, Input, Modal, ModalCancelButton, PageHeader, Pagination, Select, Spinner, Td, Th, Table, Textarea } from '../components/ui';
 import { EnvBadge } from '../components/env-badge';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -304,11 +304,10 @@ export function ResourcesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">资源台账</h1>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        title="资源台账"
+        actions={
+          <>
           <Button
             variant="outline"
             title={selected.length > 0 ? `仅导出已勾选的 ${selected.length} 个资源` : '导出当前筛选结果'}
@@ -362,8 +361,9 @@ export function ResourcesPage() {
               </Button>
             </>
           )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <Card>
         <div className="flex flex-wrap items-end gap-3 px-5 py-4">
@@ -645,7 +645,7 @@ export function ResourcesPage() {
                     >
                       {r.name}
                       {r.slotRefCount > 0 && (
-                        <span className="ml-1 inline-flex items-center gap-0.5 text-[11px] font-normal text-violet-600">
+                        <span className="ml-1 inline-flex items-center gap-0.5 text-[11px] font-normal text-brand-600">
                           <Link2 size={11} />
                           {r.slotRefCount}
                         </span>
@@ -771,7 +771,7 @@ export function ResourcesPage() {
                         </p>
                       ) : null}
                       {r.capacityPeak !== null && r.capacityAllocated > r.capacityPeak + 0.01 ? (
-                        <p className="mt-0.5 text-[10px] text-violet-600">错峰复用 · 峰值 {r.capacityPeak}</p>
+                        <p className="mt-0.5 text-[10px] text-brand-600">错峰复用 · 峰值 {r.capacityPeak}</p>
                       ) : null}
                     </div>
                   ) : (

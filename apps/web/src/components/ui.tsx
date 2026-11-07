@@ -20,19 +20,20 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: ButtonSize }) {
   const variants: Record<ButtonVariant, string> = {
     primary: 'bg-brand-600 text-white hover:bg-brand-700 disabled:bg-brand-400',
-    outline: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-    ghost: 'text-slate-600 hover:bg-slate-100',
+    outline: 'border border-slate-300 bg-transparent text-slate-700 hover:border-brand-600 hover:bg-white',
+    ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
     danger: 'bg-rose-600 text-white hover:bg-rose-700 disabled:bg-rose-300',
   };
   const sizes: Record<ButtonSize, string> = {
     sm: 'h-8 px-3 text-xs',
-    md: 'h-9 px-4 text-sm',
+    md: 'h-10 px-4 text-sm',
   };
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex items-center justify-center gap-1.5 rounded-[8px] font-medium transition-[background-color,border-color,color,transform] duration-150',
+        'hover:-translate-y-px active:translate-y-0',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0',
         variants[variant],
         sizes[size],
         className,
@@ -59,7 +60,7 @@ export function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-xs font-medium text-slate-700">
+      <span className="text-[13px] font-medium text-slate-700">
         {label}
         {required && <span className="ml-0.5 text-rose-500">*</span>}
       </span>
@@ -67,15 +68,15 @@ export function Field({
       {error ? (
         <span className="block text-xs text-rose-600">{error}</span>
       ) : hint ? (
-        <span className="block text-xs text-slate-400">{hint}</span>
+        <span className="block text-xs leading-relaxed text-slate-500">{hint}</span>
       ) : null}
     </label>
   );
 }
 
 const controlBase =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 ' +
-  'focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:bg-slate-50';
+  'w-full rounded-[8px] border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 ' +
+  'transition-colors focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-signal-100 disabled:bg-slate-50 disabled:text-slate-500';
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn(controlBase, className)} {...props} />;
@@ -177,8 +178,8 @@ export function Switch({
       disabled={disabled}
       onClick={() => !disabled && onChange(!checked)}
       className={cn(
-        'group inline-flex items-center gap-2 rounded-lg text-xs transition-opacity',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400',
+        'group inline-flex items-center gap-2 rounded-[8px] text-xs transition-opacity',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:ring-offset-2',
         disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
       )}
     >
@@ -203,16 +204,36 @@ export function Switch({
 
 /* ------------------------------- 展示组件 ------------------------------- */
 
+export function PageHeader({
+  title,
+  meta,
+  actions,
+}: {
+  title: ReactNode;
+  meta?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <header className="flex min-h-12 flex-wrap items-center justify-between gap-x-5 gap-y-3 pb-1">
+      <div className="min-w-0">
+        <h1 className="page-title">{title}</h1>
+        {meta ? <div className="mt-2 text-xs leading-relaxed text-slate-500">{meta}</div> : null}
+      </div>
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+    </header>
+  );
+}
+
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <section className={cn('rounded-xl border border-slate-200 bg-white shadow-sm', className)}>{children}</section>;
+  return <section className={cn('rounded-[12px] border border-slate-200 bg-white', className)}>{children}</section>;
 }
 
 export function CardHeader({ title, desc, action }: { title: string; desc?: string; action?: ReactNode }) {
   return (
-    <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+    <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-        {desc && <p className="mt-0.5 text-xs text-slate-500">{desc}</p>}
+        <h3 className="text-[13px] font-medium text-slate-900">{title}</h3>
+        {desc && <p className="mt-1 text-xs leading-relaxed text-slate-500">{desc}</p>}
       </div>
       {action}
     </header>
@@ -225,7 +246,7 @@ const tones = {
   green: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
   amber: 'bg-amber-50 text-amber-700 ring-amber-100',
   red: 'bg-rose-50 text-rose-700 ring-rose-100',
-  violet: 'bg-violet-50 text-violet-700 ring-violet-100',
+  violet: 'bg-signal-50 text-brand-700 ring-signal-200',
 } as const;
 
 export function Badge({
@@ -240,7 +261,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
+        'inline-flex items-center rounded-[4px] px-2 py-1 text-[11px] font-medium leading-none ring-1 ring-inset',
         tones[tone],
         className,
       )}
@@ -276,8 +297,8 @@ export function ClickableBadge({
         onClick();
       }}
       className={cn(
-        'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset transition-colors',
-        'hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400',
+        'inline-flex items-center rounded-[4px] px-2 py-1 text-[11px] font-medium leading-none ring-1 ring-inset transition-colors',
+        'hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400',
         tones[tone],
         className,
       )}
@@ -309,7 +330,7 @@ export function EmptyState({ title, desc, action }: { title: string; desc?: stri
 
 export function ErrorBanner({ message, issues }: { message: string; issues?: { field: string; message: string }[] }) {
   return (
-    <div className="space-y-1 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
+    <div className="space-y-1 rounded-[8px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
       <p>{message}</p>
       {issues && issues.length > 0 ? (
         <ul className="ml-1 list-disc space-y-0.5 pl-4 text-xs text-rose-600">
@@ -538,12 +559,12 @@ export function Modal({
   return (
     <div
       ref={layerRef}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-slate-900/40 p-4 sm:p-8"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-[#07160f]/70 p-4 backdrop-blur-[2px] sm:p-8"
     >
       <ModalGuardContext.Provider value={guard}>
       <div
         ref={dialogRef}
-        className={cn('w-full rounded-xl bg-white shadow-xl', width)}
+        className={cn('w-full rounded-[12px] border border-white/20 bg-[#fbfbf8] shadow-2xl', width)}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -557,15 +578,15 @@ export function Modal({
           if (el?.closest?.('[role="switch"], [data-dirty="1"]')) setTouched(true);
         }}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+        <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div>
-            <h3 id={titleId} className="text-base font-semibold text-slate-900">{title}</h3>
+            <h3 id={titleId} className="text-base font-medium text-slate-900">{title}</h3>
             {desc && <p id={descId} className="mt-0.5 text-xs text-slate-500">{desc}</p>}
           </div>
           <button
             type="button"
             onClick={requestClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
             aria-label="关闭"
             title="关闭（ESC）"
           >
@@ -573,7 +594,7 @@ export function Modal({
           </button>
         </header>
         <div className="px-5 py-4">{children}</div>
-        {footer && <footer className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">{footer}</footer>}
+        {footer && <footer className="flex justify-end gap-2 border-t border-slate-200 bg-white/60 px-5 py-3">{footer}</footer>}
       </div>
       </ModalGuardContext.Provider>
 
@@ -581,7 +602,7 @@ export function Modal({
         <div className="fixed inset-0 z-[60] flex items-center justify-center overscroll-contain bg-slate-900/50 p-4">
           <div
             ref={confirmRef}
-            className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl focus:outline-none"
+            className="w-full max-w-sm rounded-[12px] border border-slate-200 bg-white p-5 shadow-2xl focus:outline-none"
             role="dialog"
             aria-modal="true"
             aria-labelledby={confirmTitleId}
@@ -637,14 +658,14 @@ export function Pagination({
   onPageSizeChange?: (pageSize: number) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3 text-[13px] text-slate-500">
       <div className="flex items-center gap-2">
         <span>共 {total} 条</span>
         {onPageSizeChange && pageSizeOptions?.length ? (
           <label className="inline-flex items-center gap-1">
             <span>每页</span>
             <select
-              className="h-7 rounded-md border border-slate-200 bg-white px-1.5 text-xs text-slate-700 outline-none focus:border-brand-400"
+              className="h-8 rounded-[6px] border border-slate-300 bg-white px-2 text-xs text-slate-700 outline-none focus:border-brand-600 focus:ring-2 focus:ring-signal-100"
               value={pageSize}
               onChange={(event) => onPageSizeChange(Number(event.target.value))}
               aria-label="每页显示条数"
@@ -690,8 +711,8 @@ export function Table({
   return (
     <div className={cn('overflow-x-auto overscroll-x-contain', containerClassName)}>
       <table className={cn('w-full min-w-[720px] text-left text-sm', tableClassName)}>
-        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">{head}</thead>
-        <tbody className="divide-y divide-slate-100">{children}</tbody>
+        <thead className="bg-slate-50 text-[12px] font-medium text-slate-600">{head}</thead>
+        <tbody className="divide-y divide-slate-200">{children}</tbody>
       </table>
     </div>
   );
@@ -707,12 +728,12 @@ export function Th({
   ariaSort?: 'ascending' | 'descending' | 'none' | 'other';
 }) {
   return (
-    <th scope="col" aria-sort={ariaSort} className={cn('whitespace-nowrap px-4 py-2.5 font-medium', className)}>
+    <th scope="col" aria-sort={ariaSort} className={cn('whitespace-nowrap px-4 py-3 font-medium', className)}>
       {children}
     </th>
   );
 }
 
 export function Td({ children, className }: { children?: ReactNode; className?: string }) {
-  return <td className={cn('px-4 py-2.5 align-middle text-slate-700', className)}>{children}</td>;
+  return <td className={cn('px-4 py-3 align-middle text-slate-700', className)}>{children}</td>;
 }

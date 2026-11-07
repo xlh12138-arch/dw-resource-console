@@ -40,6 +40,12 @@ const envSchema = z.object({
 
   DB_DRIVER: z.enum(['sqlite', 'postgres']).default('sqlite'),
   DATABASE_URL: z.string().min(1).default('./data/dw-console.db'),
+  DB_SCHEMA: z
+    .string()
+    .trim()
+    .regex(/^[a-z_][a-z0-9_]{0,62}$/, 'DB_SCHEMA 必须是小写 PostgreSQL schema 名称')
+    .default('public'),
+  DB_CREATE_SCHEMA: z.string().optional(),
   DB_SSL: z.string().optional(),
   DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
 
@@ -103,6 +109,8 @@ export const config = {
   db: {
     driver: raw.DB_DRIVER,
     url: raw.DATABASE_URL,
+    schema: raw.DB_SCHEMA,
+    createSchema: bool(raw.DB_CREATE_SCHEMA, true),
     ssl: bool(raw.DB_SSL, false),
     poolMax: raw.DB_POOL_MAX,
   },

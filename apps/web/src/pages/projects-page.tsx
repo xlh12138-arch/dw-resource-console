@@ -17,6 +17,7 @@ import {
   Input,
   Modal,
   ModalCancelButton,
+  PageHeader,
   Pagination,
   Select,
   Spinner,
@@ -68,17 +69,17 @@ export function ProjectsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">需求项目</h1>
-        </div>
-        {canWrite && (
-          <Button onClick={() => setForm({ open: true, initial: null })}>
-            <Plus size={14} />
-            新建项目
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="需求项目"
+        actions={
+          canWrite ? (
+            <Button onClick={() => setForm({ open: true, initial: null })}>
+              <Plus size={14} />
+              新建项目
+            </Button>
+          ) : undefined
+        }
+      />
 
       <Card>
         <div className="flex flex-wrap items-end gap-3 px-5 py-4">

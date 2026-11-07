@@ -64,9 +64,7 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
   // 父组件按打开次数重建本组件；初始化只发生一次，避免打开后的异步回填覆盖用户刚选的资源类型。
   const [type, setType] = useState<string>(initial?.type ?? defaultType);
   const [name, setName] = useState(initial?.name ?? '');
-  const [environment, setEnvironment] = useState<string>(
-    initial?.environment ?? dict.activeEnvironments[0]?.code ?? 'DEV',
-  );
+  const [environment, setEnvironment] = useState<string>(initial?.environment ?? '');
   const [status, setStatus] = useState<ResourceStatus>(initial?.status ?? 'IN_USE');
   const [datacenter, setDatacenter] = useState(initial?.datacenter ?? '');
   const [owner, setOwner] = useState(initial?.owner ?? '');
@@ -156,7 +154,7 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
   useEffect(() => {
     if (!open || dict.loading) return;
     const known = dict.environments.some((e) => e.code === environment);
-    if (!known && dict.activeEnvironments.length > 0) {
+    if ((!environment || !known) && dict.activeEnvironments.length > 0) {
       setEnvironment(dict.activeEnvironments[0]!.code);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -393,6 +391,7 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
           <Field label="所属环境" required>
             <Select
               value={environment}
+              placeholder="请选择环境"
               options={dict.envOptions()}
               onChange={(e) => setEnvironment(e.target.value)}
             />

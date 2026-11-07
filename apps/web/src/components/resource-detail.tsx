@@ -268,7 +268,7 @@ export function ResourceDetailModal({
                   title={`槽位占用 ${capacity.slotAllocated}`}
                 />
                 <div
-                  className="h-full bg-violet-500"
+                  className="h-full bg-signal-500"
                   style={{ width: `${Math.min(100, capacity.total ? (capacity.childAllocated / capacity.total) * 100 : 0)}%` }}
                   title={`子资源申请 ${capacity.childAllocated}`}
                 />
@@ -280,7 +280,7 @@ export function ResourceDetailModal({
                   {capacity.unit ? ` ${capacity.unit}` : ''}
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm bg-violet-500" />
+                  <span className="h-2 w-2 rounded-sm bg-signal-500" />
                   子资源申请 {capacity.childAllocated}
                   {capacity.unit ? ` ${capacity.unit}` : ''}
                 </span>
@@ -403,7 +403,7 @@ export function ResourceDetailModal({
                 }))}
               />
               {tl.overlaps.length > 0 && (
-                <p className="mt-1.5 text-[11px] text-violet-600">
+                <p className="mt-1.5 text-[11px] text-brand-600">
                   存在同一时间段被多处占用的记录（共用），已用紫框标注。
                 </p>
               )}

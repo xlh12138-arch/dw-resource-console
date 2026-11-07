@@ -1,86 +1,114 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Boxes, Clock, FolderTree, RefreshCcw, TrendingUp } from 'lucide-react';
-import { RESOURCE_STATUS_LABELS, type ResourceStatus } from '@dw/shared';
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  Boxes,
+  Clock3,
+  FolderTree,
+  RefreshCcw,
+  Server,
+  Tags,
+} from 'lucide-react';
+import { RESOURCE_STATUS_LABELS } from '@dw/shared';
 import { useNavigate } from 'react-router';
 import { useDict } from '../lib/dict';
 import { statsApi } from '../lib/endpoints';
-import { Card, Badge, CardHeader, ClickableBadge, EmptyState, ErrorBanner, Spinner, Td, Th, Table } from '../components/ui';
+import { Badge, Button, Card, CardHeader, EmptyState, ErrorBanner, PageHeader, Spinner, Table, Td, Th, cn } from '../components/ui';
 import { EnvBadge } from '../components/env-badge';
 import { friendlyMessage } from '../lib/api';
 
-function StatCard({
-  title,
+function MetricTile({
+  label,
   value,
-  unit,
-  desc,
+  detail,
   icon,
-  tone,
+  dark = false,
   onClick,
-  hint,
 }: {
-  title: string;
+  label: string;
   value: string | number;
-  unit?: string;
-  desc?: string;
+  detail: string;
   icon: React.ReactNode;
-  tone: string;
+  dark?: boolean;
   onClick?: () => void;
-  hint?: string;
 }) {
-  const body = (
-    <Card className={`h-full p-5 ${onClick ? 'transition-colors hover:border-brand-300' : ''}`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs text-slate-500">{title}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">
-            {value}
-            {unit && <span className="ml-1 text-sm font-normal text-slate-500">{unit}</span>}
-          </p>
-          {desc && <p className="mt-1 text-xs text-slate-500">{desc}</p>}
-          {hint && <p className="mt-0.5 text-[11px] text-brand-600">{hint}</p>}
-        </div>
-        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${tone}`}>{icon}</div>
+  const content = (
+    <>
+      <div className="flex items-start justify-between gap-4">
+        <p className={cn('text-[13px] font-medium', dark ? 'text-white/60' : 'text-slate-500')}>{label}</p>
+        <span
+          className={cn(
+            'flex h-9 w-9 items-center justify-center rounded-[8px] border',
+            dark ? 'border-white/15 bg-white/[0.06] text-signal-400' : 'border-slate-200 bg-slate-50 text-brand-600',
+          )}
+        >
+          {icon}
+        </span>
       </div>
-    </Card>
+      <div className="mt-6">
+        <p className={cn('metric-figure text-[46px] font-medium leading-none', dark ? 'text-white' : 'text-slate-900')}>
+          {value}
+        </p>
+        <p className={cn('mt-3 text-xs leading-relaxed', dark ? 'text-white/50' : 'text-slate-500')}>{detail}</p>
+      </div>
+      {onClick ? (
+        <span className={cn('mt-5 inline-flex items-center gap-1 text-xs font-medium', dark ? 'text-signal-400' : 'text-brand-600')}>
+          查看明细
+          <ArrowUpRight size={13} />
+        </span>
+      ) : null}
+    </>
   );
-  if (!onClick) return body;
-  return (
+
+  const className = cn(
+    'flex min-h-[196px] flex-col rounded-[12px] border p-5 text-left',
+    dark ? 'console-grid border-brand-600 bg-brand-600' : 'border-slate-200 bg-white',
+    onClick && 'group transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand-500',
+  );
+
+  return onClick ? (
     <button
       type="button"
       onClick={onClick}
-      className="h-full w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+      className={cn(className, 'focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:ring-offset-2')}
     >
-      {body}
+      {content}
     </button>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }
 
-function BarList({
+function DistributionList({
   items,
   onPick,
 }: {
-  items: { label: string; count: number; total: number; tone: string; key?: string | number; hint?: string }[];
+  items: { label: string; count: number; total: number; key?: string | number; hint?: string }[];
   onPick?: (item: { label: string; key?: string | number }) => void;
 }) {
   return (
-    <ul className="space-y-3 px-5 py-4">
-      {items.map((item) => (
+    <ul className="divide-y divide-slate-200 px-5">
+      {items.map((item, index) => (
         <li key={item.key ?? item.label}>
           <button
             type="button"
             disabled={!onPick}
             onClick={() => onPick?.(item)}
-            className={`group w-full text-left ${onPick ? 'cursor-pointer' : 'cursor-default'}`}
-            title={onPick ? item.hint ?? '点击在资源台账中查看' : undefined}
+            className={cn(
+              'group w-full py-3.5 text-left',
+              onPick ? 'cursor-pointer' : 'cursor-default',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal-400',
+            )}
+            title={onPick ? item.hint ?? '在资源台账中查看' : undefined}
           >
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className={`text-slate-600 ${onPick ? 'group-hover:text-brand-700' : ''}`}>{item.label}</span>
-              <span className="font-medium text-slate-800">{item.count}</span>
+            <div className="mb-2 flex items-center justify-between gap-3 text-[13px]">
+              <span className={cn('truncate text-slate-600', onPick && 'group-hover:text-brand-600')}>{item.label}</span>
+              <span className="font-mono text-xs tabular-nums text-slate-800">{item.count}</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-1 overflow-hidden rounded-full bg-slate-100">
               <div
-                className={`h-full rounded-full ${item.tone} transition-opacity ${onPick ? 'group-hover:opacity-80' : ''}`}
-                style={{ width: `${item.total ? Math.round((item.count / item.total) * 100) : 0}%` }}
+                className={cn('h-full transition-[width,background-color]', index === 0 ? 'bg-signal-500' : 'bg-brand-500')}
+                style={{ width: `${item.total ? Math.max(3, Math.round((item.count / item.total) * 100)) : 0}%` }}
               />
             </div>
           </button>
@@ -109,129 +137,115 @@ export function DashboardPage() {
     return <ErrorBanner message={friendlyMessage(error)} />;
   }
 
-  // 优先展示资源数最多的环境，字典里没有生产环境时自动退化
   const primaryEnv = [...data.byEnvironment].sort((a, b) => b.count - a.count)[0] ?? data.byEnvironment[0];
   const prodCount = primaryEnv?.count ?? 0;
   const inUse = data.byStatus.find((s) => s.status === 'IN_USE')?.count ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">资源概览</h1>
-          {data.ipConflict.count > 0 ? (
-            <p className="mt-1 inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-0.5 text-[11px] text-rose-600">
-              <AlertTriangle size={11} />
-              {data.ipConflict.count} 个 IP 冲突：{data.ipConflict.samples.join('、')}
-            </p>
-          ) : null}
-        </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="资源概览"
+        actions={
+          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCcw size={14} className={isFetching ? 'animate-spin' : ''} />
+            刷新数据
+          </Button>
+        }
+      />
+
+      {data.ipConflict.count > 0 ? (
         <button
           type="button"
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+          className="inline-flex items-center gap-2 rounded-[6px] border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs text-rose-700 hover:bg-rose-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+          title="查看冲突的 IP 地址"
         >
-          <RefreshCcw size={13} className={isFetching ? 'animate-spin' : ''} />
-          刷新
+          <AlertTriangle size={12} />
+          {data.ipConflict.count} 个 IP 冲突：{data.ipConflict.samples.join('、')}
         </button>
-      </div>
+      ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard
-          title="资源总数"
+      <section className="grid gap-3 lg:grid-cols-2 xl:grid-cols-[1.35fr_1fr_1fr]" aria-label="核心指标">
+        <MetricTile
+          dark
+          label="资源总数"
           value={data.total}
-          desc={`在用 ${inUse} 条 · 父 ${data.hierarchy.parentCount} / 子 ${data.hierarchy.childCount}`}
-          icon={<Boxes size={17} className="text-brand-600" />}
-          tone="bg-brand-50"
+          detail={`在用 ${inUse} 条 · 顶层 ${data.hierarchy.rootCount} / 子资源 ${data.hierarchy.childCount}`}
+          icon={<Boxes size={17} />}
           onClick={() => navigate('/resources')}
-          hint="查看全部资源 →"
         />
-        <StatCard
-          title={`${primaryEnv?.label ?? '主环境'}资源`}
+        <MetricTile
+          label={`${primaryEnv?.label ?? '主环境'}资源`}
           value={prodCount}
-          desc="环境可在字典配置中自定义"
-          icon={<TrendingUp size={17} className="text-emerald-600" />}
-          tone="bg-emerald-50"
+          detail="当前资源量最高的环境"
+          icon={<Server size={17} />}
           onClick={primaryEnv ? () => navigate(`/resources?environment=${primaryEnv.environment}`) : undefined}
-          hint={primaryEnv ? '按该环境筛选 →' : undefined}
         />
-        <StatCard
-          title="占用超期"
+        <MetricTile
+          label="占用超期"
           value={data.slotPeriod.expiredCount}
-          desc={`已占用 ${data.slotPeriod.occupiedCount} · 7 天内到期 ${data.slotPeriod.expiringSoonCount} · 长期 ${data.slotPeriod.longTermCount}`}
-          icon={<Clock size={17} className={data.slotPeriod.expiredCount ? 'text-rose-600' : 'text-slate-400'} />}
-          tone={data.slotPeriod.expiredCount ? 'bg-rose-50' : 'bg-slate-100'}
+          detail={`已占用 ${data.slotPeriod.occupiedCount} · 7 天内到期 ${data.slotPeriod.expiringSoonCount} · 长期 ${data.slotPeriod.longTermCount}`}
+          icon={<Clock3 size={17} />}
           onClick={() => {
             const first = (data.overdueByProject ?? [])[0];
             navigate(first?.projectId ? `/projects/${first.projectId}` : '/projects');
           }}
-          hint={data.slotPeriod.expiredCount ? '查看超期明细 →' : undefined}
         />
-      </div>
+      </section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-3 lg:grid-cols-3" aria-label="资源分布">
         <Card>
-          <CardHeader title="按资源类型分布" desc="点击任意类型在台账中筛选" />
-          <BarList
+          <CardHeader title="资源类型" desc="按类型查看当前资源构成" />
+          <DistributionList
             items={data.byType.map((t) => ({
               key: t.type,
-              label: dict.typeLabel(t.type),
+              label: t.label,
               count: t.count,
               total: data.total,
-              tone: 'bg-brand-500',
             }))}
             onPick={(item) => navigate(`/resources?type=${item.key}`)}
           />
         </Card>
         <Card>
-          <CardHeader title="按环境分布" desc="环境可在字典配置中维护" />
-          <BarList
+          <CardHeader title="运行环境" desc="按环境查看资源分布" />
+          <DistributionList
             items={data.byEnvironment.map((e) => ({
               key: e.environment,
-              label: dict.envLabel(e.environment),
+              label: e.label,
               count: e.count,
               total: data.total,
-              tone: e.environment === primaryEnv?.environment ? 'bg-emerald-500' : 'bg-slate-400',
             }))}
             onPick={(item) => navigate(`/resources?environment=${item.key}`)}
           />
         </Card>
         <Card>
-          <CardHeader title="按状态分布" desc="资源生命周期状态" />
-          <BarList
+          <CardHeader title="生命周期" desc="按资源状态查看当前规模" />
+          <DistributionList
             items={data.byStatus.map((s) => ({
               key: s.status,
-              label: RESOURCE_STATUS_LABELS[s.status as ResourceStatus],
+              label: s.label,
               count: s.count,
               total: data.total,
-              tone:
-                s.status === 'IN_USE'
-                  ? 'bg-emerald-500'
-                  : s.status === 'MAINTAINING'
-                    ? 'bg-amber-500'
-                    : 'bg-slate-400',
             }))}
             onPick={(item) => navigate(`/resources?status=${item.key}`)}
           />
         </Card>
-      </div>
+      </section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <section className="grid gap-3 lg:grid-cols-[1.65fr_1fr]" aria-label="项目与标签">
+        <Card>
           <CardHeader
-            title="按项目分布"
-            desc={`共 ${data.projectSummary?.projectCount ?? 0} 个项目 · ${data.projectSummary?.envCount ?? 0} 套环境 · ${data.projectSummary?.templateCount ?? 0} 个模板`}
+            title="项目资源"
+            desc={`${data.projectSummary?.projectCount ?? 0} 个项目 · ${data.projectSummary?.envCount ?? 0} 套环境 · ${data.projectSummary?.templateCount ?? 0} 个模板`}
           />
           {(data.byProject ?? []).length === 0 ? (
-            <EmptyState title="还没有项目" desc="在「需求项目」中创建项目并为其建立环境" />
+            <EmptyState title="还没有项目" desc="在需求项目中创建项目并建立环境" />
           ) : (
-            <BarList
+            <DistributionList
               items={(data.byProject ?? []).map((p) => ({
                 key: p.projectId ?? 'none',
                 label: p.name,
                 count: p.count,
                 total: data.total,
-                tone: p.projectId === null ? 'bg-slate-400' : 'bg-violet-500',
               }))}
               onPick={(item) =>
                 navigate(item.key === 'none' ? '/resources?unassigned=true' : `/resources?projectId=${item.key}`)
@@ -239,108 +253,95 @@ export function DashboardPage() {
             />
           )}
         </Card>
-        <Card>
-          <CardHeader title="资源标签" desc="点击标签在台账中按标签筛选" />
+
+        <Card className="flex flex-col">
+          <CardHeader title="资源标签" desc="按标签继续查看台账" />
           {(data.byTag ?? []).length === 0 ? (
-            <EmptyState title="还没有标签" desc="在资源表单里为资源添加标签" />
+            <EmptyState title="还没有标签" desc="在资源表单中为资源添加标签" />
           ) : (
-            <div className="flex flex-wrap gap-1.5 px-5 py-4">
+            <div className="flex flex-wrap content-start gap-2 px-5 py-4">
               {(data.byTag ?? []).map((t) => (
-                <ClickableBadge
+                <button
                   key={t.tag}
-                  tone="violet"
+                  type="button"
                   title={`按标签 #${t.tag} 筛选`}
                   onClick={() => navigate(`/resources?tag=${encodeURIComponent(t.tag)}`)}
+                  className="inline-flex h-8 items-center gap-2 rounded-[6px] border border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700 transition-colors hover:border-brand-400 hover:bg-signal-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
                 >
-                  #{t.tag}
-                  <span className="ml-1 text-[10px] text-violet-500">{t.count}</span>
-                </ClickableBadge>
+                  <Tags size={12} />
+                  <span>#{t.tag}</span>
+                  <span className="font-mono text-[10px] text-slate-400">{t.count}</span>
+                </button>
               ))}
             </div>
           )}
-          <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
-            <p className="flex items-center gap-1.5">
-              <FolderTree size={12} />
+          <div className="mt-auto border-t border-slate-200 px-5 py-4 text-xs text-slate-500">
+            <p className="flex items-center gap-2">
+              <FolderTree size={13} />
               顶层资源 {data.hierarchy.rootCount} 个 · 子资源 {data.hierarchy.childCount} 个
             </p>
             <button
               type="button"
               onClick={() => navigate('/resources?rootOnly=true')}
-              className="mt-1 text-brand-600 hover:underline"
+              className="mt-2 inline-flex items-center gap-1 font-medium text-brand-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
             >
-              只看顶层资源 →
+              只看顶层资源
+              <ArrowUpRight size={12} />
             </button>
           </div>
         </Card>
-      </div>
+      </section>
 
-      {/* 超期占用统一视图：按项目归集「哪些项目的哪些资源超期」，可直接跳去处理 */}
       <Card>
         <CardHeader
-          title="超期占用资源"
+          title="超期占用"
           desc={
             (data.overdueSlots?.length ?? 0) === 0
-              ? '当前没有超过占用结束时间仍未释放的资源'
-              : `共 ${data.overdueSlots.length} 个槽位已超过占用结束时间仍未释放，容量持续被占用`
+              ? '当前没有超期占用'
+              : `${data.overdueSlots.length} 个槽位已超过占用结束时间`
           }
           action={
             (data.overdueSlots?.length ?? 0) > 0 ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700 ring-1 ring-inset ring-rose-200">
-                <AlertTriangle size={11} />
-                超期不会自动释放
-              </span>
+              <Badge tone="red">需要处理</Badge>
             ) : undefined
           }
         />
         {(data.overdueByProject ?? []).length === 0 ? (
-          <EmptyState title="没有超期占用" desc="资源占用到期后仍保留，如需长期占用请在环境槽位里续期或转为长期" />
+          <EmptyState title="没有超期占用" desc="到期资源不会自动释放，可在项目中续期或转为长期" />
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-200">
             {data.overdueByProject.map((group) => (
-              <div key={group.projectId ?? 'none'} className="px-5 py-3">
+              <div key={group.projectId ?? 'none'} className="px-5 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <button
                     type="button"
-                    className="text-sm font-medium text-slate-800 hover:text-brand-700"
-                    title="打开该项目处理超期占用"
+                    className="text-sm font-medium text-slate-900 hover:text-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+                    title="打开项目处理超期占用"
                     onClick={() => navigate(group.projectId ? `/projects/${group.projectId}` : '/projects')}
                   >
                     {group.projectName ?? '未归属项目'}
                   </button>
-                  <span className="text-xs font-medium text-rose-600">
+                  <span className="font-mono text-[11px] text-rose-600">
                     {group.count} 个槽位超期 · 最长 {group.maxOverdueDays} 天
                   </span>
                 </div>
-                <ul className="mt-2 space-y-1.5">
+                <ul className="mt-3 space-y-2">
                   {group.items.map((item) => (
                     <li key={item.slotId} className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                       <button
                         type="button"
-                        className="font-mono text-slate-500 hover:text-brand-700"
+                        className="font-mono text-brand-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
                         title="在资源台账中查看该资源"
                         onClick={() => navigate(`/resources?id=${item.resourceId}`)}
                       >
                         {item.resourceCode}
                       </button>
-                      <span className="text-slate-700">{item.resourceName}</span>
+                      <span className="text-slate-800">{item.resourceName}</span>
                       <Badge tone="gray">{item.resourceTypeLabel}</Badge>
                       <EnvBadge code={item.environment} label={item.environmentLabel} />
-                      <span>
-                        {item.envName} · 槽位「{item.slotRole}」
-                      </span>
-                      <span className="text-slate-400">
-                        {new Date(item.endAt).toLocaleDateString('zh-CN')} 到期
-                      </span>
+                      <span>{item.envName} · {item.slotRole}</span>
+                      <span className="text-slate-400">{new Date(item.endAt).toLocaleDateString('zh-CN')} 到期</span>
                       <span className="font-medium text-rose-600">超期 {item.overdueDays} 天</span>
-                      {group.projectId ? (
-                        <button
-                          type="button"
-                          className="ml-auto text-brand-600 hover:underline"
-                          onClick={() => navigate(`/projects/${group.projectId}`)}
-                        >
-                          去处理 →
-                        </button>
-                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -351,7 +352,7 @@ export function DashboardPage() {
       </Card>
 
       <Card>
-        <CardHeader title="最近更新" desc="按更新时间倒序展示最近 5 条变更" />
+        <CardHeader title="最近更新" desc="按更新时间展示最近 5 条资源" />
         {data.recentUpdated.length === 0 ? (
           <EmptyState title="暂无资源" desc="前往资源台账新增第一条资源记录" />
         ) : (
@@ -369,12 +370,12 @@ export function DashboardPage() {
             }
           >
             {data.recentUpdated.map((r) => (
-              <tr key={r.id} className="hover:bg-slate-50">
-                <Td className="font-mono text-xs">{r.code}</Td>
+              <tr key={r.id} className="transition-colors hover:bg-slate-50">
+                <Td className="font-mono text-xs text-slate-500">{r.code}</Td>
                 <Td className="font-medium">
                   <button
                     type="button"
-                    className="text-left text-slate-900 hover:text-brand-700"
+                    className="text-left text-slate-900 hover:text-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
                     onClick={() => navigate(`/resources?q=${encodeURIComponent(r.code)}`)}
                     title="在资源台账中按编码筛选"
                   >
@@ -382,12 +383,10 @@ export function DashboardPage() {
                   </button>
                 </Td>
                 <Td>{dict.typeLabel(r.type)}</Td>
-                <Td>
-                  <EnvBadge code={r.environment} label={dict.envLabel(r.environment)} />
-                </Td>
+                <Td><EnvBadge code={r.environment} label={dict.envLabel(r.environment)} /></Td>
                 <Td>{RESOURCE_STATUS_LABELS[r.status]}</Td>
                 <Td>{r.owner ?? '—'}</Td>
-                <Td className="text-xs text-slate-500">{new Date(r.updatedAt).toLocaleString('zh-CN')}</Td>
+                <Td className="whitespace-nowrap text-xs text-slate-500">{new Date(r.updatedAt).toLocaleString('zh-CN')}</Td>
               </tr>
             ))}
           </Table>

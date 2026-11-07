@@ -16,6 +16,7 @@ import {
   Field,
   Input,
   Modal,
+  PageHeader,
   Select,
   Spinner,
   Td,
@@ -98,15 +99,15 @@ export function UsersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">用户管理</h1>
-        </div>
-        <Button onClick={() => setOpen(true)}>
-          <UserPlus size={14} />
-          新建用户
-        </Button>
-      </div>
+      <PageHeader
+        title="用户管理"
+        actions={
+          <Button onClick={() => setOpen(true)}>
+            <UserPlus size={14} />
+            新建用户
+          </Button>
+        }
+      />
 
       <Card>
         <CardHeader title="账号列表" desc={`共 ${users.length} 个账号`} />

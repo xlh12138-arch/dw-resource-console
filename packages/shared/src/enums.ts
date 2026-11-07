@@ -28,7 +28,7 @@ export const RESOURCE_TYPE_PREFIX: Record<ResourceType, string> = {
   GDS_SERVER: 'GDS',
 };
 
-/** 内置环境：开发 / 产品测试 / 用户测试 / 生产（上线后可在「字典配置」里继续自定义） */
+/** 历史环境编码：仅用于类型兼容，实际字典以数据库配置为准 */
 export const ENVIRONMENTS = ['DEV', 'PT', 'UAT', 'PROD'] as const;
 export type Environment = (typeof ENVIRONMENTS)[number];
 export const ENVIRONMENT_LABELS: Record<Environment, string> = {
@@ -44,7 +44,7 @@ export const ENVIRONMENT_TONES: Record<Environment, string> = {
   UAT: 'violet',
   PROD: 'green',
 };
-/** 内置环境的默认标识色（十六进制，前端调色板与徽标共用） */
+/** 历史环境编码的默认标识色（十六进制，前端调色板与徽标共用） */
 export const ENVIRONMENT_COLORS: Record<Environment, string> = {
   DEV: '#2563eb',
   PT: '#d97706',

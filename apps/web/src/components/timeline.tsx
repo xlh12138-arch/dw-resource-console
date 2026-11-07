@@ -21,7 +21,7 @@ const TONES: Record<TimelineBar['tone'], string> = {
   green: 'bg-emerald-400/80 ring-emerald-500',
   red: 'bg-rose-400/80 ring-rose-500',
   gray: 'bg-slate-300 ring-slate-400',
-  violet: 'bg-violet-400/80 ring-violet-500',
+  violet: 'bg-signal-400/80 ring-signal-600',
   amber: 'bg-amber-400/80 ring-amber-500',
 };
 
@@ -82,7 +82,7 @@ export function TimelineChart({
             未生效
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="h-2 w-2 rounded-sm ring-1 ring-violet-500" />
+            <span className="h-2 w-2 rounded-sm ring-1 ring-signal-600" />
             共用
           </span>
         </span>
@@ -126,7 +126,7 @@ export function TimelineChart({
                   <div className="absolute inset-y-0 left-0 right-0 rounded bg-slate-50/60" />
                   <div
                     className={`absolute top-1 h-5 rounded ring-1 ${TONES[bar.tone]} ${
-                      bar.shared ? 'ring-violet-500 ring-2' : ''
+                      bar.shared ? 'ring-signal-600 ring-2' : ''
                     }`}
                     style={{ left: `${left}%`, width: `${width}%` }}
                     title={bar.tip}

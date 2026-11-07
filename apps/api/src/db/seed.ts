@@ -7,7 +7,7 @@ import { runMigrations } from '../db/auto-migrate.js';
 import { db, withTransaction } from '../db/index.js';
 import { envTemplates, projects, resources } from '../db/schema.js';
 import { authService } from '../modules/auth/service.js';
-import { ensureBuiltinDict } from '../modules/dict/bootstrap.js';
+import { seedDemoDict } from '../modules/dict/bootstrap.js';
 import { projectEnvService, projectService, templateService } from '../modules/projects/service.js';
 import { templateRepository } from '../modules/projects/repository.js';
 import { resourceRepository } from '../modules/resources/repository.js';
@@ -518,7 +518,7 @@ async function seedProjects(): Promise<void> {
 }
 
 await runMigrations();
-await ensureBuiltinDict();
+  await seedDemoDict();
 await authService.ensureBootstrapAdmin();
 
 await withTransaction(async () => {

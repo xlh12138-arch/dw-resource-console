@@ -18,6 +18,7 @@ import {
   ErrorBanner,
   Field,
   Input,
+  PageHeader,
   Pagination,
   Select,
   Spinner,
@@ -74,9 +75,7 @@ export function AuditPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">变更审计</h1>
-      </div>
+      <PageHeader title="变更审计" />
 
       <Card>
         <div className="flex flex-wrap items-end gap-3 px-5 py-4">

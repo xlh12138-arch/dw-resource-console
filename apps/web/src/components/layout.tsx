@@ -1,5 +1,4 @@
 import {
-  Activity,
   Boxes,
   Database,
   FileClock,
@@ -7,7 +6,6 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  Server,
   Settings2,
   Users,
   X,
@@ -16,17 +14,30 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { ROLE_LABELS, type Role } from '@dw/shared';
 import { useAuth } from '../lib/auth';
-import { Badge, Button, cn } from './ui';
+import { cn } from './ui';
 
 const NAV = [
-  { to: '/', label: '资源概览', icon: LayoutDashboard },
-  { to: '/resources', label: '资源台账', icon: Database },
-  { to: '/projects', label: '需求项目', icon: FolderKanban },
-  { to: '/templates', label: '环境模板', icon: Boxes },
-  { to: '/dict', label: '字典配置', icon: Settings2, permission: 'resource:read' },
-  { to: '/audit', label: '变更审计', icon: FileClock, permission: 'audit:read' },
-  { to: '/users', label: '用户管理', icon: Users, permission: 'user:manage' },
+  { to: '/', label: '资源概览', shortLabel: '概览', icon: LayoutDashboard },
+  { to: '/resources', label: '资源台账', shortLabel: '台账', icon: Database },
+  { to: '/projects', label: '需求项目', shortLabel: '项目', icon: FolderKanban },
+  { to: '/templates', label: '环境模板', shortLabel: '模板', icon: Boxes },
+  { to: '/dict', label: '字典配置', shortLabel: '字典', icon: Settings2, permission: 'resource:read' },
+  { to: '/audit', label: '变更审计', shortLabel: '审计', icon: FileClock, permission: 'audit:read' },
+  { to: '/users', label: '用户管理', shortLabel: '用户', icon: Users, permission: 'user:manage' },
 ];
+
+function Brand({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-signal-400 text-brand-700">
+        <Database size={18} strokeWidth={2.2} />
+      </div>
+      <div className={cn('min-w-0', compact && 'block')}>
+        <p className="truncate text-[14px] font-medium leading-tight text-white">数据仓库资源控制台</p>
+      </div>
+    </div>
+  );
+}
 
 export function Layout() {
   const { user, logout, can: canDo } = useAuth();
@@ -37,10 +48,6 @@ export function Layout() {
   const mobileCloseRef = useRef<HTMLButtonElement | null>(null);
 
   const visibleNav = NAV.filter((item) => !item.permission || canDo(item.permission));
-  const currentItem = visibleNav.find((item) =>
-    item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to),
-  );
-
   const signOut = async () => {
     await logout();
     navigate('/login');
@@ -98,142 +105,134 @@ export function Layout() {
         end={item.to === '/'}
         onClick={mobile ? () => setMobileOpen(false) : undefined}
         className={({ isActive }) =>
-          cn(
-            'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400',
-            isActive ? 'bg-brand-50 font-medium text-brand-700' : 'text-slate-600 hover:bg-slate-100',
-          )
+          mobile
+            ? cn(
+                'flex h-14 items-center gap-3 border-b border-white/10 px-1 text-[15px] transition-colors',
+                isActive ? 'text-signal-400' : 'text-white/70 hover:text-white',
+              )
+            : cn(
+                'relative flex h-16 items-center px-3 text-[13px] font-medium transition-colors',
+                isActive ? 'text-white' : 'text-white/55 hover:text-white',
+              )
         }
       >
-        <item.icon size={16} />
-        {item.label}
+        {({ isActive }) => (
+          <>
+            <item.icon size={mobile ? 18 : 14} strokeWidth={1.8} />
+            <span className="ml-2">{mobile ? item.label : item.shortLabel}</span>
+            {!mobile && isActive ? (
+              <span className="absolute inset-x-3 bottom-0 h-0.5 bg-signal-400" aria-hidden />
+            ) : null}
+          </>
+        )}
       </NavLink>
     ));
 
-  const renderSidebar = (mobile = false) => (
-    <>
-      <div className="flex items-center gap-2 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white">
-          <Server size={18} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-900">数据仓库资源台</p>
-          <p className="truncate text-[11px] text-slate-500">DW Resource Console</p>
-        </div>
-        {mobile ? (
-          <button
-            ref={mobileCloseRef}
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
-            aria-label="关闭导航"
-            title="关闭导航"
-            onClick={() => setMobileOpen(false)}
-          >
-            <X size={17} />
-          </button>
-        ) : null}
-      </div>
-
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3" aria-label="主导航">
-        {renderNavigation(mobile)}
-      </nav>
-
-      <div className="border-t border-slate-100 p-3">
-        <div className="mb-2 flex items-center gap-2 px-2 text-xs text-slate-500">
-          <Activity size={14} className="text-emerald-500" />
-          服务运行正常
-        </div>
-        <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
-            {user?.displayName?.slice(0, 1) ?? 'U'}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-slate-800">{user?.displayName}</p>
-            <p className="truncate text-[11px] text-slate-500">{user?.username}</p>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-
   return (
-    <div className="min-h-screen bg-[#f4f6f8]">
+    <div className="min-h-screen bg-[#f7f7f7]">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[100] focus:rounded-md focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[100] focus:rounded-[6px] focus:bg-signal-400 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-brand-700"
       >
         跳到主要内容
       </a>
 
-      <div className="flex min-h-screen">
-        <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
-          {renderSidebar()}
-        </aside>
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-brand-600 text-white">
+        <div className="mx-auto flex h-16 max-w-[1560px] items-center gap-6 px-4 sm:px-6 lg:px-8">
+          <NavLink to="/" aria-label="返回资源概览" className="shrink-0 focus:outline-none">
+            <Brand />
+          </NavLink>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:px-6">
-            <div className="flex min-w-0 items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 shrink-0 px-0 lg:hidden"
-                aria-label="打开导航"
-                title="打开导航"
-                aria-expanded={mobileOpen}
-                aria-controls="mobile-navigation"
-                onClick={() => setMobileOpen(true)}
-              >
-                <Menu size={18} />
-              </Button>
-              <div className="flex min-w-0 items-center gap-2 lg:hidden">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-600 text-white">
-                  <Server size={14} />
-                </div>
-                <span className="truncate text-sm font-semibold text-slate-900">{currentItem?.label ?? '数据仓库资源台'}</span>
+          <nav className="hidden h-full flex-1 items-center justify-center gap-1 xl:flex" aria-label="主导航">
+            {renderNavigation()}
+          </nav>
+
+          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+            <div className="hidden items-center gap-2.5 md:flex">
+              <div className="text-right">
+                <p className="max-w-28 truncate text-[13px] font-medium leading-tight text-white">
+                  {user?.displayName}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-tight text-white/45">
+                  {ROLE_LABELS[(user?.role ?? 'USER') as Role]}
+                </p>
               </div>
-              <p className="hidden text-sm font-medium text-slate-700 lg:block">{currentItem?.label ?? '数据仓库资源台'}</p>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-xs font-medium text-white">
+                {user?.displayName?.slice(0, 1) ?? 'U'}
+              </div>
             </div>
-
-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <Badge tone="blue" className="hidden sm:inline-flex">
-                {ROLE_LABELS[(user?.role ?? 'USER') as Role]}
-              </Badge>
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label="退出登录"
-                title="退出登录"
-                onClick={() => void signOut()}
-              >
-                <LogOut size={14} />
-                <span className="hidden sm:inline">退出登录</span>
-              </Button>
-            </div>
-          </header>
-
-          <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 p-4 focus:outline-none sm:p-6">
-            <Outlet />
-          </main>
+            <button
+              type="button"
+              className="flex h-9 w-9 items-center justify-center rounded-[8px] text-white/55 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+              aria-label="退出登录"
+              title="退出登录"
+              onClick={() => void signOut()}
+            >
+              <LogOut size={16} />
+            </button>
+            <button
+              type="button"
+              className="flex h-9 w-9 items-center justify-center rounded-[8px] border border-white/20 text-white/75 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400 xl:hidden"
+              aria-label="打开导航"
+              title="打开导航"
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-navigation"
+              onClick={() => setMobileOpen(true)}
+            >
+              <Menu size={18} />
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
+
+      <main id="main-content" tabIndex={-1} className="min-w-0 px-4 py-6 focus:outline-none sm:px-6 sm:py-8 lg:px-8">
+        <div className="mx-auto max-w-[1560px]">
+          <Outlet />
+        </div>
+      </main>
 
       {mobileOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            className="absolute inset-0 cursor-default bg-slate-900/45"
-            aria-label="关闭导航"
-            onClick={() => setMobileOpen(false)}
-          />
+        <div className="fixed inset-0 z-50 xl:hidden">
           <aside
             id="mobile-navigation"
             ref={mobilePanelRef}
             role="dialog"
             aria-modal="true"
             aria-label="主导航"
-            className="relative flex h-full w-[min(18rem,calc(100vw-2.5rem))] flex-col border-r border-slate-200 bg-white shadow-2xl"
+            className="flex h-full w-full flex-col overflow-y-auto bg-brand-600 px-5 text-white"
           >
-            {renderSidebar(true)}
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10">
+              <Brand compact />
+              <button
+                ref={mobileCloseRef}
+                type="button"
+                className="flex h-9 w-9 items-center justify-center rounded-[8px] text-white/65 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+                aria-label="关闭导航"
+                title="关闭导航"
+                onClick={() => setMobileOpen(false)}
+              >
+                <X size={19} />
+              </button>
+            </div>
+
+            <nav className="py-4" aria-label="移动端主导航">
+              {renderNavigation(true)}
+            </nav>
+
+            <div className="mt-auto border-t border-white/10 py-5">
+              <p className="text-sm font-medium">{user?.displayName}</p>
+              <p className="mt-1 text-xs text-white/45">
+                {user?.username} · {ROLE_LABELS[(user?.role ?? 'USER') as Role]}
+              </p>
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-white/20 text-sm font-medium text-white transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+              >
+                <LogOut size={15} />
+                退出登录
+              </button>
+            </div>
           </aside>
         </div>
       ) : null}

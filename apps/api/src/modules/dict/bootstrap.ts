@@ -15,9 +15,8 @@ import { invalidateDictCache } from './validator.js';
 import { withTransaction } from '../../db/index.js';
 
 /**
- * 内置字典初始化：把代码里内置的五类资源与三种环境写入字典表。
- * 之后它们就与自定义类型一样可在页面上维护；
- * 已存在的条目与已有字段定义不会被覆盖（避免冲掉用户的改动）。
+ * 演示数据字典初始化：仅供 `db:seed` 创建本地演示数据时使用。
+ * 正常启动不会调用，也不会再把任何字典标记为内置。
  */
 
 /** 内置类型中参与 IP 占用检测的字段 */
@@ -59,7 +58,7 @@ function fieldTypeOf(kind: string, isIp: boolean): string {
   return 'TEXT';
 }
 
-export async function ensureBuiltinDict(): Promise<void> {
+export async function seedDemoDict(): Promise<void> {
   let created = 0;
   await withTransaction(async () => {
   for (const [index, code] of RESOURCE_TYPES.entries()) {
@@ -73,7 +72,7 @@ export async function ensureBuiltinDict(): Promise<void> {
         ipUniqueByPort: IP_UNIQUE_BY_PORT[code] ?? false,
         listColumns: TYPE_COLUMNS[code] ?? [],
         enabled: true,
-        builtin: true,
+        builtin: false,
         sortOrder: index,
       });
       created += 1;
@@ -111,16 +110,15 @@ export async function ensureBuiltinDict(): Promise<void> {
         color: ENV_COLORS[code] ?? null,
         description: ENV_DESC[code] ?? null,
         enabled: true,
-        builtin: true,
+        builtin: false,
         sortOrder: index,
       });
       created += 1;
     } else {
-      // 历史库里已存在的内置环境：补齐内置标记与缺失的标识色，不覆盖用户已自定义的颜色
+      // 历史环境只补齐缺失的标识色，不覆盖用户已自定义的值。
       const row = await environmentRepository.findByCode(code);
       if (!row) continue;
-      const patch: { builtin?: boolean; color?: string } = {};
-      if (!row.builtin) patch.builtin = true;
+      const patch: { color?: string } = {};
       if (!row.color && ENV_COLORS[code]) patch.color = ENV_COLORS[code];
       if (Object.keys(patch).length > 0) await environmentRepository.update(code, patch);
     }
@@ -131,6 +129,6 @@ export async function ensureBuiltinDict(): Promise<void> {
 
   if (created > 0) {
     // eslint-disable-next-line no-console
-    console.log(`[dict] 内置字典初始化完成，新增 ${created} 条字典项`);
+    console.log(`[dict] 演示字典初始化完成，新增 ${created} 条字典项`);
   }
 }

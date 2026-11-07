@@ -1,4 +1,4 @@
-import { ENVIRONMENT_COLORS, ENVIRONMENT_LABELS } from '@dw/shared';
+import { ENVIRONMENT_COLORS } from '@dw/shared';
 import type {
   DictReferences,
   ResourceTypeFieldDto,
@@ -513,7 +513,7 @@ export const environmentService = {
       code: input.code,
       label: input.label,
       tone: input.tone,
-      // 未显式指定时，内置环境用默认色，自定义环境留空（前端按 tone 兜底）
+      // 未显式指定时按历史预设补默认色，其余环境留空（前端按 tone 兜底）
       color: input.color ?? ENVIRONMENT_COLORS[input.code as keyof typeof ENVIRONMENT_COLORS] ?? null,
       description: input.description ?? null,
       enabled: input.enabled,
@@ -718,13 +718,12 @@ export const environmentService = {
 };
 
 /**
- * 环境显示名：始终按最新环境字典实时解析，改字典后各处标签立即同步。
- * 字典缺失时回退到内置常量，保证历史数据仍可读。
+ * 环境显示名：始终按最新环境字典实时解析；字典缺失时直接显示编码。
  */
 export async function environmentLabelOf(code: string): Promise<string> {
   const row = await environmentRepository.findByCode(code);
   if (row) return row.label;
-  return (ENVIRONMENT_LABELS as Record<string, string>)[code] ?? code;
+  return code;
 }
 
 /** 供资源模块使用：校验类型 / 环境是否存在且启用 */

@@ -20,6 +20,7 @@ import {
   Input,
   Modal,
   ModalCancelButton,
+  PageHeader,
   Pagination,
   Select,
   Spinner,
@@ -74,17 +75,17 @@ export function TemplatesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">项目环境模板</h1>
-        </div>
-        {canWrite && (
-          <Button onClick={() => setForm({ open: true, initial: null })}>
-            <Plus size={14} />
-            新建模板
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="环境模板"
+        actions={
+          canWrite ? (
+            <Button onClick={() => setForm({ open: true, initial: null })}>
+              <Plus size={14} />
+              新建模板
+            </Button>
+          ) : undefined
+        }
+      />
 
       <Card>
         {list.isError && (
@@ -355,7 +356,7 @@ function TemplateFormModal({
     <Modal
       open={open}
       width="max-w-4xl"
-      title={isEdit ? `编辑模板 · ${initial?.code}` : '新建项目环境模板'}
+      title={isEdit ? `编辑模板 · ${initial?.code}` : '新建环境模板'}
       desc="每个条目表示一类资源的需求：槽位名称用于区分用途，数量决定展开出的槽位个数"
       onClose={onClose}
       onSave={() => mutation.mutate()}
@@ -496,7 +497,7 @@ function InstantiateModal({
   const navigate = useNavigate();
   const [projectId, setProjectId] = useState('');
   const [name, setName] = useState('');
-  const [environment, setEnvironment] = useState<string>('DEV');
+  const [environment, setEnvironment] = useState('');
   const [owner, setOwner] = useState('');
   const [error, setError] = useState('');
 
@@ -553,7 +554,7 @@ function InstantiateModal({
         <>
           <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
           <Button
-            disabled={!projectId || !name || mutation.isPending}
+            disabled={!projectId || !name || !environment || mutation.isPending}
             onClick={() => mutation.mutate()}
           >
             {mutation.isPending ? '创建中…' : '创建环境'}
@@ -581,7 +582,8 @@ function InstantiateModal({
           <Field label="环境类型" required>
             <Select
               value={environment}
-              options={dict.envOptions()}
+              placeholder="请选择环境"
+              options={dict.envOptions({ includeDisabled: false })}
               onChange={(e) => setEnvironment(e.target.value)}
             />
           </Field>

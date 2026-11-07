@@ -52,7 +52,7 @@ export async function buildApp() {
   await app.register(swagger, {
     openapi: {
       info: {
-        title: '数据仓库资源管理 API',
+        title: '数据仓库资源控制台 API',
         version: '0.1.0',
         description:
           '统一管理批量调度服务器、批量调度平台IP、采集交换平台IP、NAS 与 GDS 服务器的资源台账服务，' +

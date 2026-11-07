@@ -32,8 +32,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             aria-live={t.tone === 'error' ? 'assertive' : 'polite'}
             aria-atomic="true"
             className={cn(
-              'pointer-events-auto rounded-lg px-4 py-2 text-sm text-white shadow-lg',
-              t.tone === 'success' && 'bg-emerald-600',
+              'pointer-events-auto rounded-[8px] border border-white/10 px-4 py-2.5 text-sm text-white shadow-xl',
+              t.tone === 'success' && 'bg-brand-600',
               t.tone === 'error' && 'bg-rose-600',
               t.tone === 'info' && 'bg-slate-800',
             )}

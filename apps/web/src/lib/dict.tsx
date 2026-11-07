@@ -1,13 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  ATTR_FIELDS,
-  ENVIRONMENT_LABELS,
-  RESOURCE_TYPE_LABELS,
-  TYPE_COLUMNS,
-  type AttrFieldDef,
-  type EnvironmentDto,
-  type ResourceTypeDto,
-} from '@dw/shared';
+import { type AttrFieldDef, type EnvironmentDto, type ResourceTypeDto } from '@dw/shared';
 import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { dictApi, metaApi } from './endpoints';
 import { useAuth } from './auth';
@@ -42,36 +34,20 @@ export interface DictValue {
   refresh: () => void;
 }
 
-/** 字典尚未到达时的兜底：用内置常量渲染，保证下拉框永远有选项（不会只剩「全部」） */
-interface DictItemLite {
-  code: string;
-  label: string;
-  enabled: boolean;
-}
-const BUILTIN_TYPES: DictItemLite[] = Object.entries(RESOURCE_TYPE_LABELS as Record<string, string>).map(
-  ([code, label]) => ({ code, label, enabled: true }),
-);
-const BUILTIN_ENVS: DictItemLite[] = Object.entries(ENVIRONMENT_LABELS as Record<string, string>).map(
-  ([code, label]) => ({ code, label, enabled: true }),
-);
-
-/** 字典尚未加载时的兜底：使用内置常量，保证首屏不闪空白 */
+/** Provider 挂载前只返回空数据；页面字典全部以服务端结果为准。 */
 const fallback: DictValue = {
   resourceTypes: [],
   activeTypes: [],
   environments: [],
   activeEnvironments: [],
-  typeLabel: (code) => (RESOURCE_TYPE_LABELS as Record<string, string>)[code] ?? code,
-  envLabel: (code) => (ENVIRONMENT_LABELS as Record<string, string>)[code] ?? code,
+  typeLabel: (code) => code,
+  envLabel: (code) => code,
   envTone: () => 'gray',
   envColor: () => null,
-  attrFields: (code) => (ATTR_FIELDS as unknown as Record<string, AttrFieldDef[]>)[code] ?? [],
-  typeColumns: (code) => (TYPE_COLUMNS as unknown as Record<string, string[]>)[code] ?? [],
-  // 字典未加载时先用内置常量兜底，避免首屏下拉空白
-  typeOptions: () =>
-    Object.entries(RESOURCE_TYPE_LABELS as Record<string, string>).map(([value, label]) => ({ value, label })),
-  envOptions: () =>
-    Object.entries(ENVIRONMENT_LABELS as Record<string, string>).map(([value, label]) => ({ value, label })),
+  attrFields: () => [],
+  typeColumns: () => [],
+  typeOptions: () => [],
+  envOptions: () => [],
   loading: true,
   refresh: () => {},
 };
@@ -88,9 +64,19 @@ const TONE_MAP: Record<string, BadgeTone> = {
   violet: 'violet',
 };
 
+function labelCounts(items: { label: string }[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of items) counts.set(item.label, (counts.get(item.label) ?? 0) + 1);
+  return counts;
+}
+
+function optionLabel(label: string, code: string, enabled: boolean, duplicate: boolean): string {
+  const qualifiers = [duplicate ? code : null, enabled ? null : '已停用'].filter(Boolean);
+  return qualifiers.length > 0 ? `${label}（${qualifiers.join('，')}）` : label;
+}
+
 /**
- * 字典上下文：资源类型与环境均由服务端字典驱动，新增/改名后刷新即可全站生效。
- * 内置常量仅作为首屏兜底，不会出现空白下拉。
+ * 字典上下文：资源类型与环境全部由服务端字典驱动。
  */
 export function DictProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -144,39 +130,34 @@ export function DictProvider({ children }: { children: ReactNode }) {
     const columnMap = (meta.data?.typeColumns ?? {}) as Record<string, string[]>;
     const envToneMap = new Map(envList.map((e) => [e.code, e.tone]));
     const envColorMap = new Map(envList.map((e) => [e.code, e.color]));
+    const typeLabelCounts = labelCounts(typeList);
+    const envLabelCounts = labelCounts(envList);
 
     return {
       resourceTypes: typeList,
       activeTypes: typeList.filter((t) => t.enabled),
       environments: envList,
       activeEnvironments: envList.filter((e) => e.enabled),
-      typeLabel: (code) =>
-        typeList.find((t) => t.code === code)?.label ??
-        (RESOURCE_TYPE_LABELS as Record<string, string>)[code] ??
-        code,
-      envLabel: (code) =>
-        envList.find((e) => e.code === code)?.label ?? (ENVIRONMENT_LABELS as Record<string, string>)[code] ?? code,
+      typeLabel: (code) => typeList.find((t) => t.code === code)?.label ?? code,
+      envLabel: (code) => envList.find((e) => e.code === code)?.label ?? code,
       envTone: (code) => TONE_MAP[envToneMap.get(code) ?? 'gray'] ?? 'gray',
       envColor: (code) => envColorMap.get(code) ?? null,
-      attrFields: (code) =>
-        attrMap[code] ?? (ATTR_FIELDS as unknown as Record<string, AttrFieldDef[]>)[code] ?? [],
-      typeColumns: (code) =>
-        columnMap[code] ?? (TYPE_COLUMNS as unknown as Record<string, string[]>)[code] ?? [],
-      // 字典还没到位（首屏 / 请求失败）时用内置常量兜底，下拉不会只剩「全部」
+      attrFields: (code) => attrMap[code] ?? [],
+      typeColumns: (code) => columnMap[code] ?? [],
       typeOptions: ({ includeDisabled = true } = {}) =>
-        (typeList.length > 0 ? typeList : BUILTIN_TYPES)
+        typeList
           .filter((t) => includeDisabled || t.enabled)
           .map((t) => ({
             value: t.code,
-            label: t.enabled ? t.label : `${t.label}（已停用）`,
+            label: optionLabel(t.label, t.code, t.enabled, (typeLabelCounts.get(t.label) ?? 0) > 1),
             disabled: !t.enabled,
           })),
       envOptions: ({ includeDisabled = true } = {}) =>
-        (envList.length > 0 ? envList : BUILTIN_ENVS)
+        envList
           .filter((e) => includeDisabled || e.enabled)
           .map((e) => ({
             value: e.code,
-            label: e.enabled ? e.label : `${e.label}（已停用）`,
+            label: optionLabel(e.label, e.code, e.enabled, (envLabelCounts.get(e.label) ?? 0) > 1),
             disabled: !e.enabled,
           })),
       loading: types.isLoading || environments.isLoading || meta.isLoading,

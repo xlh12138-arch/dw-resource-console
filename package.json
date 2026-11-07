@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "数据仓库资源管理系统 - 批量调度服务器 / 调度平台IP / 采集交换平台IP / NAS / GDS 服务器 统一管理控制台",
+  "description": "数据仓库资源控制台 - 批量调度服务器 / 调度平台IP / 采集交换平台IP / NAS / GDS 服务器统一管理",
   "workspaces": [
     "packages/*",
     "apps/*"

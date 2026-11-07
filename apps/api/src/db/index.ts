@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { sql, type SQL } from 'drizzle-orm';
-import { drizzle as drizzleSqlite, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { drizzle as drizzlePostgres } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { config } from '../config/env.js';
@@ -21,6 +21,7 @@ let pgPool: Pool | null = null;
 
 async function createSqliteDatabase(schema: typeof sqliteSchema): Promise<Db> {
   const { default: Database } = await import('better-sqlite3');
+  const { drizzle: drizzleSqlite } = await import('drizzle-orm/better-sqlite3');
   const file = resolveSqlitePath(config.db.url);
   const sqlite = new Database(file);
   sqlite.pragma('journal_mode = WAL');
@@ -30,6 +31,11 @@ async function createSqliteDatabase(schema: typeof sqliteSchema): Promise<Db> {
   return drizzleSqlite(sqlite, { schema }) as unknown as Db;
 }
 
+export function getPostgresPool(): Pool {
+  if (!pgPool) throw new Error('PostgreSQL 连接池尚未初始化');
+  return pgPool;
+}
+
 function createPostgresDatabase(
   schema: typeof import('./schema.pg.js'),
 ): Db {
@@ -37,6 +43,9 @@ function createPostgresDatabase(
     connectionString: config.db.url,
     max: config.db.poolMax,
     connectionTimeoutMillis: 5000,
+    // DWS/PostgreSQL 的搜索路径必须与 Drizzle 动态表 schema 保持一致，
+    // 这样少量原生 SQL 里未加 schema 前缀的表名也能正确解析。
+    options: `-c search_path=${config.db.schema}`,
     ssl: config.db.ssl ? { rejectUnauthorized: true } : undefined,
   });
   return drizzlePostgres(pgPool, { schema }) as unknown as Db;
