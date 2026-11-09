@@ -80,7 +80,7 @@ function commonColumns(dict: DictValue): ImportColumn[] {
       kind: 'enum',
       group: 'common',
       options: envs,
-      hint: '留空则使用默认环境；请填写编码（如 PROD）',
+      hint: '留空则使用默认环境；请填写编码（如 PRD）',
     },
     {
       key: 'status',

@@ -1,6 +1,6 @@
 # 数据仓库资源控制台
 
-统一管理批量调度服务器、平台 IP、采集交换节点、NAS 存储和 GDS 服务器，并将资源台账、项目环境、环境模板、槽位分配、容量核算、占用期限、权限与审计整合到一个控制台中。
+统一管理 ETL 服务器、功能服务器、采集交换平台、各类数据库、调度平台、NAS 存储和 GDS 服务器，并将资源台账、项目环境、环境模板、槽位分配、容量核算、占用期限、权限与审计整合到一个控制台中。
 
 [![CI](https://github.com/xlh12138-arch/dw-resource-console/actions/workflows/ci.yml/badge.svg)](https://github.com/xlh12138-arch/dw-resource-console/actions/workflows/ci.yml)
 ![Node.js](https://img.shields.io/badge/Node.js-22_LTS-339933?logo=nodejs&logoColor=white)
@@ -127,7 +127,7 @@ npm run db:migrate
 npm run db:seed
 ```
 
-> `db:seed` 会写入演示资源、项目、环境和模板，只建议用于开发或演示环境。演示字典只铺 DEV / PT / UAT，生产环境（PROD）不再自动创建，需在「字典配置」里按实际命名自行维护。
+> `db:seed` 会写入演示资源、项目、环境和模板，只建议用于开发或演示环境。演示字典只铺 DEV / PT / UAT，生产环境不再自动创建，需在「字典配置」里按实际命名自行维护（生产库使用的编码是 PRD）。
 
 ### 5. 启动开发环境
 

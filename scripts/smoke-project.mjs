@@ -78,16 +78,14 @@ const updatedTpl = await req(`/env-templates/${tplId}`, {
   method: 'PATCH',
   token: A,
   body: {
-    items: [
-      { resourceType: 'BATCH_SCHED_SERVER', slotRole: '调度节点', quantity: 3, required: true },
-    ],
+    items: [{ resourceType: 'ETL_SERVER', slotRole: 'ETL 服务器', quantity: 3, required: true }],
   },
 });
 check(
   '更新模板组合生效',
   updatedTpl.status === 200 &&
     updatedTpl.json.slotCount === 3 &&
-    updatedTpl.json.items[0].resourceType === 'BATCH_SCHED_SERVER',
+    updatedTpl.json.items[0].resourceType === 'ETL_SERVER',
 );
 
 const cloned = await req(`/env-templates/${tplId}/clone`, { method: 'POST', token: A });
@@ -155,7 +153,7 @@ check('环境详情含 3 个槽位', envDetail.status === 200 && envDetail.json.
 const slot = envDetail.json.slots[0];
 
 console.log('\n[4] 槽位分配资源');
-const resList = await req('/resources?type=BATCH_SCHED_SERVER&environment=PT&pageSize=10', {
+const resList = await req('/resources?type=ETL_SERVER&environment=PT&pageSize=10', {
   token: A,
 });
 check(
@@ -270,11 +268,9 @@ const created = await req('/resources', {
     environment: 'DEV',
     projectId: prjId,
     attrs: {
-      hostname: 'gds-smoke-01',
-      ip: '10.77.9.99',
-      port: 9042,
-      serviceType: 'GDS_AGENT',
-      nodeRole: 'SECONDARY',
+      IP: '10.77.9.99',
+      PORT: 5000,
+      USER_NAME: 'edws',
     },
   },
 });
@@ -297,11 +293,9 @@ const badProject = await req('/resources', {
     environment: 'DEV',
     projectId: 999999,
     attrs: {
-      hostname: 'gds-smoke-02',
-      ip: '10.77.9.98',
-      port: 9042,
-      serviceType: 'GDS_AGENT',
-      nodeRole: 'SECONDARY',
+      IP: '10.77.9.98',
+      PORT: 5000,
+      USER_NAME: 'edws',
     },
   },
 });

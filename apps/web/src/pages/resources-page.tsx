@@ -1329,7 +1329,7 @@ function ImportModal({
         .filter((c) => c.group === 'attr')
         .map((c) => c.key)
         .join(','),
-    '示例资源,PROD,IN_USE,张三,',
+    '示例资源,PRD,IN_USE,张三,',
   ].join('\n');
 
   return (

@@ -51,7 +51,7 @@ const A = admin.json.accessToken;
 console.log('\n[1] 内置字典已初始化');
 const types = await req('/resource-types', { token: A });
 check('资源类型字典可读', types.status === 200, `status=${types.status}`);
-check('内置五类资源存在', types.json.length >= 5, `count=${types.json.length}`);
+check('资源类型字典存在', types.json.length >= 5, `count=${types.json.length}`);
 const envList = await req('/environments', { token: A });
 check(
   '环境字典可读',
@@ -447,22 +447,22 @@ const badAttrs = await req('/resources', {
   method: 'POST',
   token: A,
   body: {
-    type: 'BATCH_SCHED_SERVER',
+    type: 'ETL_SERVER',
     name: 'x',
     environment: 'PT',
-    attrs: { mgmtIp: '999.1.1.1' },
+    attrs: { IP: '999.1.1.1', USER_NAME: 'etladmin', OS: 'Linux' },
   },
 });
 check('属性校验失败返回 422', badAttrs.status === 422, `status=${badAttrs.status}`);
 check(
   '错误信息含具体字段原因',
-  /校验失败：.*mgmtIp/.test(badAttrs.json?.error?.message ?? ''),
+  /校验失败：.*(IP|USER_NAME|OS)/.test(badAttrs.json?.error?.message ?? ''),
   badAttrs.json?.error?.message,
 );
 const badBody = await req('/resources', {
   method: 'POST',
   token: A,
-  body: { type: 'BATCH_SCHED_SERVER' },
+  body: { type: 'ETL_SERVER' },
 });
 check(
   '框架校验也给出字段原因',

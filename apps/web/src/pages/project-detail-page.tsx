@@ -1038,10 +1038,10 @@ function ApplyTemplateBar({ envId, onDone }: { envId: number; onDone: () => void
   const [templateId, setTemplateId] = useState('');
   const [slotRole, setSlotRole] = useState('');
   const [resourceType, setResourceType] = useState<string>(
-    dict.activeTypes[0]?.code ?? 'BATCH_SCHED_SERVER',
+    dict.activeTypes[0]?.code ?? 'ETL_SERVER',
   );
 
-  // 字典到位后校正一次：默认值可能不在启用类型里（内置兜底或类型被停用），否则下拉会显示空白
+  // 字典到位后校正一次：默认值可能不在启用类型里（兜底编码或类型被停用），否则下拉会显示空白
   useEffect(() => {
     if (dict.loading) return;
     const options = dict.typeOptions({ includeDisabled: false });

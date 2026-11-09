@@ -1,7 +1,8 @@
-import { RESOURCE_ATTRS_SCHEMAS, ipv4, port, type AttrFieldDef } from '@dw/shared';
+import { ipv4, port, type AttrFieldDef } from '@dw/shared';
 import { z } from 'zod';
 import type { ResourceTypeFieldRow } from '../../db/schema.js';
 import { resourceTypeFieldRepository, resourceTypeRepository } from './repository.js';
+import { ipFieldFallbackOf, ipUniqueByPortFallbackOf } from '../resources/mapper.js';
 
 /**
  * 动态属性校验：
@@ -122,17 +123,8 @@ export async function getTypeMeta(code: string): Promise<TypeMeta> {
   const fieldRows = row ? await resourceTypeFieldRepository.listByType(code) : [];
   const fields = fieldRows.map(toRuntimeField);
 
-  let schema: z.ZodType<Record<string, unknown>>;
-  if (fields.length > 0) {
-    schema = buildAttrsSchema(fields);
-  } else if (code in RESOURCE_ATTRS_SCHEMAS) {
-    // 兜底：字典尚未初始化时使用内置静态 schema
-    schema = RESOURCE_ATTRS_SCHEMAS[
-      code as keyof typeof RESOURCE_ATTRS_SCHEMAS
-    ] as unknown as z.ZodType<Record<string, unknown>>;
-  } else {
-    schema = z.record(z.string(), z.unknown()) as z.ZodType<Record<string, unknown>>;
-  }
+  // 属性校验完全以字典字段定义为准；字典未配置字段时只要求是对象
+  const schema: z.ZodType<Record<string, unknown>> = buildAttrsSchema(fields);
 
   const meta: TypeMeta = {
     code,
@@ -140,10 +132,13 @@ export async function getTypeMeta(code: string): Promise<TypeMeta> {
     prefix: row?.prefix ?? code.slice(0, 4).toUpperCase(),
     exists: row !== undefined,
     enabled: row?.enabled ?? true,
-    ipUniqueByPort: row?.ipUniqueByPort ?? false,
+    ipUniqueByPort: row?.ipUniqueByPort ?? ipUniqueByPortFallbackOf(code),
     listColumns: row?.listColumns ?? [],
     fields,
-    ipFields: fields.filter((f) => f.isIp).map((f) => f.key),
+    // IP 字段：字典里标记 isIp 的字段，或字段类型直接就是 IP（生产字典的 IP 字段属于后者）
+    ipFields: row
+      ? fields.filter((f) => f.isIp || f.fieldType === 'IP').map((f) => f.key)
+      : ipFieldFallbackOf(code),
     schema,
   };
   cache.set(code, meta);

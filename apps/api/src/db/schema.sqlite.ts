@@ -154,7 +154,7 @@ export const envTemplateItems = sqliteTable(
   (t) => [index('idx_template_items_template').on(t.templateId)],
 );
 
-/** 项目环境：项目 × 环境类型（DEV/UAT/PROD），可由模板一键展开出资源槽位 */
+/** 项目环境：项目 × 环境类型（DEV/PT/UAT/PRD），可由模板一键展开出资源槽位 */
 export const projectEnvironments = sqliteTable(
   'project_environments',
   {
@@ -234,7 +234,7 @@ export const refreshTokens = sqliteTable(
 );
 
 /**
- * 资源主表：五类资源共用一张表（公共字段 + attrs JSON 存放类型专属字段）。
+ * 资源主表：所有资源类型共用一张表（公共字段 + attrs JSON 存放类型专属字段）。
  * 这样既能统一检索/分页/审计，又保留各类型的强类型校验（校验在边界处由 Zod 完成）。
  */
 export const resources = sqliteTable(

@@ -55,7 +55,7 @@ export async function buildApp() {
         title: '数据仓库资源控制台 API',
         version: '0.1.0',
         description:
-          '统一管理批量调度服务器、批量调度平台IP、采集交换平台IP、NAS 与 GDS 服务器的资源台账服务，' +
+          '统一管理 ETL 服务器、功能服务器、采集交换平台、数据库、调度平台、NAS 与 GDS 服务器的资源台账服务，' +
           '支持按需求项目建立多套环境，并通过环境模板一键套用资源组合。',
       },
       components: {

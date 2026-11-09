@@ -391,7 +391,7 @@ function TemplateFormModal({
               value={code}
               disabled={isEdit}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="如：STD-PROD"
+              placeholder="如：STD-DWS"
             />
           </Field>
           <Field label="模板说明">

@@ -79,7 +79,7 @@ check('分页列表返回 16 条总数', list.json.meta?.total === 16, `total=${
 const nas = await req('/resources?type=NAS', { token: A });
 check(
   '按类型筛选 NAS',
-  nas.json.items?.every((i) => i.type === 'NAS') && nas.json.meta.total === 4,
+  nas.json.items?.every((i) => i.type === 'NAS') && nas.json.meta.total === 3,
 );
 const search = await req('/resources?q=GDS', { token: A });
 check('关键字搜索命中 GDS', search.json.meta?.total >= 3, `total=${search.json.meta?.total}`);
@@ -89,10 +89,10 @@ check('排序参数可用', Array.isArray(sorted.json.items));
 console.log('\n[4] 统计概览');
 const stats = await req('/stats/overview', { token: A });
 check('统计接口返回总量', stats.json.total === 16, `total=${stats.json.total}`);
-check('按类型统计包含 5 类', stats.json.byType?.length === 5);
+check('按类型统计覆盖字典中 11 类资源类型', stats.json.byType?.length === 11);
 check(
   'NAS 容量统计正确',
-  stats.json.nasCapacity?.capacityGb === 128000,
+  stats.json.nasCapacity?.capacityGb === 25600,
   `capacity=${stats.json.nasCapacity?.capacityGb}, usage=${stats.json.nasCapacity?.usageRate}%`,
 );
 
@@ -119,11 +119,9 @@ const created = await req('/resources', {
     owner: '冒烟',
     tags: ['smoke'],
     attrs: {
-      hostname: 'gds-smoke-01',
-      ip: '10.40.9.99',
-      port: 9042,
-      serviceType: 'GDS_AGENT',
-      nodeRole: 'SECONDARY',
+      IP: '10.40.9.99',
+      PORT: 5000,
+      USER_NAME: 'edws',
     },
   },
 });
@@ -137,11 +135,12 @@ const id = created.json.id;
 const updated = await req(`/resources/${id}`, {
   method: 'PATCH',
   token: A,
-  body: { status: 'MAINTAINING', attrs: { version: 'v9.9.9' } },
+  // 改成「维护中」会使资源不再参与 IP 占用判定，后面还要用它验证重复 IP，所以这里保持 IN_USE
+  body: { status: 'IN_USE', attrs: { USER_NAME: 'edws2' } },
 });
 check(
   '更新状态与属性',
-  updated.json.status === 'MAINTAINING' && updated.json.attrs?.version === 'v9.9.9',
+  updated.json.status === 'IN_USE' && updated.json.attrs?.USER_NAME === 'edws2',
 );
 
 const invalidIp = await req('/resources', {
@@ -152,11 +151,9 @@ const invalidIp = await req('/resources', {
     name: 'bad',
     environment: 'PT',
     attrs: {
-      hostname: 'x',
-      ip: '999.1.1.1',
-      port: 9042,
-      serviceType: 'GDS_AGENT',
-      nodeRole: 'PRIMARY',
+      IP: '999.1.1.1',
+      PORT: 5000,
+      USER_NAME: 'edws',
     },
   },
 });
@@ -170,15 +167,13 @@ const dupIp = await req('/resources', {
   method: 'POST',
   token: A,
   body: {
-    type: 'BATCH_SCHED_SERVER',
-    name: 'dup',
+    type: 'GDS_SERVER',
+    name: 'dup-gds',
     environment: 'PT',
     attrs: {
-      hostname: 'dup-01',
-      mgmtIp: '10.10.1.11',
-      osType: 'Linux',
-      nodeRole: 'AGENT',
-      agentPort: 7020,
+      IP: '10.40.9.99',
+      PORT: 5000,
+      USER_NAME: 'edws',
     },
   },
 });
@@ -209,10 +204,8 @@ const normalWrite = await req('/resources', {
     name: `冒烟普通用户资源-${Date.now().toString(36)}`,
     environment: 'DEV',
     attrs: {
-      exportPath: '/smoke-rbac',
-      mountPoint: '/mnt/smoke-rbac',
-      protocol: 'NFS',
-      capacityGb: 10,
+      NAS_URL: 'nfs://nas-smoke/rbac',
+      USEAGE: 'SOURCE_NAS',
     },
   },
 });
@@ -254,10 +247,8 @@ const roWrite = await req('/resources', {
     name: `冒烟只读越权-${Date.now().toString(36)}`,
     environment: 'DEV',
     attrs: {
-      exportPath: '/smoke-ro',
-      mountPoint: '/mnt/smoke-ro',
-      protocol: 'NFS',
-      capacityGb: 10,
+      NAS_URL: 'nfs://nas-smoke/ro',
+      USEAGE: 'SOURCE_NAS',
     },
   },
 });
@@ -294,15 +285,15 @@ for (const uid of [createdNormal.json?.id, createdRo.json?.id]) {
 
 console.log('\n[8] 批量导入 / 导出');
 const csv = [
-  'name,environment,status,owner,hostname,mgmtIp,osType,nodeRole,agentPort,cpuCores',
-  '导入服务器-A,PT,IN_USE,张三,imp-a-01,10.77.1.1,Linux,AGENT,7020,8',
-  '导入服务器-B,PT,IN_USE,张三,imp-b-01,10.77.1.2,Linux,AGENT,7020,16',
-  '导入服务器-C,PT,IN_USE,张三,imp-c-01,10.77.1.3,Windows,AGENT,7020,xx',
+  'name,environment,status,owner,IP,USER_NAME,OS',
+  '导入服务器-A,PT,IN_USE,张三,10.77.1.1,etladmin,Linux',
+  '导入服务器-B,PT,IN_USE,张三,10.77.1.2,etladmin,Linux',
+  '导入服务器-C,PT,IN_USE,张三,999.1.1.3,etladmin,Linux',
 ].join('\n');
 const imported = await req('/resources/import', {
   method: 'POST',
   token: A,
-  body: { type: 'BATCH_SCHED_SERVER', csv, onConflict: 'skip' },
+  body: { type: 'ETL_SERVER', csv, onConflict: 'skip' },
 });
 check(
   'CSV 导入：2 成功 1 失败',
@@ -312,7 +303,7 @@ check(
 const reimport = await req('/resources/import', {
   method: 'POST',
   token: A,
-  body: { type: 'BATCH_SCHED_SERVER', csv, onConflict: 'overwrite' },
+  body: { type: 'ETL_SERVER', csv, onConflict: 'overwrite' },
 });
 check(
   '重复导入 overwrite 策略生效',
@@ -326,9 +317,7 @@ const exportCsv = await fetch(`${B}/resources/export?type=NAS`, {
 const csvText = await exportCsv.text();
 check(
   'CSV 导出含表头与数据行',
-  csvText.startsWith('code,name,type') &&
-    csvText.includes('NAS-0001') &&
-    csvText.includes('exportPath'),
+  csvText.startsWith('code,name,type') && csvText.includes('NAS-') && csvText.includes('NAS_URL'),
 );
 
 console.log('\n[9] 审计日志');
@@ -376,14 +365,13 @@ check(
 console.log('\n[11] 清理');
 const del = await req(`/resources/${id}`, { method: 'DELETE', token: A });
 check('删除冒烟资源', del.status === 200);
-const cleanup = await req('/resources?type=BATCH_SCHED_SERVER&q=导入服务器', { token: A });
+const cleanup = await req('/resources?type=ETL_SERVER&q=导入服务器', { token: A });
 for (const item of cleanup.json.items ?? []) {
   await req(`/resources/${item.id}`, { method: 'DELETE', token: A });
 }
 check(
   '清理导入数据',
-  (await req('/resources?type=BATCH_SCHED_SERVER&q=导入服务器', { token: A })).json.meta?.total ===
-    0,
+  (await req('/resources?type=ETL_SERVER&q=导入服务器', { token: A })).json.meta?.total === 0,
 );
 
 console.log(`\n结果：${pass} 项通过，${fail} 项失败\n`);

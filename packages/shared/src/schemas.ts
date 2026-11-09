@@ -39,80 +39,6 @@ export const longText = z.string().trim().max(500);
 export const tagList = z.array(z.string().trim().min(1).max(24)).max(10).default([]);
 
 /* ------------------------------------------------------------------ *
- * 各资源类型的专属属性（attrs）
- * ------------------------------------------------------------------ */
-
-/**
- * 内置属性 schema 均带 catchall：子资源允许在继承父资源属性的基础上补充额外字段，
- * 字典尚未初始化时也不能把未知字段静默丢掉。
- */
-export const batchSchedServerAttrsSchema = z
-  .object({
-    hostname: shortText.describe('主机名'),
-    mgmtIp: ipv4.describe('管理 IP'),
-    osType: z.enum(['Linux', 'AIX', 'Windows', 'Unix', 'Other']).describe('操作系统'),
-    cpuCores: z.coerce.number().int().min(1).max(1024).optional().describe('CPU 核数'),
-    memGb: z.coerce.number().min(1).max(65536).optional().describe('内存(GB)'),
-    diskGb: z.coerce.number().min(1).max(1048576).optional().describe('磁盘(GB)'),
-    agentPort: port.default(7020).describe('Agent 端口'),
-    nodeRole: z.enum(['MASTER', 'STANDBY', 'AGENT']).describe('节点角色'),
-    schedDomain: shortText.optional().describe('调度域'),
-  })
-  .catchall(z.unknown());
-
-/** 平台接入地址（批量调度平台 / 采集交换平台共用的地址模型） */
-export const platformIpAttrsSchema = z
-  .object({
-    ip: ipv4.describe('服务 IP'),
-    port: port.describe('服务端口'),
-    protocol: z.enum(['HTTP', 'HTTPS', 'TCP', 'FTP', 'SFTP', 'JDBC']).describe('协议'),
-    platformName: shortText.describe('平台名称'),
-    accessUrl: z.string().trim().max(200).optional().describe('访问地址'),
-    vip: z.boolean().default(false).describe('是否 VIP'),
-    gateway: ipv4.optional().describe('网关'),
-  })
-  .catchall(z.unknown());
-
-/** NAS 存储资源 */
-export const nasAttrsSchema = z
-  .object({
-    mountPoint: shortText.describe('挂载点'),
-    exportPath: z.string().trim().min(1).max(200).describe('共享路径'),
-    protocol: z.enum(['NFS', 'CIFS', 'FTP', 'S3']).describe('共享协议'),
-    capacityGb: z.coerce.number().min(1).max(1048576).describe('总容量(GB)'),
-    usedGb: z.coerce.number().min(0).max(1048576).default(0).describe('已用(GB)'),
-    clusterName: shortText.optional().describe('存储集群'),
-    rwMode: z.enum(['RW', 'RO']).default('RW').describe('读写模式'),
-  })
-  .catchall(z.unknown());
-
-/** GDS 服务器（数据交换/通用数据服务节点） */
-export const gdsServerAttrsSchema = z
-  .object({
-    hostname: shortText.describe('主机名'),
-    ip: ipv4.describe('服务 IP'),
-    port: port.default(9042).describe('服务端口'),
-    serviceType: z.enum(['GDS_SERVER', 'GDS_AGENT', 'GDS_PROXY']).describe('服务类型'),
-    version: z.string().trim().max(32).optional().describe('版本号'),
-    nodeRole: z.enum(['PRIMARY', 'SECONDARY']).describe('节点角色'),
-    upstream: shortText.optional().describe('上游节点'),
-  })
-  .catchall(z.unknown());
-
-export const RESOURCE_ATTRS_SCHEMAS = {
-  BATCH_SCHED_SERVER: batchSchedServerAttrsSchema,
-  BATCH_SCHED_PLATFORM_IP: platformIpAttrsSchema,
-  COLLECT_EXCHANGE_PLATFORM_IP: platformIpAttrsSchema,
-  NAS: nasAttrsSchema,
-  GDS_SERVER: gdsServerAttrsSchema,
-} as const satisfies Record<ResourceType, z.ZodType>;
-
-export type ResourceAttrsMap = {
-  [K in keyof typeof RESOURCE_ATTRS_SCHEMAS]: z.infer<(typeof RESOURCE_ATTRS_SCHEMAS)[K]>;
-};
-export type ResourceAttrs = ResourceAttrsMap[ResourceType];
-
-/* ------------------------------------------------------------------ *
  * 资源公共字段 + 创建 / 更新 DTO
  * ------------------------------------------------------------------ */
 
@@ -615,7 +541,7 @@ export const projectSchema = z.object({
 });
 export type ProjectDto = z.infer<typeof projectSchema>;
 
-/** 项目环境：一个项目下可有多套（DEV / UAT / PROD），每套由若干资源槽位组成 */
+/** 项目环境：一个项目下可有多套（DEV / PT / UAT / PRD），每套由若干资源槽位组成 */
 export const projectEnvCreateSchema = z.object({
   projectId: z.coerce.number().int().positive().describe('所属项目'),
   name: shortText.describe('环境名称'),
@@ -1187,179 +1113,19 @@ export type AttrFieldDef = {
   options?: { value: string; label: string }[];
 };
 
-export const ATTR_FIELDS: Record<ResourceType, AttrFieldDef[]> = {
-  BATCH_SCHED_SERVER: [
-    {
-      key: 'hostname',
-      label: '主机名',
-      kind: 'text',
-      required: true,
-      placeholder: 'dw-bs-node-01',
-    },
-    { key: 'mgmtIp', label: '管理 IP', kind: 'text', required: true, placeholder: '10.10.1.11' },
-    {
-      key: 'osType',
-      label: '操作系统',
-      kind: 'select',
-      required: true,
-      options: [
-        { value: 'Linux', label: 'Linux' },
-        { value: 'AIX', label: 'AIX' },
-        { value: 'Windows', label: 'Windows' },
-        { value: 'Unix', label: 'Unix' },
-        { value: 'Other', label: '其他' },
-      ],
-    },
-    {
-      key: 'nodeRole',
-      label: '节点角色',
-      kind: 'select',
-      required: true,
-      options: [
-        { value: 'MASTER', label: '主调度' },
-        { value: 'STANDBY', label: '备调度' },
-        { value: 'AGENT', label: '执行代理' },
-      ],
-    },
-    { key: 'agentPort', label: 'Agent 端口', kind: 'number', required: true, placeholder: '7020' },
-    { key: 'cpuCores', label: 'CPU 核数', kind: 'number', unit: '核' },
-    { key: 'memGb', label: '内存', kind: 'number', unit: 'GB' },
-    { key: 'diskGb', label: '磁盘', kind: 'number', unit: 'GB' },
-    { key: 'schedDomain', label: '调度域', kind: 'text', placeholder: '如 ETL_CORE' },
-  ],
-  BATCH_SCHED_PLATFORM_IP: [
-    {
-      key: 'platformName',
-      label: '平台名称',
-      kind: 'text',
-      required: true,
-      placeholder: '批量调度平台-生产',
-    },
-    { key: 'ip', label: '服务 IP', kind: 'text', required: true, placeholder: '10.20.1.10' },
-    { key: 'port', label: '服务端口', kind: 'number', required: true, placeholder: '8443' },
-    {
-      key: 'protocol',
-      label: '协议',
-      kind: 'select',
-      required: true,
-      options: [
-        { value: 'HTTP', label: 'HTTP' },
-        { value: 'HTTPS', label: 'HTTPS' },
-        { value: 'TCP', label: 'TCP' },
-        { value: 'FTP', label: 'FTP' },
-        { value: 'SFTP', label: 'SFTP' },
-        { value: 'JDBC', label: 'JDBC' },
-      ],
-    },
-    { key: 'accessUrl', label: '访问地址', kind: 'text', placeholder: 'https://sched.xxx/console' },
-    { key: 'gateway', label: '网关', kind: 'text', placeholder: '10.20.1.1' },
-    { key: 'vip', label: '是否 VIP', kind: 'switch' },
-  ],
-  COLLECT_EXCHANGE_PLATFORM_IP: [
-    {
-      key: 'platformName',
-      label: '平台名称',
-      kind: 'text',
-      required: true,
-      placeholder: '采集交换平台-生产',
-    },
-    { key: 'ip', label: '服务 IP', kind: 'text', required: true, placeholder: '10.30.1.10' },
-    { key: 'port', label: '服务端口', kind: 'number', required: true, placeholder: '9001' },
-    {
-      key: 'protocol',
-      label: '协议',
-      kind: 'select',
-      required: true,
-      options: [
-        { value: 'HTTP', label: 'HTTP' },
-        { value: 'HTTPS', label: 'HTTPS' },
-        { value: 'TCP', label: 'TCP' },
-        { value: 'FTP', label: 'FTP' },
-        { value: 'SFTP', label: 'SFTP' },
-        { value: 'JDBC', label: 'JDBC' },
-      ],
-    },
-    { key: 'accessUrl', label: '访问地址', kind: 'text', placeholder: 'https://exchange.xxx/' },
-    { key: 'gateway', label: '网关', kind: 'text', placeholder: '10.30.1.1' },
-    { key: 'vip', label: '是否 VIP', kind: 'switch' },
-  ],
-  NAS: [
-    { key: 'clusterName', label: '存储集群', kind: 'text', placeholder: 'NAS-CLUSTER-A' },
-    {
-      key: 'exportPath',
-      label: '共享路径',
-      kind: 'text',
-      required: true,
-      placeholder: '/vol/dw_etl',
-    },
-    {
-      key: 'mountPoint',
-      label: '挂载点',
-      kind: 'text',
-      required: true,
-      placeholder: '/mnt/dw_etl',
-    },
-    {
-      key: 'protocol',
-      label: '共享协议',
-      kind: 'select',
-      required: true,
-      options: [
-        { value: 'NFS', label: 'NFS' },
-        { value: 'CIFS', label: 'CIFS' },
-        { value: 'FTP', label: 'FTP' },
-        { value: 'S3', label: 'S3' },
-      ],
-    },
-    { key: 'capacityGb', label: '总容量', kind: 'number', required: true, unit: 'GB' },
-    { key: 'usedGb', label: '已用容量', kind: 'number', unit: 'GB' },
-    {
-      key: 'rwMode',
-      label: '读写模式',
-      kind: 'select',
-      options: [
-        { value: 'RW', label: '读写' },
-        { value: 'RO', label: '只读' },
-      ],
-    },
-  ],
-  GDS_SERVER: [
-    { key: 'hostname', label: '主机名', kind: 'text', required: true, placeholder: 'gds-node-01' },
-    { key: 'ip', label: '服务 IP', kind: 'text', required: true, placeholder: '10.40.1.10' },
-    { key: 'port', label: '服务端口', kind: 'number', required: true, placeholder: '9042' },
-    {
-      key: 'serviceType',
-      label: '服务类型',
-      kind: 'select',
-      required: true,
-      options: [
-        { value: 'GDS_SERVER', label: 'GDS 服务节点' },
-        { value: 'GDS_AGENT', label: 'GDS 采集代理' },
-        { value: 'GDS_PROXY', label: 'GDS 转发代理' },
-      ],
-    },
-    {
-      key: 'nodeRole',
-      label: '节点角色',
-      kind: 'select',
-      required: true,
-      options: [
-        { value: 'PRIMARY', label: '主节点' },
-        { value: 'SECONDARY', label: '备节点' },
-      ],
-    },
-    { key: 'version', label: '版本号', kind: 'text', placeholder: 'v3.2.1' },
-    { key: 'upstream', label: '上游节点', kind: 'text', placeholder: 'gds-center' },
-  ],
-};
-
 /** 资源类型 → 列表页展示的关键列 */
 export const TYPE_COLUMNS: Record<ResourceType, string[]> = {
-  BATCH_SCHED_SERVER: ['hostname', 'mgmtIp', 'osType', 'nodeRole', 'agentPort'],
-  BATCH_SCHED_PLATFORM_IP: ['ip', 'port', 'protocol', 'platformName', 'vip'],
-  COLLECT_EXCHANGE_PLATFORM_IP: ['ip', 'port', 'protocol', 'platformName', 'vip'],
-  NAS: ['exportPath', 'mountPoint', 'protocol', 'capacityGb', 'usedGb'],
-  GDS_SERVER: ['hostname', 'ip', 'port', 'serviceType', 'nodeRole'],
+  ETL_SERVER: ['IP'],
+  ORACLE: [],
+  DWS_DB: [],
+  ARGODB: [],
+  MRS: [],
+  DCE: ['WEB_URL'],
+  IDEAL: [],
+  DSSP: [],
+  NAS: ['USEAGE'],
+  GDS_SERVER: ['IP'],
+  FUNCTION_SERVER: ['IP'],
 };
 
 export const RESOURCE_TYPE_ALIASES = RESOURCE_TYPES.map((t) => ({

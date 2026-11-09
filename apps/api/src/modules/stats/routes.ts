@@ -175,12 +175,15 @@ async function buildOverview(): Promise<StatsOverview> {
   const nas = all.filter((r) => r.type === 'NAS');
   // 子资源只是父资源容量池里划出的一段配额（且会继承父资源的 capacityGb），
   // 统计物理容量池时只按顶层资源汇总，避免父子重复计入导致总量翻倍。
+  // 容量以资源自身的容量字段为准（GB）；早期 NAS 把容量放在 attrs.capacityGb/usedGb，
+  // 字典类资源类型已无这两个字段，这里仅保留读出兜底。
   const nasRoots = nas.filter((r) => r.parentId === null);
   let capacityGb = 0;
   let usedGb = 0;
   for (const r of nasRoots) {
     const attrs = (r.attrs ?? {}) as Record<string, unknown>;
-    capacityGb += Number(attrs['capacityGb'] ?? 0);
+    const gb = r.capacityUnit === 'GB' || !r.capacityUnit ? (r.capacityTotal ?? 0) : 0;
+    capacityGb += gb > 0 ? gb : Number(attrs['capacityGb'] ?? 0);
     usedGb += Number(attrs['usedGb'] ?? 0);
   }
 

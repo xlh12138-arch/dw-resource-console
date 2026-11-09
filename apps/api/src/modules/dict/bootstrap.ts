@@ -1,15 +1,10 @@
 import {
-  ATTR_FIELDS,
   ENVIRONMENTS,
   ENVIRONMENT_COLORS,
   ENVIRONMENT_DESCRIPTIONS,
   ENVIRONMENT_LABELS,
   ENVIRONMENT_TONES,
   PRODUCTION_ENVIRONMENTS,
-  RESOURCE_TYPES,
-  RESOURCE_TYPE_LABELS,
-  RESOURCE_TYPE_PREFIX,
-  TYPE_COLUMNS,
 } from '@dw/shared';
 import {
   environmentRepository,
@@ -22,91 +17,221 @@ import { withTransaction } from '../../db/index.js';
 /**
  * 演示数据字典初始化：仅供 `db:seed` 创建本地演示数据时使用。
  * 正常启动不会调用，也不会再把任何字典标记为内置。
+ *
+ * 内容与生产库（PG public schema）资源类型字典保持一致，差异时以生产库为准。
  */
 
-/** 内置类型中参与 IP 占用检测的字段 */
-const IP_KEYS: Record<string, string[]> = {
-  BATCH_SCHED_SERVER: ['mgmtIp'],
-  BATCH_SCHED_PLATFORM_IP: ['ip'],
-  COLLECT_EXCHANGE_PLATFORM_IP: ['ip'],
-  NAS: [],
-  GDS_SERVER: ['ip'],
-};
+/** 资源类型：编码、名称、编码前缀、是否按 IP+端口判重、列表展示列 */
+export const DEMO_TYPES: {
+  code: string;
+  label: string;
+  prefix: string;
+  ipUniqueByPort: boolean;
+  listColumns: string[];
+}[] = [
+  {
+    code: 'ETL_SERVER',
+    label: 'ETL服务器',
+    prefix: 'ETL',
+    ipUniqueByPort: true,
+    listColumns: ['IP'],
+  },
+  {
+    code: 'ORACLE',
+    label: 'ORACLE数据库',
+    prefix: 'ORACLE',
+    ipUniqueByPort: false,
+    listColumns: [],
+  },
+  { code: 'DWS_DB', label: 'DWS数据库', prefix: 'DWS', ipUniqueByPort: false, listColumns: [] },
+  { code: 'ARGODB', label: 'ARGO数据库', prefix: 'ARGODB', ipUniqueByPort: false, listColumns: [] },
+  { code: 'MRS', label: 'MRS', prefix: 'MRS', ipUniqueByPort: false, listColumns: [] },
+  {
+    code: 'DCE',
+    label: '采集交换平台',
+    prefix: 'DCE',
+    ipUniqueByPort: false,
+    listColumns: ['WEB_URL'],
+  },
+  { code: 'IDEAL', label: '理想调度平台', prefix: 'IDEAL', ipUniqueByPort: false, listColumns: [] },
+  { code: 'DSSP', label: '源启调度平台', prefix: 'DSSP', ipUniqueByPort: false, listColumns: [] },
+  { code: 'NAS', label: 'NAS', prefix: 'NAS', ipUniqueByPort: false, listColumns: ['USEAGE'] },
+  {
+    code: 'GDS_SERVER',
+    label: 'GDS服务器',
+    prefix: 'GDS',
+    ipUniqueByPort: false,
+    listColumns: ['IP'],
+  },
+  {
+    code: 'FUNCTION_SERVER',
+    label: '功能服务器',
+    prefix: 'FUNCTION',
+    ipUniqueByPort: false,
+    listColumns: ['IP'],
+  },
+];
 
-/** 平台地址类资源按 IP+端口判重 */
-const IP_UNIQUE_BY_PORT: Record<string, boolean> = {
-  BATCH_SCHED_SERVER: false,
-  BATCH_SCHED_PLATFORM_IP: true,
-  COLLECT_EXCHANGE_PLATFORM_IP: true,
-  NAS: false,
-  GDS_SERVER: false,
-};
-
-const FIELD_DEFAULTS: Record<string, Record<string, string>> = {
-  BATCH_SCHED_SERVER: { agentPort: '7020' },
-  BATCH_SCHED_PLATFORM_IP: { vip: 'false' },
-  COLLECT_EXCHANGE_PLATFORM_IP: { vip: 'false' },
-  NAS: { rwMode: 'RW', usedGb: '0' },
-  GDS_SERVER: { port: '9042' },
+/** 资源类型字段：key、名称、字段类型、是否必填、选项、默认值 */
+export const DEMO_FIELDS: Record<
+  string,
+  {
+    key: string;
+    label: string;
+    fieldType: string;
+    required: boolean;
+    options?: { value: string; label: string }[];
+    defaultValue?: string;
+  }[]
+> = {
+  ETL_SERVER: [
+    { key: 'IP', label: 'IP地址', fieldType: 'IP', required: true },
+    { key: 'USER_NAME', label: '用户名', fieldType: 'TEXT', required: true },
+    { key: 'OS', label: '操作系统', fieldType: 'TEXT', required: true },
+  ],
+  ORACLE: [
+    { key: 'IP', label: 'IP地址', fieldType: 'IP', required: true },
+    { key: 'PORT', label: '端口', fieldType: 'PORT', required: true },
+    { key: 'DB_NAME', label: '数据库名', fieldType: 'TEXT', required: true },
+    { key: 'USER_NAME', label: '用户名', fieldType: 'TEXT', required: true },
+  ],
+  DWS_DB: [
+    { key: 'CLUSTER', label: '集群', fieldType: 'TEXT', required: true },
+    { key: 'IP', label: 'IP地址', fieldType: 'IP', required: true },
+    { key: 'PORT', label: '端口', fieldType: 'PORT', required: true },
+    { key: 'DB_NAME', label: '数据库名', fieldType: 'TEXT', required: false },
+    { key: 'USER_NAME', label: '用户名', fieldType: 'TEXT', required: false },
+    { key: 'WEB_URL', label: '前端地址', fieldType: 'TEXT', required: false },
+  ],
+  ARGODB: [
+    { key: 'IP', label: 'IP地址', fieldType: 'IP', required: true },
+    { key: 'PORT', label: '端口', fieldType: 'PORT', required: true },
+    { key: 'DB_NAME', label: '数据库名', fieldType: 'TEXT', required: false },
+    { key: 'USER_NAME', label: '用户名', fieldType: 'TEXT', required: false },
+    { key: 'WEB_URL', label: '前端地址', fieldType: 'TEXT', required: false },
+  ],
+  MRS: [
+    { key: 'CLUSTER', label: '集群', fieldType: 'TEXT', required: true },
+    { key: 'USER_NAME', label: '用户名', fieldType: 'TEXT', required: true },
+    { key: 'WEB_URL', label: '前端地址', fieldType: 'TEXT', required: false },
+  ],
+  DCE: [
+    { key: 'WEB_URL', label: '前端地址', fieldType: 'TEXT', required: true },
+    { key: 'API_URL', label: 'API链接', fieldType: 'TEXT', required: true },
+    { key: 'USER_NAME', label: '用户名', fieldType: 'TEXT', required: false },
+    { key: 'TOKEN', label: 'TOKEN', fieldType: 'TEXT', required: false },
+    {
+      key: 'API_CHECK_TASKS',
+      label: 'API_检查多任务',
+      fieldType: 'TEXT',
+      required: false,
+      defaultValue: 'dce_queryjoblist',
+    },
+    {
+      key: 'API_CHECK_TASK',
+      label: 'API_检查单任务',
+      fieldType: 'TEXT',
+      required: false,
+      defaultValue: 'dce_runjinfo2',
+    },
+    {
+      key: 'API_LOAD_TASK',
+      label: 'API_启动装数任务',
+      fieldType: 'TEXT',
+      required: false,
+      defaultValue: 'dce_dlsjob',
+    },
+    {
+      key: 'API_EXPORT_TASK',
+      label: 'API_启动卸数任务',
+      fieldType: 'TEXT',
+      required: false,
+      defaultValue: 'dce_desjob',
+    },
+    {
+      key: 'API_ADD_TOKEN',
+      label: 'API_增加令牌',
+      fieldType: 'TEXT',
+      required: false,
+      defaultValue: 'dce_addjob',
+    },
+  ],
+  IDEAL: [
+    { key: 'WEB_URL', label: '前端地址', fieldType: 'TEXT', required: true },
+    { key: 'USER_NAME', label: '用户名', fieldType: 'TEXT', required: false },
+  ],
+  DSSP: [
+    { key: 'WEB_URL', label: '前端地址', fieldType: 'TEXT', required: true },
+    { key: 'USER_NAME', label: '用户名', fieldType: 'TEXT', required: false },
+  ],
+  NAS: [
+    { key: 'NAS_URL', label: 'NAS地址', fieldType: 'TEXT', required: true },
+    {
+      key: 'USEAGE',
+      label: '用途',
+      fieldType: 'TEXT',
+      required: true,
+      options: [{ value: 'SOURCE_NAS', label: '上游NAS' }],
+    },
+  ],
+  GDS_SERVER: [
+    { key: 'IP', label: 'IP地址', fieldType: 'IP', required: true },
+    { key: 'PORT', label: '端口', fieldType: 'PORT', required: true, defaultValue: '5000' },
+    { key: 'USER_NAME', label: '用户名', fieldType: 'TEXT', required: true, defaultValue: 'edws' },
+  ],
+  FUNCTION_SERVER: [
+    { key: 'IP', label: 'IP地址', fieldType: 'IP', required: true },
+    { key: 'USER_NAME', label: '用户名', fieldType: 'TEXT', required: true },
+    { key: 'OS', label: '操作系统', fieldType: 'TEXT', required: true },
+  ],
 };
 
 const ENV_TONES: Record<string, string> = { ...ENVIRONMENT_TONES };
 const ENV_COLORS: Record<string, string> = { ...ENVIRONMENT_COLORS };
 const ENV_DESC: Record<string, string> = { ...ENVIRONMENT_DESCRIPTIONS };
 
-function fieldTypeOf(kind: string, isIp: boolean): string {
-  if (isIp) return 'IP';
-  if (kind === 'select') return 'SELECT';
-  if (kind === 'switch') return 'BOOLEAN';
-  if (kind === 'number') return 'NUMBER';
-  if (kind === 'textarea') return 'TEXTAREA';
-  return 'TEXT';
-}
-
 export async function seedDemoDict(): Promise<void> {
   let created = 0;
   await withTransaction(async () => {
-    for (const [index, code] of RESOURCE_TYPES.entries()) {
-      const exists = await resourceTypeRepository.exists(code);
+    for (const [index, type] of DEMO_TYPES.entries()) {
+      const exists = await resourceTypeRepository.exists(type.code);
       if (!exists) {
         await resourceTypeRepository.create({
-          code,
-          label: RESOURCE_TYPE_LABELS[code],
-          prefix: RESOURCE_TYPE_PREFIX[code],
+          code: type.code,
+          label: type.label,
+          prefix: type.prefix,
           description: null,
-          ipUniqueByPort: IP_UNIQUE_BY_PORT[code] ?? false,
-          listColumns: TYPE_COLUMNS[code] ?? [],
+          ipUniqueByPort: type.ipUniqueByPort,
+          listColumns: type.listColumns,
           enabled: true,
           builtin: false,
-          sortOrder: index,
+          sortOrder: index + 1,
         });
         created += 1;
       }
 
-      const existingFields = await resourceTypeFieldRepository.listByType(code);
+      const existingFields = await resourceTypeFieldRepository.listByType(type.code);
       if (existingFields.length === 0) {
-        const ipKeys = IP_KEYS[code] ?? [];
-        const defaults = FIELD_DEFAULTS[code] ?? {};
         await resourceTypeFieldRepository.replaceAll(
-          code,
-          (ATTR_FIELDS[code] ?? []).map((f, i) => ({
-            typeCode: code,
+          type.code,
+          (DEMO_FIELDS[type.code] ?? []).map((f, i) => ({
+            typeCode: type.code,
             key: f.key,
             label: f.label,
-            fieldType: fieldTypeOf(f.kind, ipKeys.includes(f.key)),
-            required: f.required ?? false,
+            fieldType: f.fieldType,
+            required: f.required,
             options: f.options ?? [],
-            defaultValue: defaults[f.key] ?? null,
-            placeholder: f.placeholder ?? null,
-            unit: f.unit ?? null,
-            isIp: ipKeys.includes(f.key),
-            sortOrder: i,
+            defaultValue: f.defaultValue ?? null,
+            placeholder: null,
+            unit: null,
+            isIp: false,
+            sortOrder: i + 1,
           })),
         );
       }
     }
 
-    // 只初始化演示用的非生产环境：生产环境（PROD 等）由管理员在字典里自行维护，
+    // 只初始化演示用的非生产环境：生产环境（PRD）由管理员在字典里自行维护，
     // 种子数据不再自动创建，避免演示库凭空出现生产环境。
     for (const code of ENVIRONMENTS.filter((c) => !PRODUCTION_ENVIRONMENTS.includes(c))) {
       if (!(await environmentRepository.exists(code))) {
@@ -119,7 +244,7 @@ export async function seedDemoDict(): Promise<void> {
           enabled: true,
           builtin: false,
           // 用全量枚举的下标，跳过生产环境也不会打乱其余环境的排序
-          sortOrder: ENVIRONMENTS.indexOf(code),
+          sortOrder: ENVIRONMENTS.indexOf(code) + 1,
         });
         created += 1;
       } else {

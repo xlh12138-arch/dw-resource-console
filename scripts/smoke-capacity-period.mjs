@@ -87,13 +87,9 @@ const nas = (
       capacityTotal: 1000,
       capacityUnit: 'GB',
       attrs: {
-        clusterName: 'SMOKE-NAS',
-        exportPath: '/vol/smoke',
-        mountPoint: '/mnt/smoke',
-        protocol: 'NFS',
-        capacityGb: 1000,
-        usedGb: 0,
-        rwMode: 'RW',
+        NAS_URL: 'nfs://nas-smoke/vol/smoke',
+        USEAGE: 'SOURCE_NAS',
+        REMARK_NOTE: '/mnt/smoke',
       },
     },
   })

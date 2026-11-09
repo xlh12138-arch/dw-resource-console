@@ -3,61 +3,79 @@
  */
 
 export const RESOURCE_TYPES = [
-  'BATCH_SCHED_SERVER',
-  'BATCH_SCHED_PLATFORM_IP',
-  'COLLECT_EXCHANGE_PLATFORM_IP',
+  'ETL_SERVER',
+  'ORACLE',
+  'DWS_DB',
+  'ARGODB',
+  'MRS',
+  'DCE',
+  'IDEAL',
+  'DSSP',
   'NAS',
   'GDS_SERVER',
+  'FUNCTION_SERVER',
 ] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 
 export const RESOURCE_TYPE_LABELS: Record<ResourceType, string> = {
-  BATCH_SCHED_SERVER: '批量调度服务器',
-  BATCH_SCHED_PLATFORM_IP: '批量调度平台IP',
-  COLLECT_EXCHANGE_PLATFORM_IP: '采集交换平台IP',
-  NAS: 'NAS 存储',
-  GDS_SERVER: 'GDS 服务器',
+  ETL_SERVER: 'ETL服务器',
+  ORACLE: 'ORACLE数据库',
+  DWS_DB: 'DWS数据库',
+  ARGODB: 'ARGO数据库',
+  MRS: 'MRS',
+  DCE: '采集交换平台',
+  IDEAL: '理想调度平台',
+  DSSP: '源启调度平台',
+  NAS: 'NAS',
+  GDS_SERVER: 'GDS服务器',
+  FUNCTION_SERVER: '功能服务器',
 };
 
-/** 资源编码前缀，用于自动生成 BS-SRV-0001 之类的业务唯一编码 */
+/** 资源编码前缀，用于自动生成 ETL-0001 之类的业务唯一编码 */
 export const RESOURCE_TYPE_PREFIX: Record<ResourceType, string> = {
-  BATCH_SCHED_SERVER: 'BS-SRV',
-  BATCH_SCHED_PLATFORM_IP: 'BS-IP',
-  COLLECT_EXCHANGE_PLATFORM_IP: 'CE-IP',
+  ETL_SERVER: 'ETL',
+  ORACLE: 'ORACLE',
+  DWS_DB: 'DWS',
+  ARGODB: 'ARGODB',
+  MRS: 'MRS',
+  DCE: 'DCE',
+  IDEAL: 'IDEAL',
+  DSSP: 'DSSP',
   NAS: 'NAS',
   GDS_SERVER: 'GDS',
+  FUNCTION_SERVER: 'FUNCTION',
 };
 
 /** 历史环境编码：仅用于类型兼容，实际字典以数据库配置为准 */
-export const ENVIRONMENTS = ['DEV', 'PT', 'UAT', 'PROD'] as const;
+export const ENVIRONMENTS = ['DEV', 'PT', 'UAT', 'PRD'] as const;
 export type Environment = (typeof ENVIRONMENTS)[number];
 /** 生产类环境编码：字典里仍可存在，但演示种子数据不会自动创建它们 */
-export const PRODUCTION_ENVIRONMENTS: readonly Environment[] = ['PROD'];
+export const PRODUCTION_ENVIRONMENTS: readonly Environment[] = ['PRD'];
 export const ENVIRONMENT_LABELS: Record<Environment, string> = {
   DEV: '开发',
   PT: '产品测试',
   UAT: '用户测试',
-  PROD: '生产',
+  PRD: '生产',
 };
 /** 预设色调：仅在环境未设置自定义标识色时作为 Badge 兜底 */
 export const ENVIRONMENT_TONES: Record<Environment, string> = {
-  DEV: 'blue',
-  PT: 'amber',
-  UAT: 'violet',
-  PROD: 'green',
+  DEV: 'gray',
+  PT: 'gray',
+  UAT: 'gray',
+  PRD: 'gray',
 };
 /** 历史环境编码的默认标识色（十六进制，前端调色板与徽标共用） */
 export const ENVIRONMENT_COLORS: Record<Environment, string> = {
-  DEV: '#2563eb',
-  PT: '#d97706',
-  UAT: '#7c3aed',
-  PROD: '#dc2626',
+  DEV: '#16a34a',
+  PT: '#2563eb',
+  UAT: '#d97706',
+  PRD: '#dc2626',
 };
 export const ENVIRONMENT_DESCRIPTIONS: Record<Environment, string> = {
   DEV: '开发环境，供研发自测联调使用',
   PT: '产品测试环境，供产品与测试同学验证需求',
   UAT: '用户测试环境，上线前的用户验收环境',
-  PROD: '生产环境，直接承载线上业务，变更需走审批与变更窗口',
+  PRD: '生产环境，直接承载线上业务，变更需走审批与变更窗口',
 };
 
 /** 调色板预设：常用环境色，点一下即可套用（也可自行输入 RGB） */

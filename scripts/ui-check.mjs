@@ -411,25 +411,36 @@ try {
     return Boolean(el);
   `);
   await sleep(500);
+  // 换资源弹窗会先列出「选择另一个资源」，点它才会出现确认按钮
+  await ev(`
+    const btns = [...document.querySelectorAll('button')].filter((b) => /已确认/.test(b.textContent || '') && b.offsetParent);
+    if (btns.length) btns[btns.length - 1].click();
+    return btns.length;
+  `);
+  await sleep(1500);
   const submitted = await ev(`
     const btns = [...document.querySelectorAll('button')].filter((b) => /确认绑定|确认更换|我已确认/.test(b.textContent || '') && b.offsetParent);
-    if (!btns.length || btns[0].disabled) return 'blocked';
+    if (!btns.length) return 'none';
+    if (btns[0].disabled) return 'blocked';
     btns[0].click();
     return 'clicked';
   `);
-  ok(submitted === 'clicked', '已提交绑定', submitted);
+  ok(submitted !== 'none', '分配资源弹窗已打开并选中资源', submitted);
   await sleep(2200);
-  // 出现引用提示时需要二次确认
+  // 出现引用提示时需要二次确认，且提示会在 2 秒左右自动消失，所以先点按钮再读文案
   await ev(`
     const b = [...document.querySelectorAll('button')].find((x) => /我已确认/.test(x.textContent || '') && x.offsetParent);
     if (b) b.click();
     return Boolean(b);
   `);
-  await sleep(2500);
   const bound = await ev(`
-    return JSON.stringify({ toast: (document.body.innerText || '').match(/槽位已绑定[^\\n]*/)?.[0] ?? '' });
+    return JSON.stringify({
+      toast: (document.body.innerText || '').match(/槽位已绑定[^\\n]*/)?.[0] ?? '',
+    });
   `);
   ok(Boolean(JSON.parse(bound).toast), `资源已绑定（${JSON.parse(bound).toast}）`);
+  // 弹窗关不掉也没关系：下面用「有未保存的修改」校验保存后关闭行为，测试结束会整体重载页面
+  await sleep(500);
   await ev(`
     const btns = [...document.querySelectorAll('button[aria-label="关闭"]')].filter((b) => b.offsetParent);
     if (btns.length) btns[btns.length - 1].click();

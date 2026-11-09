@@ -89,13 +89,9 @@ async function main() {
    * ---------------------------------------------------------------- */
   console.log('\n[2] 父子资源：创建 / 继承 / 容量同步');
   const nasAttrs = {
-    clusterName: 'SMOKE-CLUSTER',
-    exportPath: `/vol/smoke_${suffix}`,
-    mountPoint: `/mnt/smoke_${suffix}`,
-    protocol: 'NFS',
-    capacityGb: 1000,
-    usedGb: 0,
-    rwMode: 'RW',
+    NAS_URL: `nfs://nas-smoke/vol/smoke_${suffix}`,
+    USEAGE: 'SOURCE_NAS',
+    REMARK_NOTE: `/mnt/smoke_${suffix}`,
   };
 
   const parent = (
@@ -134,7 +130,7 @@ async function main() {
         environment: 'DEV',
         parentId: parent.id,
         demandAmount: 200,
-        attrs: { mountPoint: `/mnt/smoke_child_${suffix}`, clusterName: 'SMOKE-CHILD' },
+        attrs: { REMARK_NOTE: `/mnt/smoke_child_${suffix}` },
       },
     })
   ).json;
@@ -142,12 +138,9 @@ async function main() {
   ok(child?.demandAmount === 200, '子资源申请容量 200');
   ok(child?.capacityTotal === 200, `子资源总容量等于申请额度（${child?.capacityTotal}）`);
   ok(child?.projectId === project.id, '子资源继承父资源的项目归属');
-  ok(child?.attrs?.exportPath === nasAttrs.exportPath, '子资源继承父资源的专属属性');
-  ok(
-    child?.attrs?.mountPoint === nasAttrs.mountPoint,
-    '子资源无法覆盖必填属性（挂载点继承父资源）',
-  );
-  ok(child?.attrs?.clusterName === 'SMOKE-CHILD', '子资源可以补充非必填属性');
+  ok(child?.attrs?.NAS_URL === nasAttrs.NAS_URL, '子资源继承父资源的专属属性');
+  ok(child?.attrs?.USEAGE === nasAttrs.USEAGE, '子资源无法覆盖必填属性（用途继承父资源）');
+  ok(child?.attrs?.REMARK_NOTE === `/mnt/smoke_child_${suffix}`, '子资源可以补充非必填属性');
 
   const parentAfterChild = (await req(`/resources/${parent.id}`, { token })).json;
   ok(parentAfterChild?.capacity?.childAllocated === 200, '父资源「其中子资源」为 200');
@@ -503,16 +496,16 @@ async function main() {
 
   // 环境标识色：可写任意 HEX，非 #rrggbb 被拒绝
   const envDicts = (await req('/environments?includeDisabled=true', { token })).json;
-  const prodDict = envDicts.find((e) => e.code === 'PROD');
-  // PROD 由管理员按需建立、演示种子不创建；存在则必须带合法标识色，不强制内置状态
+  const prodDict = envDicts.find((e) => e.code === 'PRD');
+  // 生产环境（PRD）由管理员按需建立、演示种子不创建；存在则必须带合法标识色，不强制内置状态
   console.log(
     prodDict
-      ? `  · PROD 字典已存在（builtin=${prodDict.builtin}，标签 ${prodDict.label}）`
-      : '  · PROD 未内置到演示字典（符合预期）',
+      ? `  · PRD 字典已存在（builtin=${prodDict.builtin}，标签 ${prodDict.label}）`
+      : '  · PRD 未出现在演示字典（符合预期）',
   );
   ok(!prodDict || /^#[0-9a-f]{6}$/.test(prodDict.color ?? ''), '环境字典标识色均为 #rrggbb');
   // 环境标识色：可写任意 HEX，非 #rrggbb 被拒绝；生产环境不存在时用 DEV 代替
-  const colorTarget = prodDict ? '/environments/PROD' : '/environments/DEV';
+  const colorTarget = prodDict ? '/environments/PRD' : '/environments/DEV';
   const recolor = await req(colorTarget, {
     method: 'PATCH',
     token,
@@ -531,7 +524,7 @@ async function main() {
   await req(colorTarget, {
     method: 'PATCH',
     token,
-    body: { color: prodDict ? '#dc2626' : '#0ea5e9' },
+    body: { color: prodDict ? '#dc2626' : '#16a34a' },
   });
 
   // 释放槽位，便于后续删除资源

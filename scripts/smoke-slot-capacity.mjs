@@ -7,7 +7,7 @@
  *  3. 跨环境引用（准生产引用开发资源）需确认后放行
  *  4. 资源台账可查看被哪些项目 / 环境引用
  *  5. 容量：槽位申请必填且不可超额、调小容量时校验现有占用、台账显示容量明细
- *  6. 环境字典为 DEV / PT / UAT，且不再标记内置
+ *  6. 环境字典为 DEV / PT / UAT，且不再标记内置（生产环境 PRD 由管理员自建）
  */
 
 import { ADMIN_USERNAME, BASE, adminPassword } from './lib/smoke-env.mjs';
@@ -67,12 +67,12 @@ const uat = envs.find((e) => e.code === 'UAT');
 ok(dev?.builtin === false && Boolean(dev?.label), `DEV 为非内置且有显示名（${dev?.label}）`);
 ok(pt?.builtin === false && Boolean(pt?.label), `PT 为非内置且有显示名（${pt?.label}）`);
 ok(uat?.builtin === false && Boolean(uat?.label), `UAT 为非内置且有显示名（${uat?.label}）`);
-const prod = envs.find((e) => e.code === 'PROD');
-// PROD 存在则必须是管理员自建（非内置）；本地老库可能还留着内置标记，这里只提示不判失败
+const prod = envs.find((e) => e.code === 'PRD');
+// PRD 存在则只做提示；演示种子不创建生产环境，不因此判定失败
 console.log(
   prod
-    ? `  · PROD 字典已存在（builtin=${prod.builtin}，标签 ${prod.label}）`
-    : '  · PROD 未内置到演示字典（符合预期）',
+    ? `  · PRD 字典已存在（builtin=${prod.builtin}，标签 ${prod.label}）`
+    : '  · PRD 未出现在演示字典（符合预期）',
 );
 ok(
   envs.every((e) => /^#[0-9a-f]{6}$/.test(e.color ?? '')),
@@ -131,13 +131,9 @@ const nas = (
       capacityTotal: 1000,
       capacityUnit: 'GB',
       attrs: {
-        clusterName: 'SMOKE-NAS',
-        exportPath: '/vol/smoke',
-        mountPoint: '/mnt/smoke',
-        protocol: 'NFS',
-        capacityGb: 1000,
-        usedGb: 0,
-        rwMode: 'RW',
+        NAS_URL: 'nfs://nas-smoke/vol/smoke',
+        USEAGE: 'SOURCE_NAS',
+        REMARK_NOTE: '/mnt/smoke',
       },
     },
   })

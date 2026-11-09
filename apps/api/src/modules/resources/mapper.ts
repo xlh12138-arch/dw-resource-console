@@ -1,9 +1,4 @@
-import type {
-  CapacityPeak as CapacityPeakDto,
-  ResourceAttrsMap,
-  ResourceDto,
-  ResourceType,
-} from '@dw/shared';
+import type { CapacityPeak as CapacityPeakDto, ResourceDto, ResourceType } from '@dw/shared';
 import { getTypeMeta } from '../dict/validator.js';
 import { projectEnvRepository, projectRepository } from '../projects/repository.js';
 import type { ResourceRow } from '../../db/schema.js';
@@ -127,23 +122,34 @@ export function capacityDetailOf(
   };
 }
 
-/** 各类型中承载 IP 的字段（用于 IP 占用检测与冲突校验） */
-export const IP_FIELDS: Record<ResourceType, string[]> = {
-  BATCH_SCHED_SERVER: ['mgmtIp'],
-  BATCH_SCHED_PLATFORM_IP: ['ip'],
-  COLLECT_EXCHANGE_PLATFORM_IP: ['ip'],
+/**
+ * 各类型中承载 IP 的字段：以字典字段定义（isIp 或 fieldType=IP）为准；
+ * 字典尚未初始化时才回退到内置映射（与生产库资源类型字典一致）。
+ */
+const FALLBACK_IP_FIELDS: Record<string, string[]> = {
+  ETL_SERVER: ['IP'],
+  FUNCTION_SERVER: ['IP'],
+  GDS_SERVER: ['IP'],
+  ORACLE: ['IP'],
+  DWS_DB: ['IP'],
+  ARGODB: ['IP'],
+  DCE: [],
+  IDEAL: [],
+  DSSP: [],
+  MRS: [],
   NAS: [],
-  GDS_SERVER: ['ip'],
 };
 
-/** 平台地址类资源按 IP+端口判重，主机类资源按 IP 判重 */
-export const IP_UNIQUE_BY_PORT: Record<ResourceType, boolean> = {
-  BATCH_SCHED_SERVER: false,
-  BATCH_SCHED_PLATFORM_IP: true,
-  COLLECT_EXCHANGE_PLATFORM_IP: true,
-  NAS: false,
-  GDS_SERVER: false,
-};
+/** 按 IP+端口判重还是只按 IP 判重（字典未初始化时的回退值，与生产库 ip_unique_by_port 一致） */
+const FALLBACK_IP_UNIQUE_BY_PORT: Record<string, boolean> = {};
+
+export function ipFieldFallbackOf(type: string): string[] {
+  return FALLBACK_IP_FIELDS[type] ?? [];
+}
+
+export function ipUniqueByPortFallbackOf(type: string): boolean {
+  return FALLBACK_IP_UNIQUE_BY_PORT[type] ?? false;
+}
 
 export function extractIps(
   attrs: Record<string, unknown>,
@@ -157,23 +163,23 @@ export function extractIps(
     );
 }
 
-/** 取某类型的 IP 字段：优先用字典里的字段定义（isIp 标记），回退到内置映射 */
+/** 取某类型的 IP 字段（字典 meta.ipFields 已含 isIp 与 fieldType=IP 两种写法） */
 export async function ipFieldsOf(type: string): Promise<string[]> {
   const meta = await getTypeMeta(type);
-  if (meta.fields.length > 0) return meta.ipFields;
-  return IP_FIELDS[type as ResourceType] ?? [];
+  if (!meta.exists) return ipFieldFallbackOf(type);
+  return meta.ipFields;
 }
 
 /** 平台地址类资源按 IP+端口判重，主机类按 IP 判重（取自字典 ipUniqueByPort） */
 export async function ipUniqueByPortOf(type: string): Promise<boolean> {
   const meta = await getTypeMeta(type);
   if (meta.fields.length > 0 || meta.exists) return meta.ipUniqueByPort;
-  return IP_UNIQUE_BY_PORT[type as ResourceType] ?? false;
+  return ipUniqueByPortFallbackOf(type);
 }
 
-export function attrsOf<K extends ResourceType>(
-  type: K,
+export function attrsOf(
+  type: ResourceType,
   attrs: Record<string, unknown>,
-): ResourceAttrsMap[K] {
-  return attrs as ResourceAttrsMap[K];
+): Record<string, unknown> {
+  return attrs;
 }

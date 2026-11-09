@@ -513,8 +513,8 @@ async function assertNoIpConflict(
   const ips = extractIps(attrs, await ipFieldsOf(type));
   if (ips.length === 0) return;
   const byPort = await ipUniqueByPortOf(type);
-  const port =
-    typeof attrs['port'] === 'number' ? (attrs['port'] as number) : Number(attrs['port']);
+  // 端口按字典字段编码取（字典字段是大写 PORT），小写 port 仅作为历史数据兜底
+  const port = Number(attrs['PORT'] ?? attrs['port']);
 
   for (const { field, value } of ips) {
     const candidates = await resourceRepository.findByIp(value);
@@ -532,7 +532,7 @@ async function assertNoIpConflict(
         hit = c;
         break;
       }
-      const cPort = Number(cAttrs['port']);
+      const cPort = Number(cAttrs['PORT'] ?? cAttrs['port']);
       if (Number.isFinite(cPort) && Number.isFinite(port) ? cPort === port : true) {
         hit = c;
         break;
