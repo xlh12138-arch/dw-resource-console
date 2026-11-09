@@ -399,7 +399,7 @@ async function main() {
   // 环境标识色：可写任意 HEX，非 #rrggbb 被拒绝
   const envDicts = (await req('/environments?includeDisabled=true', { token })).json;
   const prodDict = envDicts.find((e) => e.code === 'PROD');
-  ok(prodDict?.builtin === true && prodDict?.label === '生产', 'PROD 为内置生产环境');
+  ok(prodDict?.builtin === false && prodDict?.label === '生产', 'PROD 为非内置生产环境');
   ok(/^#[0-9a-f]{6}$/.test(prodDict?.color ?? ''), `生产环境带默认标识色（${prodDict?.color}）`);
   const recolor = await req('/environments/PROD', { method: 'PATCH', token, body: { color: '#0ea5e9' } });
   ok(recolor.status === 200 && recolor.json?.detail?.color === '#0ea5e9', '标识色可改为任意 HEX（对应 RGB 输入）');

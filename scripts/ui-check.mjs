@@ -202,11 +202,12 @@ try {
   await waitFor(async () => ev(`return !!document.querySelector('input')`), 30000, '登录页加载');
 
   /* ---------- 登录 ---------- */
-  // 用页面自带的「演示账号」填充（第一个即管理员），再提交
+  // 用页面自带的「演示账号」填充（admin），再提交
   await ev(`
-    const demo = [...document.querySelectorAll('button')].filter((b) => b.className.includes('w-full rounded-lg border'));
-    if (demo[0]) demo[0].click();
-    return demo.length;
+    const demos = [...document.querySelectorAll('button[data-demo]')];
+    const admin = demos.find((b) => b.dataset.demo === 'admin') || demos[0];
+    if (admin) admin.click();
+    return demos.length;
   `);
   await sleep(400);
   await ev(`
@@ -646,7 +647,8 @@ try {
   /* ---------- 10. 只读用户：可见同普通用户，但无写入口 ---------- */
   console.log('\n[10] 只读用户');
   await ev(`
-    const btn = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').includes('退出登录'));
+    const btn = document.querySelector('button[aria-label="退出登录"]')
+      || [...document.querySelectorAll('button')].find((b) => (b.textContent || '').includes('退出登录'));
     if (btn) btn.click();
     return Boolean(btn);
   `);
@@ -654,9 +656,10 @@ try {
   await waitFor(async () => ev(`return !!document.querySelector('input[type=password]')`), 15000, '退回登录页');
   const roDemo = JSON.parse(
     await ev(`
-      const demo = [...document.querySelectorAll('button')].filter((b) => b.className.includes('w-full rounded-lg border'));
-      if (demo.length >= 3) demo[2].click();
-      return JSON.stringify({ count: demo.length, label: (demo[2]?.innerText || '').trim() });
+      const demos = [...document.querySelectorAll('button[data-demo]')];
+      const ro = demos.find((b) => b.dataset.demo === 'readonly');
+      if (ro) ro.click();
+      return JSON.stringify({ count: demos.length, label: (ro?.innerText || '').trim() });
     `),
   );
   ok(roDemo.count >= 3, `登录页有 ${roDemo.count} 个演示账号（含只读）`, roDemo.label);
@@ -674,14 +677,18 @@ try {
         logged: !document.querySelector('input[type=password]'),
         header: (document.querySelector('header')?.innerText || '').replace(/\\n/g, ' '),
         nav: [...document.querySelectorAll('nav a')].map((a) => (a.textContent || '').trim()),
+        navHrefs: [...document.querySelectorAll('nav a')].map((a) => a.getAttribute('href') || ''),
       });
     `),
   );
   ok(roState.logged, '以只读账号登录成功');
   ok(/只读用户/.test(roState.header), '顶栏角色徽标显示「只读用户」');
-  ok(!roState.nav.includes('用户管理'), '只读用户看不到「用户管理」菜单');
-  ok(!roState.nav.includes('变更审计'), '只读用户看不到「变更审计」菜单');
-  ok(roState.nav.includes('资源台账') && roState.nav.includes('需求项目'), '可见菜单与普通用户一致');
+  ok(!roState.navHrefs.includes('/users'), '只读用户看不到「用户管理」菜单');
+  ok(!roState.navHrefs.includes('/audit'), '只读用户看不到「变更审计」菜单');
+  ok(
+    roState.navHrefs.includes('/resources') && roState.navHrefs.includes('/projects'),
+    '可见菜单与普通用户一致',
+  );
 
   ok(await clickHref('/resources'), '只读用户可进入资源台账');
   await sleep(1400);
@@ -719,16 +726,17 @@ try {
   /* ---------- 11. 普通用户：除用户管理与审计外与管理员一致 ---------- */
   console.log('\n[11] 普通用户');
   await ev(`
-    const btn = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').includes('退出登录'));
+    const btn = document.querySelector('button[aria-label="退出登录"]')
+      || [...document.querySelectorAll('button')].find((b) => (b.textContent || '').includes('退出登录'));
     if (btn) btn.click();
     return Boolean(btn);
   `);
   await sleep(1800);
   await waitFor(async () => ev(`return !!document.querySelector('input[type=password]')`), 15000, '退回登录页');
   await ev(`
-    const demo = [...document.querySelectorAll('button')].filter((b) => b.className.includes('w-full rounded-lg border'));
-    if (demo[1]) demo[1].click();
-    return Boolean(demo[1]);
+    const user = [...document.querySelectorAll('button[data-demo]')].find((b) => b.dataset.demo === 'user');
+    if (user) user.click();
+    return Boolean(user);
   `);
   await sleep(400);
   await ev(`
@@ -744,15 +752,16 @@ try {
         logged: !document.querySelector('input[type=password]'),
         header: (document.querySelector('header')?.innerText || '').replace(/\\n/g, ' '),
         nav: [...document.querySelectorAll('nav a')].map((a) => (a.textContent || '').trim()),
+        navHrefs: [...document.querySelectorAll('nav a')].map((a) => a.getAttribute('href') || ''),
       });
     `),
   );
   ok(uState.logged, '以普通用户登录成功');
   ok(/普通用户/.test(uState.header), '顶栏角色徽标显示「普通用户」');
-  ok(!uState.nav.includes('用户管理'), '普通用户看不到「用户管理」菜单');
-  ok(!uState.nav.includes('变更审计'), '普通用户看不到「变更审计」菜单');
+  ok(!uState.navHrefs.includes('/users'), '普通用户看不到「用户管理」菜单');
+  ok(!uState.navHrefs.includes('/audit'), '普通用户看不到「变更审计」菜单');
   ok(
-    uState.nav.includes('资源台账') && uState.nav.includes('需求项目') && uState.nav.includes('环境模板'),
+    ['/', '/resources', '/projects', '/templates', '/dict'].every((href) => uState.navHrefs.includes(href)),
     `普通用户可见其余菜单（${uState.nav.join(' / ')}）`,
   );
   ok(await clickHref('/resources'), '进入资源台账');

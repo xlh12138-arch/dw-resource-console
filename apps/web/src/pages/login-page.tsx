@@ -124,6 +124,7 @@ export function LoginPage() {
                     <button
                       key={acc.username}
                       type="button"
+                      data-demo={acc.username}
                       className="flex h-11 w-full items-center justify-between text-left text-[13px] text-slate-600 transition-colors hover:text-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
                       onClick={() => {
                         setUsername(acc.username);

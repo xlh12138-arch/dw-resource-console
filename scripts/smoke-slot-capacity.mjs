@@ -7,7 +7,7 @@
  *  3. 跨环境引用（准生产引用开发资源）需确认后放行
  *  4. 资源台账可查看被哪些项目 / 环境引用
  *  5. 容量：槽位申请必填且不可超额、调小容量时校验现有占用、台账显示容量明细
- *  6. 内置环境为 DEV / PT / UAT
+ *  6. 环境字典为 DEV / PT / UAT，且不再标记内置
  */
 
 const BASE = process.env.SMOKE_BASE ?? 'http://127.0.0.1:8787/api/v1';
@@ -52,21 +52,21 @@ const ADMIN = {
 const A = (await req('/auth/login', { method: 'POST', body: ADMIN })).json.accessToken;
 
 /* ------------------------------------------------------------------ *
- * [1] 内置环境字典
+ * [1] 环境字典（不再内置）
  * ------------------------------------------------------------------ */
-console.log('\n[1] 内置环境为 DEV / PT / UAT');
+console.log('\n[1] 环境字典为 DEV / PT / UAT');
 const envs = (await req('/environments?includeDisabled=true', { token: A })).json;
 const codes = envs.map((e) => e.code);
-ok(['DEV', 'PT', 'UAT'].every((c) => codes.includes(c)), `内置环境齐全（${codes.join('/')}）`);
+ok(['DEV', 'PT', 'UAT'].every((c) => codes.includes(c)), `环境字典齐全（${codes.join('/')}）`);
 const dev = envs.find((e) => e.code === 'DEV');
 const pt = envs.find((e) => e.code === 'PT');
 const uat = envs.find((e) => e.code === 'UAT');
-ok(dev?.builtin === true && Boolean(dev?.label), `DEV 为内置且有显示名（${dev?.label}）`);
-ok(pt?.builtin === true && Boolean(pt?.label), `PT 为内置且有显示名（${pt?.label}）`);
-ok(uat?.builtin === true && Boolean(uat?.label), `UAT 为内置且有显示名（${uat?.label}）`);
+ok(dev?.builtin === false && Boolean(dev?.label), `DEV 为非内置且有显示名（${dev?.label}）`);
+ok(pt?.builtin === false && Boolean(pt?.label), `PT 为非内置且有显示名（${pt?.label}）`);
+ok(uat?.builtin === false && Boolean(uat?.label), `UAT 为非内置且有显示名（${uat?.label}）`);
 const prod = envs.find((e) => e.code === 'PROD');
-ok(prod?.builtin === true && prod?.label === '生产', `PROD 为内置生产环境（${prod?.label}）`);
-ok(envs.every((e) => /^#[0-9a-f]{6}$/.test(e.color ?? '')), '内置环境均带 #rrggbb 标识色');
+ok(prod?.builtin === false && prod?.label === '生产', `PROD 为非内置生产环境（${prod?.label}）`);
+ok(envs.every((e) => /^#[0-9a-f]{6}$/.test(e.color ?? '')), '环境字典均带 #rrggbb 标识色');
 
 /* ------------------------------------------------------------------ *
  * [2] 准备：两个项目、各自环境
