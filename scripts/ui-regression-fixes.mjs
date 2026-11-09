@@ -136,6 +136,8 @@ async function connect() {
     ws.addEventListener('open', resolve, { once: true });
     ws.addEventListener('error', reject, { once: true });
   });
+  // 等浏览器完成附加：紧接着发 Page.navigate 会报 Sent before connected
+  await send('Runtime.enable');
 }
 
 function send(method, params = {}) {
@@ -345,7 +347,7 @@ try {
 
   console.log('\n[2] 环境模板');
   await navigate('/templates');
-  await waitFor(`return document.body.innerText.includes('项目环境模板')`, '模板列表');
+  await waitFor(`return document.body.innerText.includes('环境模板')`, '模板列表');
   await waitFor(
     `return [...document.querySelectorAll('button')].some((b) => b.querySelector('.lucide-pencil'))`,
     '模板编辑按钮',

@@ -101,7 +101,11 @@ check(
   JSON.stringify(projects.json?.meta),
 );
 const prj = projects.json.items.find((p) => p.name === '信贷风控数据集市');
-check('项目统计含环境数（含生产环境）', prj?.envCount === 4, `envCount=${prj?.envCount}`);
+check(
+  '项目统计含环境数（演示种子 3 套非生产环境）',
+  prj?.envCount === 3,
+  `envCount=${prj?.envCount}`,
+);
 check('项目统计含资源数', prj?.resourceCount > 0, `resourceCount=${prj?.resourceCount}`);
 
 const newPrj = await req('/projects', {

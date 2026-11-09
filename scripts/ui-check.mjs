@@ -100,6 +100,8 @@ async function connect() {
     ws.once('open', resolve);
     ws.once('error', reject);
   });
+  // 等浏览器完成附加：紧接着发 Page.navigate 会报 Sent before connected
+  await send('Runtime.enable');
 }
 
 let msgId = 0;
@@ -446,14 +448,18 @@ try {
   ok(await clickHref('/resources'), '进入资源台账');
   const rowInfo = await ev(`
     const btns = [...document.querySelectorAll('button[title^="查看资源详情"]')];
+    let fallback = null;
     for (const b of btns) {
       const row = b.closest('tr');
       const text = row ? row.textContent || '' : '';
       if (!/GB|TB/.test(text)) continue;
-      // 只挑「已有占用」的容量资源，才能同时校验时间轴
+      // 优先挑「已有占用」的容量资源，才能同时校验时间轴；都空闲时退化为校验空态
       const m = text.match(/([\\d.]+)\\s*\\/\\s*([\\d.]+)/);
-      if (m && Number(m[1]) > 0) { b.click(); return JSON.stringify({ used: Number(m[1]), total: Number(m[2]) }); }
+      if (!m) continue;
+      if (Number(m[1]) > 0) { b.click(); return JSON.stringify({ used: Number(m[1]), total: Number(m[2]) }); }
+      if (!fallback) fallback = { b, used: Number(m[1]), total: Number(m[2]) };
     }
+    if (fallback) { fallback.b.click(); return JSON.stringify({ used: fallback.used, total: fallback.total }); }
     return JSON.stringify(null);
   `);
   const ri = JSON.parse(rowInfo);
@@ -482,13 +488,25 @@ try {
     });
   `);
   const tipInfo = JSON.parse(tips);
-  ok(tipInfo.count > 0, `时间轴有 ${tipInfo.count} 段占用`);
-  ok(
-    / · /.test(tipInfo.sample) && tipInfo.sample.includes('槽位「'),
-    'tooltip 含项目名 · 环境 · 槽位 · 时段',
-    tipInfo.sample,
-  );
-  ok(tipInfo.firstInPage, 'tooltip 首段（项目名）能在详情里找到', tipInfo.sample);
+  if (tipInfo.count > 0) {
+    ok(
+      / · /.test(tipInfo.sample) && tipInfo.sample.includes('槽位「'),
+      `时间轴有 ${tipInfo.count} 段占用，tooltip 含项目名 · 环境 · 槽位 · 时段`,
+      tipInfo.sample,
+    );
+    ok(tipInfo.firstInPage, 'tooltip 首段（项目名）能在详情里找到', tipInfo.sample);
+  } else {
+    // 存量数据可能还没被任何槽位引用，新建的 CI 库里更是如此：此时校验空态文案
+    const empty = await ev(`
+      const text = document.body.innerText || '';
+      return JSON.stringify({
+        hasEmpty: /暂无占用/.test(text),
+        hasTimeline: text.includes('占用时间轴'),
+      });
+    `);
+    const emptyInfo = JSON.parse(empty);
+    ok(emptyInfo.hasEmpty && emptyInfo.hasTimeline, '资源无占用时时间轴展示「暂无占用记录」空态');
+  }
   console.log(`    tooltip：${tipInfo.sample}`);
 
   /* ---------- 8. 字典环境引用带项目名 ---------- */

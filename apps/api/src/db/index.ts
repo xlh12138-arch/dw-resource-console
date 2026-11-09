@@ -11,6 +11,12 @@ import type * as sqliteSchema from './schema.sqlite.js';
 export type Db = BetterSQLite3Database<typeof sqliteSchema>;
 
 function resolveSqlitePath(url: string): string {
+  // 兼容误把连接串传给 SQLite 的配置，给出明确提示而不是拼出怪异的目录
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
+    throw new Error(
+      `DATABASE_URL 看起来是数据库连接串（${url.split(':')[0]}://…），请同时设置 DB_DRIVER=postgres`,
+    );
+  }
   const path = resolve(process.cwd(), url);
   mkdirSync(dirname(path), { recursive: true });
   return path;

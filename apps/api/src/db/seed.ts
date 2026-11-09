@@ -395,7 +395,8 @@ const PROJECTS: {
   description: string;
   envs: {
     name: string;
-    environment: 'DEV' | 'PT' | 'UAT' | 'PROD';
+    // 演示种子只铺非生产环境；生产环境由管理员在字典与项目里按需建立
+    environment: 'DEV' | 'PT' | 'UAT';
     template?: string;
     status: 'PLANNING' | 'BUILDING' | 'RUNNING' | 'OFFLINE';
   }[];
@@ -405,7 +406,6 @@ const PROJECTS: {
     owner: '张伟',
     description: '风控指标与特征集市，覆盖贷前审批与贷后预警',
     envs: [
-      { name: '生产环境', environment: 'PROD', template: '标准数仓项目-生产', status: 'RUNNING' },
       { name: '产品测试环境', environment: 'PT', template: '标准数仓项目-生产', status: 'RUNNING' },
       {
         name: '用户测试环境',

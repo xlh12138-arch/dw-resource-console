@@ -31,6 +31,8 @@ export const RESOURCE_TYPE_PREFIX: Record<ResourceType, string> = {
 /** 历史环境编码：仅用于类型兼容，实际字典以数据库配置为准 */
 export const ENVIRONMENTS = ['DEV', 'PT', 'UAT', 'PROD'] as const;
 export type Environment = (typeof ENVIRONMENTS)[number];
+/** 生产类环境编码：字典里仍可存在，但演示种子数据不会自动创建它们 */
+export const PRODUCTION_ENVIRONMENTS: readonly Environment[] = ['PROD'];
 export const ENVIRONMENT_LABELS: Record<Environment, string> = {
   DEV: '开发',
   PT: '产品测试',

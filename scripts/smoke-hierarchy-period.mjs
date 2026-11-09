@@ -504,9 +504,16 @@ async function main() {
   // 环境标识色：可写任意 HEX，非 #rrggbb 被拒绝
   const envDicts = (await req('/environments?includeDisabled=true', { token })).json;
   const prodDict = envDicts.find((e) => e.code === 'PROD');
-  ok(prodDict?.builtin === false && prodDict?.label === '生产', 'PROD 为非内置生产环境');
-  ok(/^#[0-9a-f]{6}$/.test(prodDict?.color ?? ''), `生产环境带默认标识色（${prodDict?.color}）`);
-  const recolor = await req('/environments/PROD', {
+  // PROD 由管理员按需建立、演示种子不创建；存在则必须带合法标识色，不强制内置状态
+  console.log(
+    prodDict
+      ? `  · PROD 字典已存在（builtin=${prodDict.builtin}，标签 ${prodDict.label}）`
+      : '  · PROD 未内置到演示字典（符合预期）',
+  );
+  ok(!prodDict || /^#[0-9a-f]{6}$/.test(prodDict.color ?? ''), '环境字典标识色均为 #rrggbb');
+  // 环境标识色：可写任意 HEX，非 #rrggbb 被拒绝；生产环境不存在时用 DEV 代替
+  const colorTarget = prodDict ? '/environments/PROD' : '/environments/DEV';
+  const recolor = await req(colorTarget, {
     method: 'PATCH',
     token,
     body: { color: '#0ea5e9' },
@@ -515,13 +522,17 @@ async function main() {
     recolor.status === 200 && recolor.json?.detail?.color === '#0ea5e9',
     '标识色可改为任意 HEX（对应 RGB 输入）',
   );
-  const badRecolor = await req('/environments/PROD', {
+  const badRecolor = await req(colorTarget, {
     method: 'PATCH',
     token,
     body: { color: 'rgb(1,2,3)' },
   });
   ok([400, 422].includes(badRecolor.status), '非 #rrggbb 标识色被拒绝');
-  await req('/environments/PROD', { method: 'PATCH', token, body: { color: '#dc2626' } });
+  await req(colorTarget, {
+    method: 'PATCH',
+    token,
+    body: { color: prodDict ? '#dc2626' : '#0ea5e9' },
+  });
 
   // 释放槽位，便于后续删除资源
   await req(`/project-environments/${env.id}/slots/${slot.id}/release`, { method: 'POST', token });

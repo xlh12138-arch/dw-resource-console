@@ -5,6 +5,7 @@ import {
   ENVIRONMENT_DESCRIPTIONS,
   ENVIRONMENT_LABELS,
   ENVIRONMENT_TONES,
+  PRODUCTION_ENVIRONMENTS,
   RESOURCE_TYPES,
   RESOURCE_TYPE_LABELS,
   RESOURCE_TYPE_PREFIX,
@@ -105,7 +106,9 @@ export async function seedDemoDict(): Promise<void> {
       }
     }
 
-    for (const [index, code] of ENVIRONMENTS.entries()) {
+    // 只初始化演示用的非生产环境：生产环境（PROD 等）由管理员在字典里自行维护，
+    // 种子数据不再自动创建，避免演示库凭空出现生产环境。
+    for (const code of ENVIRONMENTS.filter((c) => !PRODUCTION_ENVIRONMENTS.includes(c))) {
       if (!(await environmentRepository.exists(code))) {
         await environmentRepository.create({
           code,
@@ -115,7 +118,8 @@ export async function seedDemoDict(): Promise<void> {
           description: ENV_DESC[code] ?? null,
           enabled: true,
           builtin: false,
-          sortOrder: index,
+          // 用全量枚举的下标，跳过生产环境也不会打乱其余环境的排序
+          sortOrder: ENVIRONMENTS.indexOf(code),
         });
         created += 1;
       } else {
