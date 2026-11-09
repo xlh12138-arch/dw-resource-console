@@ -290,12 +290,17 @@ npm run db:reset
 先启动并初始化 API，然后运行：
 
 ```bash
+npm run lint
+npm run format:check
 npm run typecheck
 npm run build
 npm run smoke
 npm run test:transaction
 npm run test:rate-limit
 ```
+
+冒烟脚本统一从根目录 `.env` 的 `BOOTSTRAP_ADMIN_PASSWORD` 读取管理员口令，也可以用
+`SMOKE_PASSWORD` 显式覆盖。口令缺失或仍是占位值时脚本直接以非 0 退出，不会静默跳过。
 
 UI 测试需要同时运行 Web 和 API：
 
@@ -316,7 +321,7 @@ npm run ui:check
 
 [CI 工作流](.github/workflows/ci.yml) 在每次 push 和 pull request 时执行：
 
-1. 类型检查和完整构建。
+1. lint、格式检查、类型检查和完整构建。
 2. SQLite 迁移、种子、事务、API 和 UI 测试。
 3. PostgreSQL 16 迁移、种子、事务和完整 API 测试。
 
@@ -381,8 +386,14 @@ npm run ui:check
 提交改动前请至少执行：
 
 ```bash
+npm run lint
+npm run format:check
 npm run typecheck
 npm run build
 ```
+
+代码风格由 Prettier 统一（`.prettierrc.json`，100 列、单引号、结尾逗号），
+规则由 ESLint 把关（`eslint.config.js`）。改完代码可以 `npm run format` 与
+`npm run lint:fix` 自动修复大部分问题。
 
 涉及数据库、权限或交互的改动，还应运行对应冒烟测试和 UI 测试。

@@ -9,7 +9,12 @@ import type {
 } from '@dw/shared';
 import { peakOf, peakWithin, type CapacitySegment } from '../../lib/capacity.js';
 import { AppError, conflict, notFound, validationError } from '../../lib/errors.js';
-import { notStartedOf, overdueDaysOf, occupancyStateOf, overlapRange } from '../../lib/occupancy.js';
+import {
+  notStartedOf,
+  overdueDaysOf,
+  occupancyStateOf,
+  overlapRange,
+} from '../../lib/occupancy.js';
 import { auditRepository, type AuditChange } from '../audit/repository.js';
 import {
   projectEnvRepository,
@@ -19,7 +24,12 @@ import {
 } from '../projects/repository.js';
 import { environmentRepository } from '../dict/repository.js';
 import { dictGuard, environmentLabelOf } from '../dict/service.js';
-import { getTypeMeta, normalizeAttrs, type RuntimeField, type TypeMeta } from '../dict/validator.js';
+import {
+  getTypeMeta,
+  normalizeAttrs,
+  type RuntimeField,
+  type TypeMeta,
+} from '../dict/validator.js';
 import { parseCsv, toCsv } from './csv.js';
 import { withTransaction } from '../../db/index.js';
 import {
@@ -49,7 +59,8 @@ export interface Actor {
 
 /** 项目维度检索：主归属 ∪ 环境槽位引用 */
 async function resolveScope(q: ResourceQuery): Promise<ResourceScope | undefined> {
-  if (q.projectEnvId) return { slotResourceIds: await slotRepository.resourceIdsByEnv(q.projectEnvId) };
+  if (q.projectEnvId)
+    return { slotResourceIds: await slotRepository.resourceIdsByEnv(q.projectEnvId) };
   if (q.projectId) {
     const envs = await projectEnvRepository.listByProject(q.projectId);
     return { slotResourceIds: await slotRepository.resourceIdsByEnvs(envs.map((e) => e.id)) };
@@ -61,9 +72,12 @@ async function resolveScope(q: ResourceQuery): Promise<ResourceScope | undefined
  * 解析并校验项目归属：
  * 只给 projectEnvId 时自动补全其所属项目；两者同时给出时必须一致。
  */
-async function resolveProjectRef(input: { projectId?: number | null; projectEnvId?: number | null }) {
+async function resolveProjectRef(input: {
+  projectId?: number | null;
+  projectEnvId?: number | null;
+}) {
   let projectId = input.projectId ?? null;
-  let projectEnvId = input.projectEnvId ?? null;
+  const projectEnvId = input.projectEnvId ?? null;
 
   if (projectEnvId !== null) {
     const env = await projectEnvRepository.findById(projectEnvId);
@@ -104,7 +118,10 @@ async function validateAttrs(type: string, attrs: Record<string, unknown>, row?:
       .map((d) => `${d.field.replace(/^attrs\./, '')}：${d.message}`)
       .join('；');
     const suffix = details.length > 3 ? ` 等 ${details.length} 项` : '';
-    throw validationError(`${row ? `第 ${row} 行` : ''}资源属性校验失败：${summary}${suffix}`, details);
+    throw validationError(
+      `${row ? `第 ${row} 行` : ''}资源属性校验失败：${summary}${suffix}`,
+      details,
+    );
   }
   const value = { ...(result.data as Record<string, unknown>) };
   // 选填字段允许空串，落库前统一清掉，避免列表展示出空白值
@@ -171,7 +188,9 @@ async function peakAmountByResources(
   usage: Map<number, { childAllocated: number }>,
 ): Promise<Map<number, number>> {
   const out = new Map<number, number>();
-  const ids = rows.filter((r) => r.capacityTotal !== null && r.capacityTotal !== undefined).map((r) => r.id);
+  const ids = rows
+    .filter((r) => r.capacityTotal !== null && r.capacityTotal !== undefined)
+    .map((r) => r.id);
   if (ids.length === 0) return out;
   const refsMap = await resourceRefRepository.listByResources(ids);
   for (const id of ids) {
@@ -385,9 +404,7 @@ export async function assertCapacityAvailable(
         childAllocated: round2(childAllocated),
         unit: row.capacityUnit ?? null,
         /** 峰值口径：未按时间段拆分时的合计（用于提示「错峰可复用容量」） */
-        allocatedSum: round2(
-          others.reduce((sum, r) => sum + r.amount, 0) + childAllocated,
-        ),
+        allocatedSum: round2(others.reduce((sum, r) => sum + r.amount, 0) + childAllocated),
         peak: {
           amount: peak.amount,
           startAt: peak.startAt ? peak.startAt.toISOString() : null,
@@ -401,8 +418,7 @@ export async function assertCapacityAvailable(
 /** 占用区间的中文提示，用于容量报错里说明「按哪个时间段核算」 */
 function formatPeriod(startAt: Date | null, endAt: Date | null): string {
   if (!startAt && !endAt) return '';
-  const fmt = (d: Date | null) =>
-    d ? d.toISOString().slice(0, 10) : '长期';
+  const fmt = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '长期');
   return `在 ${fmt(startAt)} → ${fmt(endAt)} 期间`;
 }
 
@@ -453,7 +469,9 @@ async function loadHierarchy(rows: ResourceRow[]): Promise<Map<number, Hierarchy
   const map = new Map<number, HierarchyLabels>();
   if (rows.length === 0) return map;
 
-  const parentIds = [...new Set(rows.map((r) => r.parentId).filter((id): id is number => id !== null))];
+  const parentIds = [
+    ...new Set(rows.map((r) => r.parentId).filter((id): id is number => id !== null)),
+  ];
   const parents = await resourceRepository.findByIds(parentIds);
   const parentMap = new Map(parents.map((p) => [p.id, p]));
 
@@ -495,7 +513,8 @@ async function assertNoIpConflict(
   const ips = extractIps(attrs, await ipFieldsOf(type));
   if (ips.length === 0) return;
   const byPort = await ipUniqueByPortOf(type);
-  const port = typeof attrs['port'] === 'number' ? (attrs['port'] as number) : Number(attrs['port']);
+  const port =
+    typeof attrs['port'] === 'number' ? (attrs['port'] as number) : Number(attrs['port']);
 
   for (const { field, value } of ips) {
     const candidates = await resourceRepository.findByIp(value);
@@ -594,7 +613,13 @@ export const resourceService = {
     const peaks = await peakAmountByResources(items, usage);
     return {
       items: items.map((r) =>
-        toResourceDto(r, labelsOf(r, maps), usage.get(r.id), hierarchy.get(r.id), peaks.get(r.id) ?? null),
+        toResourceDto(
+          r,
+          labelsOf(r, maps),
+          usage.get(r.id),
+          hierarchy.get(r.id),
+          peaks.get(r.id) ?? null,
+        ),
       ),
       meta,
     };
@@ -634,12 +659,25 @@ export const resourceService = {
     }
 
     // 按项目聚合占用，便于一眼看清容量去向
-    const byProject = new Map<string, { projectId: number | null; projectName: string | null; envIds: Set<number>; slotCount: number; amount: number }>();
+    const byProject = new Map<
+      string,
+      {
+        projectId: number | null;
+        projectName: string | null;
+        envIds: Set<number>;
+        slotCount: number;
+        amount: number;
+      }
+    >();
     for (const ref of references) {
       const key = String(ref.projectId ?? '—');
-      const cur =
-        byProject.get(key) ??
-        { projectId: ref.projectId, projectName: ref.projectName, envIds: new Set<number>(), slotCount: 0, amount: 0 };
+      const cur = byProject.get(key) ?? {
+        projectId: ref.projectId,
+        projectName: ref.projectName,
+        envIds: new Set<number>(),
+        slotCount: 0,
+        amount: 0,
+      };
       cur.envIds.add(ref.envId);
       cur.slotCount += 1;
       cur.amount += ref.amount ?? 0;
@@ -778,7 +816,10 @@ export const resourceService = {
     const starts = entries.map((e) => new Date(e.startAt).getTime());
     const ends = entries.filter((e) => e.endAt).map((e) => new Date(e.endAt!).getTime());
     const hasLongTerm = entries.some((e) => e.endAt === null);
-    const min = starts.length > 0 ? Math.min(...starts, now.getTime() - 45 * 86400000) : now.getTime() - 45 * 86400000;
+    const min =
+      starts.length > 0
+        ? Math.min(...starts, now.getTime() - 45 * 86400000)
+        : now.getTime() - 45 * 86400000;
     const max = Math.max(
       now.getTime() + 45 * 86400000,
       ...ends,
@@ -864,7 +905,8 @@ export const resourceService = {
     const { projectId, projectEnvId } = await resolveProjectRef({
       // 子资源默认继承父资源的项目归属，便于在项目视图里一并管理
       projectId: input.projectId !== undefined ? input.projectId : (parent?.projectId ?? null),
-      projectEnvId: input.projectEnvId !== undefined ? input.projectEnvId : (parent?.projectEnvId ?? null),
+      projectEnvId:
+        input.projectEnvId !== undefined ? input.projectEnvId : (parent?.projectEnvId ?? null),
     });
 
     const code = await resourceRepository.nextCode(input.type);
@@ -884,11 +926,15 @@ export const resourceService = {
       parentId: parent?.id ?? null,
       demandAmount: parent ? (input.demandAmount ?? null) : null,
       // 子资源自身的容量上限即向父资源申请的额度，避免出现「申请 100 却对外声称 1000」
-      capacityTotal: parent
-        ? (input.demandAmount ?? null)
-        : (input.capacityTotal ?? null),
-      capacityUnit: parent ? (parent.capacityUnit ?? null) : (input.capacityTotal != null ? (input.capacityUnit ?? null) : null),
-      capacityRemark: parent ? (input.capacityRemark ?? `从父资源 ${parent.code} 申请`) : (input.capacityRemark ?? null),
+      capacityTotal: parent ? (input.demandAmount ?? null) : (input.capacityTotal ?? null),
+      capacityUnit: parent
+        ? (parent.capacityUnit ?? null)
+        : input.capacityTotal != null
+          ? (input.capacityUnit ?? null)
+          : null,
+      capacityRemark: parent
+        ? (input.capacityRemark ?? `从父资源 ${parent.code} 申请`)
+        : (input.capacityRemark ?? null),
       createdById: actor.id,
       createdByName: actor.username,
       createdAt: new Date(),
@@ -907,7 +953,9 @@ export const resourceService = {
       changes: [
         {
           field: '*',
-          label: parent ? `创建子资源（父资源 ${parent.code}，申请容量 ${input.demandAmount ?? '—'}）` : '创建资源',
+          label: parent
+            ? `创建子资源（父资源 ${parent.code}，申请容量 ${input.demandAmount ?? '—'}）`
+            : '创建资源',
           from: null,
           to: toResourceDto(row, labelsOf(row, maps), undefined, hierarchy.get(row.id)),
         },
@@ -955,7 +1003,7 @@ export const resourceService = {
         throw validationError('资源不能作为自己的父资源', { field: 'parentId' });
       }
       if (nextParentId !== null) {
-        parent = await resourceRepository.findById(nextParentId) ?? null;
+        parent = (await resourceRepository.findById(nextParentId)) ?? null;
         if (!parent) throw notFound(`父资源 ${nextParentId} 不存在`);
         if (parent.type !== before.type) {
           throw validationError('子资源类型必须与父资源一致', {
@@ -967,7 +1015,9 @@ export const resourceService = {
         // 防止把父资源挂到自己的后代下形成环
         const descendants = await resourceRepository.descendantIds(id);
         if (descendants.includes(parent.id)) {
-          throw validationError('不能把资源挂到它自己的子资源下，会形成循环层级', { field: 'parentId' });
+          throw validationError('不能把资源挂到它自己的子资源下，会形成循环层级', {
+            field: 'parentId',
+          });
         }
         await assertParentCapacityAvailable(parent, nextDemand ?? null, id);
       } else if (nextDemand) {
@@ -982,7 +1032,7 @@ export const resourceService = {
     const nextParent = parentTouched
       ? parent
       : before.parentId
-        ? (await resourceRepository.findById(before.parentId)) ?? null
+        ? ((await resourceRepository.findById(before.parentId)) ?? null)
         : null;
 
     // 子资源的总容量由申请额度派生，不接受直接改写（避免出现「申请 100 却对外声称 1000」）
@@ -1040,7 +1090,9 @@ export const resourceService = {
 
     const updated = await resourceRepository.update(id, {
       ...(patch.name !== undefined ? { name: patch.name } : {}),
-      ...(patch.environment !== undefined ? { environment: patch.environment as ResourceRow['environment'] } : {}),
+      ...(patch.environment !== undefined
+        ? { environment: patch.environment as ResourceRow['environment'] }
+        : {}),
       ...(patch.status !== undefined ? { status: patch.status as ResourceRow['status'] } : {}),
       ...(patch.datacenter !== undefined ? { datacenter: patch.datacenter ?? null } : {}),
       ...(patch.owner !== undefined ? { owner: patch.owner ?? null } : {}),
@@ -1060,7 +1112,8 @@ export const resourceService = {
         ? {
             capacityTotal: patch.capacityTotal,
             // 取消容量核算时一并清掉单位，避免残留「0 / GB」这类歧义展示
-            capacityUnit: patch.capacityTotal === null ? null : (patch.capacityUnit ?? before.capacityUnit),
+            capacityUnit:
+              patch.capacityTotal === null ? null : (patch.capacityUnit ?? before.capacityUnit),
           }
         : {}),
       ...(patch.capacityUnit !== undefined && patch.capacityTotal === undefined && !nextParent
@@ -1086,7 +1139,12 @@ export const resourceService = {
     // 回带容量占用，前端调容量后可立即看到新的「已占用 / 剩余」
     const usage = await resourceRepository.capacityUsageByResources([updated.id]);
     const hierarchy = await loadHierarchy([updated]);
-    return toResourceDto(updated, labelsOf(updated, maps), usage.get(updated.id), hierarchy.get(updated.id));
+    return toResourceDto(
+      updated,
+      labelsOf(updated, maps),
+      usage.get(updated.id),
+      hierarchy.get(updated.id),
+    );
   },
 
   async remove(id: number, actor: Actor, requestId?: string) {
@@ -1098,7 +1156,12 @@ export const resourceService = {
         `资源 ${before.code} 下仍有 ${children.length} 个子资源（${children.map((c) => c.code).join('、')}），请先调整或删除子资源后再删除父资源`,
         {
           resourceId: id,
-          children: children.map((c) => ({ id: c.id, code: c.code, name: c.name, demandAmount: c.demandAmount })),
+          children: children.map((c) => ({
+            id: c.id,
+            code: c.code,
+            name: c.name,
+            demandAmount: c.demandAmount,
+          })),
           reason: 'HAS_CHILDREN',
         },
       );
@@ -1126,7 +1189,9 @@ export const resourceService = {
     const rows = await resourceRepository.findByIds(uniqueIds);
     const selectedIds = new Set(rows.map((row) => row.id));
     const children = await resourceRepository.listChildrenByParentIds([...selectedIds]);
-    const outside = children.filter((child) => child.parentId !== null && !selectedIds.has(child.id));
+    const outside = children.filter(
+      (child) => child.parentId !== null && !selectedIds.has(child.id),
+    );
     if (outside.length > 0) {
       const byParent = new Map<number, ResourceRow[]>();
       for (const child of outside) {
@@ -1227,7 +1292,20 @@ export const resourceService = {
 
         const attrs: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(record)) {
-          if (['name', 'environment', 'status', 'datacenter', 'owner', 'tags', 'remark', 'project', 'projectEnv'].includes(k)) continue;
+          if (
+            [
+              'name',
+              'environment',
+              'status',
+              'datacenter',
+              'owner',
+              'tags',
+              'remark',
+              'project',
+              'projectEnv',
+            ].includes(k)
+          )
+            continue;
           attrs[k] = v === '' ? undefined : coerce(typeMeta.fields, k, v);
         }
         for (const k of Object.keys(attrs)) if (attrs[k] === undefined) delete attrs[k];
@@ -1239,7 +1317,12 @@ export const resourceService = {
           status: record['status'] || 'IN_USE',
           datacenter: record['datacenter'] || undefined,
           owner: record['owner'] || undefined,
-          tags: record['tags'] ? record['tags'].split(/[;|]/).map((t) => t.trim()).filter(Boolean) : [],
+          tags: record['tags']
+            ? record['tags']
+                .split(/[;|]/)
+                .map((t) => t.trim())
+                .filter(Boolean)
+            : [],
           remark: record['remark'] || undefined,
           attrs,
         };
@@ -1251,9 +1334,9 @@ export const resourceService = {
         const outcome = await withTransaction(async () => {
           // 以「名称 + 环境」作为幂等键，重复导入时按策略跳过或覆盖；
           // 覆盖场景需把自身排除在 IP 冲突校验之外，否则自己跟自己冲突。
-          const existing = (await resourceRepository.listAll({ type: input.type, q: payload.name })).find(
-            (r) => r.name === payload.name && r.environment === payload.environment,
-          );
+          const existing = (
+            await resourceRepository.listAll({ type: input.type, q: payload.name })
+          ).find((r) => r.name === payload.name && r.environment === payload.environment);
           await assertNoIpConflict(input.type, validated, payload.environment, existing?.id);
 
           if (existing) {
@@ -1348,7 +1431,9 @@ export const resourceService = {
     await resourceProjectRepository.setProject(targetIds, ref.projectId, ref.projectEnvId);
 
     const maps = await loadProjectLabels();
-    const projectName = ref.projectId ? (maps.projects.get(ref.projectId) ?? String(ref.projectId)) : '未标注';
+    const projectName = ref.projectId
+      ? (maps.projects.get(ref.projectId) ?? String(ref.projectId))
+      : '未标注';
     await auditRepository.record({
       actorId: actor.id,
       actorName: actor.username,
@@ -1413,9 +1498,7 @@ function importErrorFields(
     const field = String(raw.field ?? '').replace(/^attrs\./, '');
     if (!field) continue;
     const label =
-      COMMON_FIELD_LABELS[field] ??
-      typeMeta.fields.find((f) => f.key === field)?.label ??
-      field;
+      COMMON_FIELD_LABELS[field] ?? typeMeta.fields.find((f) => f.key === field)?.label ?? field;
     fields.push({
       field,
       label,

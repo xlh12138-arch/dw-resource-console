@@ -57,7 +57,9 @@ const KIND_LABELS: Record<ImportColumnKind, string> = {
 
 /** 公共列。name 必填；environment/status 留空时后端会补默认值 */
 function commonColumns(dict: DictValue): ImportColumn[] {
-  const envs = (dict.activeEnvironments.length > 0 ? dict.activeEnvironments : dict.environments).map((e) => ({
+  const envs = (
+    dict.activeEnvironments.length > 0 ? dict.activeEnvironments : dict.environments
+  ).map((e) => ({
     value: e.code,
     label: e.label,
   }));
@@ -188,7 +190,9 @@ export async function downloadImportTemplate(
     if (col.unit) lines.push(`单位：${col.unit}`);
     if (col.placeholder) lines.push(`示例：${col.placeholder}`);
     if (col.hint) lines.push(`说明：${col.hint}`);
-    lines.push(col.group === 'attr' ? `来源：资源类型「${typeLabel}」的属性定义` : '来源：资源公共列');
+    lines.push(
+      col.group === 'attr' ? `来源：资源类型「${typeLabel}」的属性定义` : '来源：资源公共列',
+    );
     cell.note = lines.join('\n');
   });
   columns.forEach((col, idx) => {
@@ -424,7 +428,9 @@ export async function parseImportFile(file: File, columns: ImportColumn[]): Prom
 
 /** 校验通过的行转成后端 /resources/import 接受的 CSV 文本 */
 export function importRowsToCsv(rows: Record<string, string>[], columns: ImportColumn[]): string {
-  const keys = Array.from(new Set([...columns.map((c) => c.key), ...rows.flatMap((r) => Object.keys(r))]));
+  const keys = Array.from(
+    new Set([...columns.map((c) => c.key), ...rows.flatMap((r) => Object.keys(r))]),
+  );
   const escape = (value: string) =>
     /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
   return [

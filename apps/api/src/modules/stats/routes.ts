@@ -11,7 +11,12 @@ import { resourceRepository } from '../resources/repository.js';
 import { getTypeMeta } from '../dict/validator.js';
 import { labelsOf, loadProjectLabels, toResourceDto } from '../resources/mapper.js';
 import { environmentService, resourceTypeService } from '../dict/service.js';
-import { projectEnvRepository, projectRepository, slotRepository, templateRepository } from '../projects/repository.js';
+import {
+  projectEnvRepository,
+  projectRepository,
+  slotRepository,
+  templateRepository,
+} from '../projects/repository.js';
 
 /** 项目维度统计：主归属 ∪ 环境槽位引用，另统计未标注项目的资源 */
 async function buildProjectStats(all: Awaited<ReturnType<typeof resourceRepository.listAll>>) {
@@ -67,9 +72,13 @@ async function buildOverdue(envLabels: Map<string, string>) {
 
   const envMap = new Map(envs.map((e) => [e.id, e]));
   const projectMap = new Map(projects.map((p) => [p.id, p]));
-  const resourceIds = [...new Set(slots.map((s) => s.resourceId).filter((id): id is number => id !== null))];
+  const resourceIds = [
+    ...new Set(slots.map((s) => s.resourceId).filter((id): id is number => id !== null)),
+  ];
   const resourceMap = new Map(
-    resourceIds.length ? (await resourceRepository.findByIds(resourceIds)).map((r) => [r.id, r]) : [],
+    resourceIds.length
+      ? (await resourceRepository.findByIds(resourceIds)).map((r) => [r.id, r])
+      : [],
   );
 
   const now = new Date();
@@ -129,9 +138,16 @@ async function buildOverview(): Promise<StatsOverview> {
   const all = await resourceRepository.listAll();
 
   // 类型 / 环境分布按字典输出，新增的自定义类型与环境自动进入统计
-  const [typeDict, envDict] = await Promise.all([resourceTypeService.list(true), environmentService.list(true)]);
+  const [typeDict, envDict] = await Promise.all([
+    resourceTypeService.list(true),
+    environmentService.list(true),
+  ]);
   const byType = typeDict
-    .map((t) => ({ type: t.code, label: t.label, count: all.filter((r) => r.type === t.code).length }))
+    .map((t) => ({
+      type: t.code,
+      label: t.label,
+      count: all.filter((r) => r.type === t.code).length,
+    }))
     .filter((t) => t.count > 0 || typeDict.length <= 12);
   const byEnvironment = envDict
     .map((e) => ({
@@ -208,7 +224,10 @@ async function buildOverview(): Promise<StatsOverview> {
   const slotPeriod = {
     occupiedCount: bound.length,
     expiringSoonCount: bound.filter(
-      (s) => s.endAt !== null && s.endAt.getTime() >= now.getTime() && s.endAt.getTime() - now.getTime() <= 7 * 86400000,
+      (s) =>
+        s.endAt !== null &&
+        s.endAt.getTime() >= now.getTime() &&
+        s.endAt.getTime() - now.getTime() <= 7 * 86400000,
     ).length,
     expiredCount: bound.filter((s) => s.endAt !== null && s.endAt.getTime() < now.getTime()).length,
     longTermCount: bound.filter((s) => s.endAt === null).length,

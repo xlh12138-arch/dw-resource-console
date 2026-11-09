@@ -25,7 +25,12 @@ export interface Paged<T> {
 function page<T>(rows: T[], total: number, q: { page: number; pageSize: number }): Paged<T> {
   return {
     items: rows,
-    meta: { page: q.page, pageSize: q.pageSize, total, totalPages: Math.max(1, Math.ceil(total / q.pageSize)) },
+    meta: {
+      page: q.page,
+      pageSize: q.pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / q.pageSize)),
+    },
   };
 }
 
@@ -126,9 +131,11 @@ export const projectEnvRepository = {
   findByName(projectId: number, name: string): Promise<ProjectEnvRow | undefined> {
     return firstRow<ProjectEnvRow>(
       db
-      .select()
-      .from(projectEnvironments)
-      .where(and(eq(projectEnvironments.projectId, projectId), eq(projectEnvironments.name, name)))
+        .select()
+        .from(projectEnvironments)
+        .where(
+          and(eq(projectEnvironments.projectId, projectId), eq(projectEnvironments.name, name)),
+        ),
     );
   },
 
@@ -137,7 +144,10 @@ export const projectEnvRepository = {
     return rows[0]!;
   },
 
-  async update(id: number, values: Partial<typeof projectEnvironments.$inferInsert>): Promise<ProjectEnvRow> {
+  async update(
+    id: number,
+    values: Partial<typeof projectEnvironments.$inferInsert>,
+  ): Promise<ProjectEnvRow> {
     const rows = await db
       .update(projectEnvironments)
       .set({ ...values, updatedAt: new Date() })
@@ -283,7 +293,10 @@ export const templateRepository = {
     await db.delete(envTemplates).where(eq(envTemplates.id, id));
   },
 
-  async replaceItems(templateId: number, items: (typeof envTemplateItems.$inferInsert)[]): Promise<void> {
+  async replaceItems(
+    templateId: number,
+    items: (typeof envTemplateItems.$inferInsert)[],
+  ): Promise<void> {
     await db.delete(envTemplateItems).where(eq(envTemplateItems.templateId, templateId));
     if (items.length > 0) await db.insert(envTemplateItems).values(items);
   },

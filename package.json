@@ -34,10 +34,21 @@
     "db:generate": "npm run db:generate -w @dw/api",
     "db:migrate": "npm run db:migrate -w @dw/api",
     "db:seed": "npm run db:seed -w @dw/api",
-    "db:reset": "npm run db:reset -w @dw/api"
+    "db:reset": "npm run db:reset -w @dw/api",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "concurrently": "^9.2.1",
-    "typescript": "5.9.3"
+    "eslint": "10.14.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "16.5.0",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.1"
   }
 }

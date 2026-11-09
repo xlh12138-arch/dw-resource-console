@@ -2,7 +2,12 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { FolderKanban, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, type ProjectDto, type ProjectStatus } from '@dw/shared';
+import {
+  PROJECT_STATUSES,
+  PROJECT_STATUS_LABELS,
+  type ProjectDto,
+  type ProjectStatus,
+} from '@dw/shared';
 import { projectsApi, type ProjectQuery } from '../lib/endpoints';
 import { friendlyMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -38,7 +43,10 @@ export function ProjectsPage() {
 
   const [keyword, setKeyword] = useState('');
   const [query, setQuery] = useState<ProjectQuery>({ page: 1, pageSize: PAGE_SIZE });
-  const [form, setForm] = useState<{ open: boolean; initial: ProjectDto | null }>({ open: false, initial: null });
+  const [form, setForm] = useState<{ open: boolean; initial: ProjectDto | null }>({
+    open: false,
+    initial: null,
+  });
   const [pendingDelete, setPendingDelete] = useState<ProjectDto | null>(null);
 
   useEffect(() => {
@@ -86,7 +94,10 @@ export function ProjectsPage() {
           <div className="min-w-56 flex-1">
             <Field label="关键字">
               <div className="relative">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search
+                  size={15}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
                 <Input
                   className="pl-9"
                   value={keyword}
@@ -101,7 +112,10 @@ export function ProjectsPage() {
               <Select
                 value={query.status ?? ''}
                 placeholder="全部"
-                options={PROJECT_STATUSES.map((s) => ({ value: s, label: PROJECT_STATUS_LABELS[s] }))}
+                options={PROJECT_STATUSES.map((s) => ({
+                  value: s,
+                  label: PROJECT_STATUS_LABELS[s],
+                }))}
                 onChange={(e) =>
                   setQuery((prev) => ({ ...prev, status: e.target.value || undefined, page: 1 }))
                 }
@@ -163,7 +177,9 @@ export function ProjectsPage() {
                 <Td>{p.envCount}</Td>
                 <Td>{p.resourceCount}</Td>
                 <Td>
-                  <Badge tone={p.status === 'ACTIVE' ? 'green' : 'gray'}>{PROJECT_STATUS_LABELS[p.status]}</Badge>
+                  <Badge tone={p.status === 'ACTIVE' ? 'green' : 'gray'}>
+                    {PROJECT_STATUS_LABELS[p.status]}
+                  </Badge>
                 </Td>
                 <Td className="whitespace-nowrap text-xs text-slate-500">
                   {new Date(p.updatedAt).toLocaleString('zh-CN')}
@@ -242,7 +258,8 @@ export function ProjectsPage() {
         }
       >
         <p className="text-sm text-slate-700">
-          确认删除项目 <span className="font-medium">{pendingDelete?.name}</span> 吗？删除后其资源的归属会被清空。
+          确认删除项目 <span className="font-medium">{pendingDelete?.name}</span>{' '}
+          吗？删除后其资源的归属会被清空。
         </p>
       </Modal>
     </div>
@@ -319,7 +336,11 @@ function ProjectFormModal({
         {error && <ErrorBanner message={error} />}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="项目名称" required>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="如：信贷风控数据集市" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="如：信贷风控数据集市"
+            />
           </Field>
           <Field label="项目编码" hint={isEdit ? '创建后不可修改' : '留空自动生成'}>
             <Input
@@ -330,7 +351,11 @@ function ProjectFormModal({
             />
           </Field>
           <Field label="负责人">
-            <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="如：张伟" />
+            <Input
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+              placeholder="如：张伟"
+            />
           </Field>
           <Field label="项目状态">
             <Select
@@ -341,7 +366,11 @@ function ProjectFormModal({
           </Field>
         </div>
         <Field label="项目说明">
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="项目背景、业务范围等" />
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="项目背景、业务范围等"
+          />
         </Field>
       </div>
     </Modal>

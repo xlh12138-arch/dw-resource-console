@@ -43,6 +43,9 @@ API 关键位置：
 ```bash
 npm install                 # Node >= 20.19
 npm run dev                 # shared 构建 + API 8787 + Web 5173
+npm run lint                # ESLint（TS/TSX + React Hooks）
+npm run format              # Prettier 统一格式
+npm run format:check        # 只检查不写入，CI 用
 npm run typecheck           # 三个 workspace 的 tsc --noEmit
 npm run build               # shared → api → web
 npm run smoke               # 7 套冒烟串联，需先启动 API（Web 仅 UI 用例需要）
@@ -51,8 +54,10 @@ npm run db:seed             # 写入演示项目/环境/资源/账号
 npm run db:reset            # 只用于本地演示库，会清空数据
 ```
 
-测试脚本读取根目录 `.env` 里的 `BOOTSTRAP_ADMIN_*`；也可用 `SMOKE_BASE`、`SMOKE_PASSWORD`、
-`CHROME_PATH` 覆盖。CI 里 Web 端口固定 5173（见 `.github/workflows/ci.yml`）。
+测试脚本统一从 `scripts/lib/smoke-env.mjs` 读环境：显式环境变量 > 根目录 `.env`。
+管理员口令取 `SMOKE_PASSWORD` 或 `BOOTSTRAP_ADMIN_PASSWORD`，缺失时脚本直接非 0 退出，
+不要改成「跳过并 exit 0」。其余可用 `SMOKE_BASE`、`SMOKE_WEB_BASE`、`CHROME_PATH` 覆盖。
+CI 里 Web 端口固定 5173（见 `.github/workflows/ci.yml`）。
 
 ## 数据库与部署
 
@@ -73,11 +78,13 @@ npm run db:reset            # 只用于本地演示库，会清空数据
 - 资源类型/环境来自数据库字典，不要再假设代码常量一定存在；显示名用 `environmentLabelOf()`。
 - 前端文案用中文，风格克制；颜色走 CSS 变量/主题 token，不写死十六进制。
 - 时间轴粒度是天；容量按时段峰值计算，父子资源容量规则见 `capacity.ts`。
+- 格式交给 Prettier（`.prettierrc.json`：100 列、单引号、结尾逗号），规则交给 ESLint
+  （`eslint.config.js`）；不要手写与配置冲突的排版，也不要新增 `eslint-disable` 而不写原因。
 - 提交信息使用中文或 conventional commit 均可，但要能说明「为什么」。
 
 ## 测试与验收
 
-- 提交前至少：`npm run typecheck` + `npm run build`。
+- 提交前至少：`npm run lint` + `npm run format:check` + `npm run typecheck` + `npm run build`。
 - 改后端行为：启动 API 后跑对应 `npm run smoke:*`；改 UI 再跑 `npm run ui:check`。
 - 冒烟会真实写库。跑 `ui:regression-fixes` 等破坏性用例前，确认 `DATABASE_URL` 指向临时库。
 - 不要对已有业务数据的库执行 `db:reset`、`db:seed` 或手工删表。

@@ -13,7 +13,20 @@ import { RESOURCE_STATUS_LABELS } from '@dw/shared';
 import { useNavigate } from 'react-router';
 import { useDict } from '../lib/dict';
 import { statsApi } from '../lib/endpoints';
-import { Badge, Button, Card, CardHeader, EmptyState, ErrorBanner, PageHeader, Spinner, Table, Td, Th, cn } from '../components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  ErrorBanner,
+  PageHeader,
+  Spinner,
+  Table,
+  Td,
+  Th,
+  cn,
+} from '../components/ui';
 import { EnvBadge } from '../components/env-badge';
 import { friendlyMessage } from '../lib/api';
 
@@ -35,24 +48,42 @@ function MetricTile({
   const content = (
     <>
       <div className="flex items-start justify-between gap-4">
-        <p className={cn('text-[13px] font-medium', dark ? 'text-white/60' : 'text-slate-500')}>{label}</p>
+        <p className={cn('text-[13px] font-medium', dark ? 'text-white/60' : 'text-slate-500')}>
+          {label}
+        </p>
         <span
           className={cn(
             'flex h-9 w-9 items-center justify-center rounded-[8px] border',
-            dark ? 'border-white/15 bg-white/[0.06] text-signal-400' : 'border-slate-200 bg-slate-50 text-brand-600',
+            dark
+              ? 'border-white/15 bg-white/[0.06] text-signal-400'
+              : 'border-slate-200 bg-slate-50 text-brand-600',
           )}
         >
           {icon}
         </span>
       </div>
       <div className="mt-6">
-        <p className={cn('metric-figure text-[46px] font-medium leading-none', dark ? 'text-white' : 'text-slate-900')}>
+        <p
+          className={cn(
+            'metric-figure text-[46px] font-medium leading-none',
+            dark ? 'text-white' : 'text-slate-900',
+          )}
+        >
           {value}
         </p>
-        <p className={cn('mt-3 text-xs leading-relaxed', dark ? 'text-white/50' : 'text-slate-500')}>{detail}</p>
+        <p
+          className={cn('mt-3 text-xs leading-relaxed', dark ? 'text-white/50' : 'text-slate-500')}
+        >
+          {detail}
+        </p>
       </div>
       {onClick ? (
-        <span className={cn('mt-5 inline-flex items-center gap-1 text-xs font-medium', dark ? 'text-signal-400' : 'text-brand-600')}>
+        <span
+          className={cn(
+            'mt-5 inline-flex items-center gap-1 text-xs font-medium',
+            dark ? 'text-signal-400' : 'text-brand-600',
+          )}
+        >
           查看明细
           <ArrowUpRight size={13} />
         </span>
@@ -63,14 +94,18 @@ function MetricTile({
   const className = cn(
     'flex min-h-[196px] flex-col rounded-[12px] border p-5 text-left',
     dark ? 'console-grid border-brand-600 bg-brand-600' : 'border-slate-200 bg-white',
-    onClick && 'group transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand-500',
+    onClick &&
+      'group transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand-500',
   );
 
   return onClick ? (
     <button
       type="button"
       onClick={onClick}
-      className={cn(className, 'focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:ring-offset-2')}
+      className={cn(
+        className,
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:ring-offset-2',
+      )}
     >
       {content}
     </button>
@@ -99,16 +134,25 @@ function DistributionList({
               onPick ? 'cursor-pointer' : 'cursor-default',
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal-400',
             )}
-            title={onPick ? item.hint ?? '在资源台账中查看' : undefined}
+            title={onPick ? (item.hint ?? '在资源台账中查看') : undefined}
           >
             <div className="mb-2 flex items-center justify-between gap-3 text-[13px]">
-              <span className={cn('truncate text-slate-600', onPick && 'group-hover:text-brand-600')}>{item.label}</span>
+              <span
+                className={cn('truncate text-slate-600', onPick && 'group-hover:text-brand-600')}
+              >
+                {item.label}
+              </span>
               <span className="font-mono text-xs tabular-nums text-slate-800">{item.count}</span>
             </div>
             <div className="h-1 overflow-hidden rounded-full bg-slate-100">
               <div
-                className={cn('h-full transition-[width,background-color]', index === 0 ? 'bg-signal-500' : 'bg-brand-500')}
-                style={{ width: `${item.total ? Math.max(3, Math.round((item.count / item.total) * 100)) : 0}%` }}
+                className={cn(
+                  'h-full transition-[width,background-color]',
+                  index === 0 ? 'bg-signal-500' : 'bg-brand-500',
+                )}
+                style={{
+                  width: `${item.total ? Math.max(3, Math.round((item.count / item.total) * 100)) : 0}%`,
+                }}
               />
             </div>
           </button>
@@ -137,7 +181,8 @@ export function DashboardPage() {
     return <ErrorBanner message={friendlyMessage(error)} />;
   }
 
-  const primaryEnv = [...data.byEnvironment].sort((a, b) => b.count - a.count)[0] ?? data.byEnvironment[0];
+  const primaryEnv =
+    [...data.byEnvironment].sort((a, b) => b.count - a.count)[0] ?? data.byEnvironment[0];
   const prodCount = primaryEnv?.count ?? 0;
   const inUse = data.byStatus.find((s) => s.status === 'IN_USE')?.count ?? 0;
 
@@ -164,7 +209,10 @@ export function DashboardPage() {
         </button>
       ) : null}
 
-      <section className="grid gap-3 lg:grid-cols-2 xl:grid-cols-[1.35fr_1fr_1fr]" aria-label="核心指标">
+      <section
+        className="grid gap-3 lg:grid-cols-2 xl:grid-cols-[1.35fr_1fr_1fr]"
+        aria-label="核心指标"
+      >
         <MetricTile
           dark
           label="资源总数"
@@ -178,7 +226,11 @@ export function DashboardPage() {
           value={prodCount}
           detail="当前资源量最高的环境"
           icon={<Server size={17} />}
-          onClick={primaryEnv ? () => navigate(`/resources?environment=${primaryEnv.environment}`) : undefined}
+          onClick={
+            primaryEnv
+              ? () => navigate(`/resources?environment=${primaryEnv.environment}`)
+              : undefined
+          }
         />
         <MetricTile
           label="占用超期"
@@ -248,7 +300,11 @@ export function DashboardPage() {
                 total: data.total,
               }))}
               onPick={(item) =>
-                navigate(item.key === 'none' ? '/resources?unassigned=true' : `/resources?projectId=${item.key}`)
+                navigate(
+                  item.key === 'none'
+                    ? '/resources?unassigned=true'
+                    : `/resources?projectId=${item.key}`,
+                )
               }
             />
           )}
@@ -301,9 +357,7 @@ export function DashboardPage() {
               : `${data.overdueSlots.length} 个槽位已超过占用结束时间`
           }
           action={
-            (data.overdueSlots?.length ?? 0) > 0 ? (
-              <Badge tone="red">需要处理</Badge>
-            ) : undefined
+            (data.overdueSlots?.length ?? 0) > 0 ? <Badge tone="red">需要处理</Badge> : undefined
           }
         />
         {(data.overdueByProject ?? []).length === 0 ? (
@@ -317,7 +371,9 @@ export function DashboardPage() {
                     type="button"
                     className="text-sm font-medium text-slate-900 hover:text-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
                     title="打开项目处理超期占用"
-                    onClick={() => navigate(group.projectId ? `/projects/${group.projectId}` : '/projects')}
+                    onClick={() =>
+                      navigate(group.projectId ? `/projects/${group.projectId}` : '/projects')
+                    }
                   >
                     {group.projectName ?? '未归属项目'}
                   </button>
@@ -327,7 +383,10 @@ export function DashboardPage() {
                 </div>
                 <ul className="mt-3 space-y-2">
                   {group.items.map((item) => (
-                    <li key={item.slotId} className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                    <li
+                      key={item.slotId}
+                      className="flex flex-wrap items-center gap-2 text-xs text-slate-600"
+                    >
                       <button
                         type="button"
                         className="font-mono text-brand-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
@@ -339,8 +398,12 @@ export function DashboardPage() {
                       <span className="text-slate-800">{item.resourceName}</span>
                       <Badge tone="gray">{item.resourceTypeLabel}</Badge>
                       <EnvBadge code={item.environment} label={item.environmentLabel} />
-                      <span>{item.envName} · {item.slotRole}</span>
-                      <span className="text-slate-400">{new Date(item.endAt).toLocaleDateString('zh-CN')} 到期</span>
+                      <span>
+                        {item.envName} · {item.slotRole}
+                      </span>
+                      <span className="text-slate-400">
+                        {new Date(item.endAt).toLocaleDateString('zh-CN')} 到期
+                      </span>
                       <span className="font-medium text-rose-600">超期 {item.overdueDays} 天</span>
                     </li>
                   ))}
@@ -383,10 +446,14 @@ export function DashboardPage() {
                   </button>
                 </Td>
                 <Td>{dict.typeLabel(r.type)}</Td>
-                <Td><EnvBadge code={r.environment} label={dict.envLabel(r.environment)} /></Td>
+                <Td>
+                  <EnvBadge code={r.environment} label={dict.envLabel(r.environment)} />
+                </Td>
                 <Td>{RESOURCE_STATUS_LABELS[r.status]}</Td>
                 <Td>{r.owner ?? '—'}</Td>
-                <Td className="whitespace-nowrap text-xs text-slate-500">{new Date(r.updatedAt).toLocaleString('zh-CN')}</Td>
+                <Td className="whitespace-nowrap text-xs text-slate-500">
+                  {new Date(r.updatedAt).toLocaleString('zh-CN')}
+                </Td>
               </tr>
             ))}
           </Table>

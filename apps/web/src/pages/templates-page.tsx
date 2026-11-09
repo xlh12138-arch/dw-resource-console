@@ -2,9 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { Boxes, Copy, Pencil, Plus, Rocket, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import {
-  type EnvTemplateDto,
-} from '@dw/shared';
+import { type EnvTemplateDto } from '@dw/shared';
 import { useDict } from '../lib/dict';
 import { projectsApi, templatesApi, type TemplateItemInput } from '../lib/endpoints';
 import { friendlyMessage } from '../lib/api';
@@ -42,7 +40,10 @@ export function TemplatesPage() {
   const canDelete = canDo('resource:delete');
 
   const [query, setQuery] = useState({ page: 1, pageSize: PAGE_SIZE });
-  const [form, setForm] = useState<{ open: boolean; initial: EnvTemplateDto | null }>({ open: false, initial: null });
+  const [form, setForm] = useState<{ open: boolean; initial: EnvTemplateDto | null }>({
+    open: false,
+    initial: null,
+  });
   const [pendingDelete, setPendingDelete] = useState<EnvTemplateDto | null>(null);
   const [instantiate, setInstantiate] = useState<EnvTemplateDto | null>(null);
 
@@ -366,7 +367,10 @@ function TemplateFormModal({
             共 {items.length} 类资源 · 展开 {totalSlots} 个槽位
           </span>
           <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
-          <Button disabled={!name || items.length === 0 || itemsInvalid || mutation.isPending} onClick={() => mutation.mutate()}>
+          <Button
+            disabled={!name || items.length === 0 || itemsInvalid || mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
             {mutation.isPending ? '保存中…' : '保存模板'}
           </Button>
         </>
@@ -376,13 +380,26 @@ function TemplateFormModal({
         {error && <ErrorBanner message={error} />}
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="模板名称" required>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="如：标准数仓项目-生产" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="如：标准数仓项目-生产"
+            />
           </Field>
           <Field label="模板编码" hint={isEdit ? '创建后不可修改' : '留空自动生成'}>
-            <Input value={code} disabled={isEdit} onChange={(e) => setCode(e.target.value)} placeholder="如：STD-PROD" />
+            <Input
+              value={code}
+              disabled={isEdit}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="如：STD-PROD"
+            />
           </Field>
           <Field label="模板说明">
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="适用场景" />
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="适用场景"
+            />
           </Field>
         </div>
 
@@ -413,69 +430,72 @@ function TemplateFormModal({
               <div className="flex h-24 items-center justify-center">
                 <Spinner className="h-5 w-5" />
               </div>
-            ) : items.map((item, index) => (
-              <div key={index} className="flex flex-wrap items-end gap-3 px-4 py-3">
-                <div className="w-52">
-                  <Field label="资源类型">
-                    <Select
-                      value={item.resourceType}
-                      placeholder="请选择资源类型"
-                      options={dict.typeOptions()}
-                      onChange={(e) =>
-                        patchItem(index, {
-                          resourceType: e.target.value,
-                        })
-                      }
+            ) : (
+              items.map((item, index) => (
+                <div key={index} className="flex flex-wrap items-end gap-3 px-4 py-3">
+                  <div className="w-52">
+                    <Field label="资源类型">
+                      <Select
+                        value={item.resourceType}
+                        placeholder="请选择资源类型"
+                        options={dict.typeOptions()}
+                        onChange={(e) =>
+                          patchItem(index, {
+                            resourceType: e.target.value,
+                          })
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <div className="w-48">
+                    <Field label="槽位名称">
+                      <Input
+                        value={item.slotRole}
+                        onChange={(e) => patchItem(index, { slotRole: e.target.value })}
+                        placeholder="如：调度主节点"
+                      />
+                    </Field>
+                  </div>
+                  <div className="w-24">
+                    <Field label="数量">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={item.quantity}
+                        onChange={(e) => patchItem(index, { quantity: Number(e.target.value) })}
+                      />
+                    </Field>
+                  </div>
+                  <div className="flex h-9 items-center">
+                    <Switch
+                      checked={item.required}
+                      label="是否必需"
+                      hint={item.required ? '必需' : '可选'}
+                      onChange={(next) => patchItem(index, { required: next })}
                     />
-                  </Field>
+                  </div>
+                  <div className="ml-auto flex h-9 items-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label="删除模板槽位"
+                      title="删除模板槽位"
+                      disabled={items.length === 1}
+                      onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== index))}
+                    >
+                      <Trash2 size={13} className="text-rose-600" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="w-48">
-                  <Field label="槽位名称">
-                    <Input
-                      value={item.slotRole}
-                      onChange={(e) => patchItem(index, { slotRole: e.target.value })}
-                      placeholder="如：调度主节点"
-                    />
-                  </Field>
-                </div>
-                <div className="w-24">
-                  <Field label="数量">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={99}
-                      value={item.quantity}
-                      onChange={(e) => patchItem(index, { quantity: Number(e.target.value) })}
-                    />
-                  </Field>
-                </div>
-                <div className="flex h-9 items-center">
-                  <Switch
-                    checked={item.required}
-                    label="是否必需"
-                    hint={item.required ? '必需' : '可选'}
-                    onChange={(next) => patchItem(index, { required: next })}
-                  />
-                </div>
-                <div className="ml-auto flex h-9 items-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label="删除模板槽位"
-                    title="删除模板槽位"
-                    disabled={items.length === 1}
-                    onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== index))}
-                  >
-                    <Trash2 size={13} className="text-rose-600" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
         <p className="text-[11px] text-slate-500">
-          提示：数量大于 1 时，套用模板会自动展开为「槽位名称-1、槽位名称-2 …」多个槽位，便于逐个分配实际资源。
+          提示：数量大于 1 时，套用模板会自动展开为「槽位名称-1、槽位名称-2
+          …」多个槽位，便于逐个分配实际资源。
         </p>
       </div>
     </Modal>
@@ -577,7 +597,11 @@ function InstantiateModal({
             />
           </Field>
           <Field label="环境名称" required>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="如：生产环境" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="如：生产环境"
+            />
           </Field>
           <Field label="环境类型" required>
             <Select
@@ -588,7 +612,11 @@ function InstantiateModal({
             />
           </Field>
           <Field label="负责人">
-            <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="如：张伟" />
+            <Input
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+              placeholder="如：张伟"
+            />
           </Field>
         </div>
       </div>

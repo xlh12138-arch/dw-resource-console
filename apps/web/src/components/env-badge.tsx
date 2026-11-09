@@ -60,7 +60,8 @@ export function EnvBadge({
   const hex = raw ?? TONE_HEX[tone] ?? TONE_HEX.gray;
   const text = luminance(hex) > 0.62 ? darken(hex, 0.45) : hex;
   const resolvedLabel = label ?? dict.envLabel(code);
-  const duplicateLabel = dict.environments.filter((item) => item.label === resolvedLabel).length > 1;
+  const duplicateLabel =
+    dict.environments.filter((item) => item.label === resolvedLabel).length > 1;
   const displayLabel = duplicateLabel ? `${resolvedLabel}（${code}）` : resolvedLabel;
 
   return (

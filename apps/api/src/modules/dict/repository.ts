@@ -21,7 +21,10 @@ import {
 
 export const resourceTypeRepository = {
   listAll(): Promise<ResourceTypeRow[]> {
-    return db.select().from(resourceTypes).orderBy(asc(resourceTypes.sortOrder), asc(resourceTypes.code));
+    return db
+      .select()
+      .from(resourceTypes)
+      .orderBy(asc(resourceTypes.sortOrder), asc(resourceTypes.code));
   },
 
   listEnabled(): Promise<ResourceTypeRow[]> {
@@ -33,7 +36,9 @@ export const resourceTypeRepository = {
   },
 
   async findByCode(code: string): Promise<ResourceTypeRow | undefined> {
-    return firstRow<ResourceTypeRow>(db.select().from(resourceTypes).where(eq(resourceTypes.code, code)));
+    return firstRow<ResourceTypeRow>(
+      db.select().from(resourceTypes).where(eq(resourceTypes.code, code)),
+    );
   },
 
   async create(values: typeof resourceTypes.$inferInsert): Promise<ResourceTypeRow> {
@@ -41,7 +46,10 @@ export const resourceTypeRepository = {
     return rows[0]!;
   },
 
-  async update(code: string, values: Partial<typeof resourceTypes.$inferInsert>): Promise<ResourceTypeRow> {
+  async update(
+    code: string,
+    values: Partial<typeof resourceTypes.$inferInsert>,
+  ): Promise<ResourceTypeRow> {
     const rows = await db
       .update(resourceTypes)
       .set({ ...values, updatedAt: new Date() })
@@ -59,7 +67,10 @@ export const resourceTypeRepository = {
     const before = await this.findByCode(from);
     if (!before) return;
     await db.insert(resourceTypes).values({ ...before, code: to, updatedAt: new Date() });
-    await db.update(resourceTypeFields).set({ typeCode: to }).where(eq(resourceTypeFields.typeCode, from));
+    await db
+      .update(resourceTypeFields)
+      .set({ typeCode: to })
+      .where(eq(resourceTypeFields.typeCode, from));
     await db.delete(resourceTypes).where(eq(resourceTypes.code, from));
   },
 
@@ -91,11 +102,17 @@ export const resourceTypeFieldRepository = {
   },
 
   listAll(): Promise<ResourceTypeFieldRow[]> {
-    return db.select().from(resourceTypeFields).orderBy(asc(resourceTypeFields.sortOrder), asc(resourceTypeFields.id));
+    return db
+      .select()
+      .from(resourceTypeFields)
+      .orderBy(asc(resourceTypeFields.sortOrder), asc(resourceTypeFields.id));
   },
 
   /** 全量替换某类型的字段定义 */
-  async replaceAll(typeCode: string, fields: (typeof resourceTypeFields.$inferInsert)[]): Promise<void> {
+  async replaceAll(
+    typeCode: string,
+    fields: (typeof resourceTypeFields.$inferInsert)[],
+  ): Promise<void> {
     await db.delete(resourceTypeFields).where(eq(resourceTypeFields.typeCode, typeCode));
     if (fields.length > 0) await db.insert(resourceTypeFields).values(fields);
   },
@@ -115,7 +132,10 @@ export const resourceTypeFieldRepository = {
 
 export const environmentRepository = {
   listAll(): Promise<EnvironmentRow[]> {
-    return db.select().from(environmentDict).orderBy(asc(environmentDict.sortOrder), asc(environmentDict.code));
+    return db
+      .select()
+      .from(environmentDict)
+      .orderBy(asc(environmentDict.sortOrder), asc(environmentDict.code));
   },
 
   listEnabled(): Promise<EnvironmentRow[]> {
@@ -137,7 +157,10 @@ export const environmentRepository = {
     return rows[0]!;
   },
 
-  async update(code: string, values: Partial<typeof environmentDict.$inferInsert>): Promise<EnvironmentRow> {
+  async update(
+    code: string,
+    values: Partial<typeof environmentDict.$inferInsert>,
+  ): Promise<EnvironmentRow> {
     const rows = await db
       .update(environmentDict)
       .set({ ...values, updatedAt: new Date() })
@@ -208,7 +231,9 @@ export const dictReferenceRepository = {
 
     const templateNames = new Map<number, string>();
     if (itemRows.length > 0) {
-      const tpls = await db.select({ id: envTemplates.id, name: envTemplates.name }).from(envTemplates);
+      const tpls = await db
+        .select({ id: envTemplates.id, name: envTemplates.name })
+        .from(envTemplates);
       for (const t of tpls) templateNames.set(t.id, t.name);
     }
     const envNames = new Map<number, string>();
@@ -235,28 +260,29 @@ export const dictReferenceRepository = {
           entity: 'RESOURCE' as const,
           label: '资源',
           count: resRows.length,
-          samples: resRows.slice(0, SAMPLE_LIMIT).map((r) => ({ id: String(r.id), name: `${r.code} ${r.name}` })),
+          samples: resRows
+            .slice(0, SAMPLE_LIMIT)
+            .map((r) => ({ id: String(r.id), name: `${r.code} ${r.name}` })),
         },
         {
           entity: 'TEMPLATE_ITEM' as const,
           label: '环境模板条目',
           count: itemRows.length,
-          samples: itemRows
-            .slice(0, SAMPLE_LIMIT)
-            .map((r) => ({ id: String(r.id), name: `${templateNames.get(r.templateId) ?? '模板'} · ${r.slotRole}` })),
+          samples: itemRows.slice(0, SAMPLE_LIMIT).map((r) => ({
+            id: String(r.id),
+            name: `${templateNames.get(r.templateId) ?? '模板'} · ${r.slotRole}`,
+          })),
         },
         {
           entity: 'ENV_SLOT' as const,
           label: '项目环境槽位',
           count: slotRows.length,
-          samples: slotRows
-            .slice(0, SAMPLE_LIMIT)
-            .map((r) => ({
-              id: String(r.id),
-              name: `${projectNames.get(envProject.get(r.envId) ?? -1) ?? '未归属项目'} · ${
-                envNames.get(r.envId) ?? '环境'
-              } · ${r.slotRole}`,
-            })),
+          samples: slotRows.slice(0, SAMPLE_LIMIT).map((r) => ({
+            id: String(r.id),
+            name: `${projectNames.get(envProject.get(r.envId) ?? -1) ?? '未归属项目'} · ${
+              envNames.get(r.envId) ?? '环境'
+            } · ${r.slotRole}`,
+          })),
         },
       ].filter((g) => g.count > 0),
     };
@@ -288,15 +314,18 @@ export const dictReferenceRepository = {
           entity: 'RESOURCE' as const,
           label: '资源',
           count: resRows.length,
-          samples: resRows.slice(0, SAMPLE_LIMIT).map((r) => ({ id: String(r.id), name: `${r.code} ${r.name}` })),
+          samples: resRows
+            .slice(0, SAMPLE_LIMIT)
+            .map((r) => ({ id: String(r.id), name: `${r.code} ${r.name}` })),
         },
         {
           entity: 'PROJECT_ENV' as const,
           label: '项目环境',
           count: envRows.length,
-          samples: envRows
-            .slice(0, SAMPLE_LIMIT)
-            .map((r) => ({ id: String(r.id), name: `${projectNames.get(r.projectId ?? -1) ?? '未归属项目'} · ${r.name}` })),
+          samples: envRows.slice(0, SAMPLE_LIMIT).map((r) => ({
+            id: String(r.id),
+            name: `${projectNames.get(r.projectId ?? -1) ?? '未归属项目'} · ${r.name}`,
+          })),
         },
       ].filter((g) => g.count > 0),
     };

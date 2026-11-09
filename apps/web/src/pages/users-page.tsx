@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, KeyRound, Trash2, UserPlus } from 'lucide-react';
 import { useState } from 'react';
-import { ROLES, ROLE_LABELS, USER_STATUS_LABELS, type Role, type UserDto, type UserStatus } from '@dw/shared';
+import {
+  ROLES,
+  ROLE_LABELS,
+  USER_STATUS_LABELS,
+  type Role,
+  type UserDto,
+  type UserStatus,
+} from '@dw/shared';
 import { usersApi } from '../lib/endpoints';
 import { friendlyMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -29,14 +36,21 @@ export function UsersPage() {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ username: '', password: '', displayName: '', role: 'USER' as Role });
+  const [form, setForm] = useState({
+    username: '',
+    password: '',
+    displayName: '',
+    role: 'USER' as Role,
+  });
   const [roleTarget, setRoleTarget] = useState<{ user: UserDto; role: Role } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserDto | null>(null);
 
   /** 待重置密码的用户；null 表示未打开重置流程 */
   const [resetTarget, setResetTarget] = useState<UserDto | null>(null);
   /** 重置成功后返回的新密码，展示一次 */
-  const [resetResult, setResetResult] = useState<{ username: string; password: string } | null>(null);
+  const [resetResult, setResetResult] = useState<{ username: string; password: string } | null>(
+    null,
+  );
 
   const query = useQuery({ queryKey: ['users'], queryFn: usersApi.list });
 
@@ -111,7 +125,11 @@ export function UsersPage() {
 
       <Card>
         <CardHeader title="账号列表" desc={`共 ${users.length} 个账号`} />
-        {query.isError && <div className="px-5 pb-4"><ErrorBanner message={friendlyMessage(query.error)} /></div>}
+        {query.isError && (
+          <div className="px-5 pb-4">
+            <ErrorBanner message={friendlyMessage(query.error)} />
+          </div>
+        )}
         {query.isLoading ? (
           <div className="flex h-48 items-center justify-center">
             <Spinner className="h-6 w-6" />
@@ -149,12 +167,16 @@ export function UsersPage() {
                   />
                 </Td>
                 <Td>
-                  <Badge tone={u.status === 'ACTIVE' ? 'green' : 'gray'}>{USER_STATUS_LABELS[u.status as UserStatus]}</Badge>
+                  <Badge tone={u.status === 'ACTIVE' ? 'green' : 'gray'}>
+                    {USER_STATUS_LABELS[u.status as UserStatus]}
+                  </Badge>
                 </Td>
                 <Td className="text-xs text-slate-500">
                   {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('zh-CN') : '从未登录'}
                 </Td>
-                <Td className="text-xs text-slate-500">{new Date(u.createdAt).toLocaleString('zh-CN')}</Td>
+                <Td className="text-xs text-slate-500">
+                  {new Date(u.createdAt).toLocaleString('zh-CN')}
+                </Td>
                 <Td className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => setResetTarget(u)}>
@@ -230,10 +252,16 @@ export function UsersPage() {
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="用户名" required>
-              <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+              <Input
+                value={form.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
+              />
             </Field>
             <Field label="姓名" required>
-              <Input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} />
+              <Input
+                value={form.displayName}
+                onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+              />
             </Field>
           </div>
           <Field label="初始密码" required hint="至少 8 位；忘记后可由管理员重置">
@@ -277,12 +305,17 @@ export function UsersPage() {
         }
       >
         <p className="text-sm leading-relaxed text-slate-600">
-          将账号 <span className="font-medium text-slate-900">{roleTarget?.user.displayName ?? ''}</span> 的角色从{' '}
+          将账号{' '}
+          <span className="font-medium text-slate-900">{roleTarget?.user.displayName ?? ''}</span>{' '}
+          的角色从{' '}
           <span className="font-medium text-slate-900">
             {roleTarget ? ROLE_LABELS[roleTarget.user.role] : ''}
           </span>{' '}
           修改为{' '}
-          <span className="font-medium text-brand-700">{roleTarget ? ROLE_LABELS[roleTarget.role] : ''}</span>。
+          <span className="font-medium text-brand-700">
+            {roleTarget ? ROLE_LABELS[roleTarget.role] : ''}
+          </span>
+          。
         </p>
       </Modal>
 

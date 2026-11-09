@@ -1,4 +1,9 @@
-import type { CapacityPeak as CapacityPeakDto, ResourceAttrsMap, ResourceDto, ResourceType } from '@dw/shared';
+import type {
+  CapacityPeak as CapacityPeakDto,
+  ResourceAttrsMap,
+  ResourceDto,
+  ResourceType,
+} from '@dw/shared';
 import { getTypeMeta } from '../dict/validator.js';
 import { projectEnvRepository, projectRepository } from '../projects/repository.js';
 import type { ResourceRow } from '../../db/schema.js';
@@ -146,7 +151,10 @@ export function extractIps(
 ): { field: string; value: string }[] {
   return ipFields
     .map((field) => ({ field, value: attrs[field] }))
-    .filter((x): x is { field: string; value: string } => typeof x.value === 'string' && x.value.length > 0);
+    .filter(
+      (x): x is { field: string; value: string } =>
+        typeof x.value === 'string' && x.value.length > 0,
+    );
 }
 
 /** 取某类型的 IP 字段：优先用字典里的字段定义（isIp 标记），回退到内置映射 */
@@ -163,6 +171,9 @@ export async function ipUniqueByPortOf(type: string): Promise<boolean> {
   return IP_UNIQUE_BY_PORT[type as ResourceType] ?? false;
 }
 
-export function attrsOf<K extends ResourceType>(type: K, attrs: Record<string, unknown>): ResourceAttrsMap[K] {
+export function attrsOf<K extends ResourceType>(
+  type: K,
+  attrs: Record<string, unknown>,
+): ResourceAttrsMap[K] {
   return attrs as ResourceAttrsMap[K];
 }

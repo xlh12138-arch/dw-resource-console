@@ -35,7 +35,10 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.get(
     '/resource-types',
-    { ...read, schema: { querystring: dictQuerySchema, response: { 200: z.array(resourceTypeSchema) } } },
+    {
+      ...read,
+      schema: { querystring: dictQuerySchema, response: { 200: z.array(resourceTypeSchema) } },
+    },
     async (request) => resourceTypeService.list(request.query.includeDisabled ?? true),
   );
 
@@ -44,7 +47,9 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       ...read,
       schema: {
-        response: { 200: z.array(z.object({ value: z.string(), label: z.string(), prefix: z.string() })) },
+        response: {
+          200: z.array(z.object({ value: z.string(), label: z.string(), prefix: z.string() })),
+        },
       },
     },
     async () => {
@@ -55,7 +60,10 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.post(
     '/resource-types',
-    { ...write, schema: { body: resourceTypeCreateSchema, response: { 201: resourceTypeMutationSchema } } },
+    {
+      ...write,
+      schema: { body: resourceTypeCreateSchema, response: { 201: resourceTypeMutationSchema } },
+    },
     async (request, reply) => {
       const detail = await withTransaction(() =>
         resourceTypeService.create(request.body, actorOf(request), request.id),
@@ -86,16 +94,15 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
     '/resource-types/:code',
     {
       ...write,
-      schema: { params: idParams, body: resourceTypeUpdateSchema, response: { 200: resourceTypeMutationSchema } },
+      schema: {
+        params: idParams,
+        body: resourceTypeUpdateSchema,
+        response: { 200: resourceTypeMutationSchema },
+      },
     },
     async (request) => {
       const { detail, sync, resourceCodeSynced, pendingAttrSync } = await withTransaction(() =>
-        resourceTypeService.update(
-          request.params.code,
-          request.body,
-          actorOf(request),
-          request.id,
-        ),
+        resourceTypeService.update(request.params.code, request.body, actorOf(request), request.id),
       );
       const references = await resourceTypeService.references(detail.code);
       return { detail, sync, resourceCodeSynced, pendingAttrSync, references };
@@ -138,7 +145,14 @@ export const resourceTypeRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.delete(
     '/resource-types/:code',
-    { ...drop, schema: { params: idParams, body: dictDeleteSchema.nullable().optional(), response: { 200: dictSyncResultSchema } } },
+    {
+      ...drop,
+      schema: {
+        params: idParams,
+        body: dictDeleteSchema.nullable().optional(),
+        response: { 200: dictSyncResultSchema },
+      },
+    },
     async (request) =>
       withTransaction(() =>
         resourceTypeService.remove(
@@ -159,7 +173,10 @@ export const environmentRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.get(
     '/environments',
-    { ...read, schema: { querystring: dictQuerySchema, response: { 200: z.array(environmentDictSchema) } } },
+    {
+      ...read,
+      schema: { querystring: dictQuerySchema, response: { 200: z.array(environmentDictSchema) } },
+    },
     async (request) => environmentService.list(request.query.includeDisabled ?? true),
   );
 
@@ -167,7 +184,11 @@ export const environmentRoutes: FastifyPluginAsyncZod = async (app) => {
     '/environments/options',
     {
       ...read,
-      schema: { response: { 200: z.array(z.object({ value: z.string(), label: z.string(), tone: z.string() })) } },
+      schema: {
+        response: {
+          200: z.array(z.object({ value: z.string(), label: z.string(), tone: z.string() })),
+        },
+      },
     },
     async () => {
       const list = await environmentService.list(false);
@@ -177,12 +198,17 @@ export const environmentRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.post(
     '/environments',
-    { ...write, schema: { body: environmentDictCreateSchema, response: { 201: environmentMutationSchema } } },
+    {
+      ...write,
+      schema: { body: environmentDictCreateSchema, response: { 201: environmentMutationSchema } },
+    },
     async (request, reply) => {
       const detail = await withTransaction(() =>
         environmentService.create(request.body, actorOf(request), request.id),
       );
-      return reply.code(201).send({ detail, sync: null, references: null, pendingNameSync: 0, nameSynced: 0 });
+      return reply
+        .code(201)
+        .send({ detail, sync: null, references: null, pendingNameSync: 0, nameSynced: 0 });
     },
   );
 
@@ -196,16 +222,15 @@ export const environmentRoutes: FastifyPluginAsyncZod = async (app) => {
     '/environments/:code',
     {
       ...write,
-      schema: { params: idParams, body: environmentDictUpdateSchema, response: { 200: environmentMutationSchema } },
+      schema: {
+        params: idParams,
+        body: environmentDictUpdateSchema,
+        response: { 200: environmentMutationSchema },
+      },
     },
     async (request) => {
       const { detail, sync, pendingNameSync, nameSynced } = await withTransaction(() =>
-        environmentService.update(
-          request.params.code,
-          request.body,
-          actorOf(request),
-          request.id,
-        ),
+        environmentService.update(request.params.code, request.body, actorOf(request), request.id),
       );
       const references = await environmentService.references(detail.code);
       return { detail, sync, references, pendingNameSync, nameSynced };
@@ -214,7 +239,14 @@ export const environmentRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.delete(
     '/environments/:code',
-    { ...drop, schema: { params: idParams, body: dictDeleteSchema.nullable().optional(), response: { 200: dictSyncResultSchema } } },
+    {
+      ...drop,
+      schema: {
+        params: idParams,
+        body: dictDeleteSchema.nullable().optional(),
+        response: { 200: dictSyncResultSchema },
+      },
+    },
     async (request) =>
       withTransaction(() =>
         environmentService.remove(

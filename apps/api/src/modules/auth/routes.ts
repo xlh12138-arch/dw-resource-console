@@ -14,7 +14,9 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
   app.post(
     '/auth/login',
     {
-      config: { rateLimit: { max: config.rateLimitLogin.max, timeWindow: config.rateLimitLogin.timeWindow } },
+      config: {
+        rateLimit: { max: config.rateLimitLogin.max, timeWindow: config.rateLimitLogin.timeWindow },
+      },
       schema: { body: loginSchema, response: { 200: authResultSchema } },
     },
     async (request, reply) => {
@@ -56,7 +58,10 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.post(
     '/auth/logout',
-    { preHandler: app.authenticate, schema: { response: { 200: z.object({ success: z.boolean() }) } } },
+    {
+      preHandler: app.authenticate,
+      schema: { response: { 200: z.object({ success: z.boolean() }) } },
+    },
     async (request, reply) => {
       const result = await withTransaction(() =>
         authService.logout(refreshTokenFrom(request), actorOf(request)),

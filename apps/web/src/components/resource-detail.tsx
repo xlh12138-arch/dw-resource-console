@@ -264,12 +264,16 @@ export function ResourceDetailModal({
               <div className="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full bg-brand-500"
-                  style={{ width: `${Math.min(100, capacity.total ? (capacity.slotAllocated / capacity.total) * 100 : 0)}%` }}
+                  style={{
+                    width: `${Math.min(100, capacity.total ? (capacity.slotAllocated / capacity.total) * 100 : 0)}%`,
+                  }}
                   title={`槽位占用 ${capacity.slotAllocated}`}
                 />
                 <div
                   className="h-full bg-signal-500"
-                  style={{ width: `${Math.min(100, capacity.total ? (capacity.childAllocated / capacity.total) * 100 : 0)}%` }}
+                  style={{
+                    width: `${Math.min(100, capacity.total ? (capacity.childAllocated / capacity.total) * 100 : 0)}%`,
+                  }}
                   title={`子资源申请 ${capacity.childAllocated}`}
                 />
               </div>
@@ -286,13 +290,15 @@ export function ResourceDetailModal({
                 </span>
                 <span className="text-slate-400">（合计口径，未按时间段拆分）</span>
               </p>
-              {capacity.remark && <p className="mt-2 text-xs text-slate-500">说明：{capacity.remark}</p>}
+              {capacity.remark && (
+                <p className="mt-2 text-xs text-slate-500">说明：{capacity.remark}</p>
+              )}
               {(d?.capacityByProject ?? []).length > 0 && (
                 <ul className="mt-2 space-y-1">
                   {(d?.capacityByProject ?? []).map((p) => (
                     <li key={String(p.projectId ?? 'none')} className="text-xs text-slate-600">
-                      {p.projectName ?? '未归属项目'}：{p.envCount} 套环境 / {p.slotCount} 个槽位，占用{' '}
-                      {p.amount}
+                      {p.projectName ?? '未归属项目'}：{p.envCount} 套环境 / {p.slotCount}{' '}
+                      个槽位，占用 {p.amount}
                       {capacity.unit ? ` ${capacity.unit}` : ''}
                     </li>
                   ))}
@@ -329,7 +335,11 @@ export function ResourceDetailModal({
               }
             >
               {children.map((c) => (
-                <tr key={c.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setCurrentId(c.id)}>
+                <tr
+                  key={c.id}
+                  className="cursor-pointer hover:bg-slate-50"
+                  onClick={() => setCurrentId(c.id)}
+                >
                   <Td>
                     <span className="font-medium text-brand-700">{c.code}</span>
                     <span className="ml-1.5 text-slate-600">{c.name}</span>
@@ -348,7 +358,11 @@ export function ResourceDetailModal({
                     {c.childCount} 个子资源 · {c.slotRefCount} 处引用
                   </Td>
                   <Td>
-                    <Badge tone={c.status === 'IN_USE' ? 'green' : c.status === 'RETIRED' ? 'red' : 'gray'}>
+                    <Badge
+                      tone={
+                        c.status === 'IN_USE' ? 'green' : c.status === 'RETIRED' ? 'red' : 'gray'
+                      }
+                    >
                       {RESOURCE_STATUS_LABELS[c.status]}
                     </Badge>
                   </Td>
@@ -364,7 +378,9 @@ export function ResourceDetailModal({
             <CalendarClock size={13} />
             占用时间轴
             {tl && tl.expiredCount > 0 && <Badge tone="red">{tl.expiredCount} 处已超期</Badge>}
-            {tl && tl.overlaps.length > 0 && <Badge tone="violet">{tl.overlaps.length} 组时间重叠</Badge>}
+            {tl && tl.overlaps.length > 0 && (
+              <Badge tone="violet">{tl.overlaps.length} 组时间重叠</Badge>
+            )}
           </p>
           {timeline.isLoading ? (
             <div className="py-3 text-center">
@@ -466,7 +482,9 @@ export function ResourceDetailModal({
                   <Td>{ref.amount ?? '—'}</Td>
                   <Td className="whitespace-nowrap text-xs text-slate-600">
                     {fmtTime(ref.startAt)} → {fmtTime(ref.endAt)}
-                    {ref.endAt === null && <span className="ml-1 text-slate-400">（不定期限）</span>}
+                    {ref.endAt === null && (
+                      <span className="ml-1 text-slate-400">（不定期限）</span>
+                    )}
                     {ref.notStarted && (
                       <span className="ml-1 rounded bg-brand-50 px-1 py-0.5 text-[10px] font-medium text-brand-700">
                         未开始
@@ -477,7 +495,9 @@ export function ResourceDetailModal({
                     <Badge tone={SLOT_OCCUPANCY_STATE_TONES[ref.occupancyState]}>
                       {SLOT_OCCUPANCY_STATE_LABELS[ref.occupancyState]}
                     </Badge>
-                    {ref.notStarted && <span className="ml-1 text-[11px] text-brand-700">已预约</span>}
+                    {ref.notStarted && (
+                      <span className="ml-1 text-[11px] text-brand-700">已预约</span>
+                    )}
                     {ref.overdueDays > 0 && (
                       <span className="ml-1 text-[11px] font-medium text-rose-600">
                         超期 {ref.overdueDays} 天
@@ -496,7 +516,9 @@ export function ResourceDetailModal({
             {[...columns, ...otherAttrs.map(([k]) => k)].map((key) => (
               <div key={key} className="rounded-lg border border-slate-200 px-3 py-2">
                 <p className="text-[11px] text-slate-500">{key}</p>
-                <p className="mt-0.5 break-all text-sm text-slate-800">{String(r.attrs[key] ?? '—')}</p>
+                <p className="mt-0.5 break-all text-sm text-slate-800">
+                  {String(r.attrs[key] ?? '—')}
+                </p>
               </div>
             ))}
           </div>
@@ -535,7 +557,10 @@ export function ResourceDetailModal({
                     {Array.isArray(log.changes)
                       ? (log.changes as { field: string; from: unknown; to: unknown }[])
                           .slice(0, 4)
-                          .map((c) => `${c.field}: ${String(c.from ?? '空')} → ${String(c.to ?? '空')}`)
+                          .map(
+                            (c) =>
+                              `${c.field}: ${String(c.from ?? '空')} → ${String(c.to ?? '空')}`,
+                          )
                           .join('；')
                       : '—'}
                   </Td>

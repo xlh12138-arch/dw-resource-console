@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+package-lock.json
+apps/api/data/
+apps/api/drizzle/
+data/
+artifacts/
+import/
+**/*.md
+**/*.sql
+**/*.yml
+**/*.yaml
+apps/api/drizzle-pg/

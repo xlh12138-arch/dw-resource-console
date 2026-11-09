@@ -82,13 +82,18 @@ export function LoginPage() {
 
         <div className="my-auto w-full max-w-[390px] self-center py-12 sm:py-16">
           <p className="font-mono text-[11px] text-slate-500">账号登录</p>
-          <h2 className="mt-3 text-[30px] font-medium leading-none tracking-[-0.045em] text-slate-900">登录</h2>
+          <h2 className="mt-3 text-[30px] font-medium leading-none tracking-[-0.045em] text-slate-900">
+            登录
+          </h2>
           <div className="mt-8 border-t border-slate-300 pt-7">
             <form className="space-y-5" onSubmit={submit}>
               {error && <ErrorBanner message={error} />}
               <Field label="用户名" required>
                 <div className="relative">
-                  <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <User
+                    size={15}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
                   <Input
                     className="h-11 pl-9"
                     value={username}
@@ -100,7 +105,10 @@ export function LoginPage() {
               </Field>
               <Field label="密码" required>
                 <div className="relative">
-                  <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Lock
+                    size={15}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
                   <Input
                     className="h-11 pl-9"
                     type="password"
@@ -141,7 +149,9 @@ export function LoginPage() {
           </div>
         </div>
 
-        <p className="text-center font-mono text-[10px] text-slate-400 lg:text-right">DW / Console</p>
+        <p className="text-center font-mono text-[10px] text-slate-400 lg:text-right">
+          DW / Console
+        </p>
       </section>
     </div>
   );

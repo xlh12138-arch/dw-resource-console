@@ -72,10 +72,14 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
   const [projectId, setProjectId] = useState(initial?.projectId ? String(initial.projectId) : '');
   const [parentId, setParentId] = useState(initial?.parentId ? String(initial.parentId) : '');
   const [demandAmount, setDemandAmount] = useState(
-    initial?.demandAmount !== null && initial?.demandAmount !== undefined ? String(initial.demandAmount) : '',
+    initial?.demandAmount !== null && initial?.demandAmount !== undefined
+      ? String(initial.demandAmount)
+      : '',
   );
   const [capacityTotal, setCapacityTotal] = useState(
-    initial?.capacityTotal !== null && initial?.capacityTotal !== undefined ? String(initial.capacityTotal) : '',
+    initial?.capacityTotal !== null && initial?.capacityTotal !== undefined
+      ? String(initial.capacityTotal)
+      : '',
   );
   const [capacityUnit, setCapacityUnit] = useState(initial?.capacityUnit ?? 'GB');
   const [capacityRemark, setCapacityRemark] = useState('');
@@ -126,20 +130,23 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
   const parentCandidates = (parentOptions.data?.items ?? []).filter((r) => r.id !== initial?.id);
   // 候选列表按类型分页查询，若当前父资源不在其中（跨类型 / 超出分页 / 数据仍在加载），单独取一次详情兜底，
   // 保证「父资源」下拉一定有可回显的选项，且子资源态不会因为候选未到位而误判成顶层资源
-  const parentMissing = Boolean(parentId) && !parentCandidates.some((r) => String(r.id) === parentId);
+  const parentMissing =
+    Boolean(parentId) && !parentCandidates.some((r) => String(r.id) === parentId);
   const parentDetail = useQuery({
     queryKey: ['resource-detail', parentId],
     queryFn: () => resourcesApi.get(Number(parentId)),
     enabled: open && parentMissing,
   });
   const pickedParent =
-    parentCandidates.find((r) => String(r.id) === parentId) ?? (parentDetail.data ?? undefined);
+    parentCandidates.find((r) => String(r.id) === parentId) ?? parentDetail.data ?? undefined;
   // 只要填了父资源就算子资源：编辑时类型不可改，parentId 一定有效；新增时切换类型会自动清空 parentId
   const isChild = Boolean(parentId);
   /** 当前父资源的剩余容量已包含本资源的旧申请量，编辑场景要加回去再展示。 */
   const availableForParent = (parent: ResourceDto): number => {
     const base = parent.capacityAvailable ?? 0;
-    return initial?.parentId === parent.id && initial?.demandAmount !== null && initial?.demandAmount !== undefined
+    return initial?.parentId === parent.id &&
+      initial?.demandAmount !== null &&
+      initial?.demandAmount !== undefined
       ? base + initial.demandAmount
       : base;
   };
@@ -160,7 +167,10 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, dict.loading, dict.environments.length]);
 
-  const projects = useQuery({ queryKey: ['projects-options'], queryFn: () => projectsApi.options() });
+  const projects = useQuery({
+    queryKey: ['projects-options'],
+    queryFn: () => projectsApi.options(),
+  });
 
   const ipValue = useMemo(() => {
     for (const key of IP_KEYS) {
@@ -213,9 +223,7 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
         ...(isEdit && capacityRemark.trim() ? { capacityRemark: capacityRemark.trim() } : {}),
         ...(projectId ? { projectId: Number(projectId) } : { projectId: null }),
       };
-      return initial
-        ? resourcesApi.update(initial.id, payload)
-        : resourcesApi.create(payload);
+      return initial ? resourcesApi.update(initial.id, payload) : resourcesApi.create(payload);
     },
     onSuccess: () => {
       const applied = Number(demandAmount) > 0;
@@ -281,9 +289,7 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
     setErrors(next);
     if (Object.keys(next).length > 0) {
       setFormError(`请先补全必填项：${Object.values(next).join('、')}`);
-      setFormIssues(
-        Object.entries(next).map(([field, message]) => ({ field, message })),
-      );
+      setFormIssues(Object.entries(next).map(([field, message]) => ({ field, message })));
       return;
     }
     setFormIssues([]);
@@ -331,7 +337,9 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
                   data-selected-resource-type={type}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-brand-900">{dict.typeLabel(type)}</p>
+                    <p className="truncate text-sm font-medium text-brand-900">
+                      {dict.typeLabel(type)}
+                    </p>
                     <p className="truncate font-mono text-[11px] text-brand-600">{type}</p>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => setTypePickerOpen(true)}>
@@ -355,7 +363,11 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
                       {filteredTypes.length} / {selectableTypes.length}
                     </span>
                   </div>
-                  <div role="listbox" aria-label="资源类型" className="max-h-52 overflow-y-auto p-1">
+                  <div
+                    role="listbox"
+                    aria-label="资源类型"
+                    className="max-h-52 overflow-y-auto p-1"
+                  >
                     {filteredTypes.map((option) => {
                       const selected = type === String(option.value);
                       return (
@@ -368,25 +380,37 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
                           onClick={() => changeType(String(option.value))}
                           className={cn(
                             'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors',
-                            selected ? 'bg-brand-50 text-brand-800' : 'text-slate-700 hover:bg-slate-50',
+                            selected
+                              ? 'bg-brand-50 text-brand-800'
+                              : 'text-slate-700 hover:bg-slate-50',
                           )}
                         >
                           <span className="min-w-0 flex-1 truncate text-sm">{option.label}</span>
-                          <span className="shrink-0 font-mono text-[11px] text-slate-400">{option.value}</span>
+                          <span className="shrink-0 font-mono text-[11px] text-slate-400">
+                            {option.value}
+                          </span>
                         </button>
                       );
                     })}
                     {filteredTypes.length === 0 && (
-                      <p className="px-3 py-6 text-center text-xs text-slate-400">没有匹配的资源类型</p>
+                      <p className="px-3 py-6 text-center text-xs text-slate-400">
+                        没有匹配的资源类型
+                      </p>
                     )}
                   </div>
                 </div>
               )}
-              {errors['type'] && <span className="block text-xs text-rose-600">{errors['type']}</span>}
+              {errors['type'] && (
+                <span className="block text-xs text-rose-600">{errors['type']}</span>
+              )}
             </div>
           )}
           <Field label="资源名称" required error={errors['name']}>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="如：调度主节点-01" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="如：调度主节点-01"
+            />
           </Field>
           <Field label="所属环境" required>
             <Select
@@ -399,18 +423,33 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
           <Field label="资源状态">
             <Select
               value={status}
-              options={RESOURCE_STATUSES.map((s) => ({ value: s, label: RESOURCE_STATUS_LABELS[s] }))}
+              options={RESOURCE_STATUSES.map((s) => ({
+                value: s,
+                label: RESOURCE_STATUS_LABELS[s],
+              }))}
               onChange={(e) => setStatus(e.target.value as ResourceStatus)}
             />
           </Field>
           <Field label="机房 / 可用区">
-            <Input value={datacenter} onChange={(e) => setDatacenter(e.target.value)} placeholder="如：深圳A机房" />
+            <Input
+              value={datacenter}
+              onChange={(e) => setDatacenter(e.target.value)}
+              placeholder="如：深圳A机房"
+            />
           </Field>
           <Field label="负责人">
-            <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="如：张伟" />
+            <Input
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+              placeholder="如：张伟"
+            />
           </Field>
           <Field label="标签" hint="多个标签用英文逗号分隔">
-            <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="核心, 调度" />
+            <Input
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="核心, 调度"
+            />
           </Field>
           <Field label="所属项目" hint="用于按项目查看与统计">
             <Select
@@ -426,7 +465,9 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
         <div className="rounded-lg border border-slate-200 p-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-slate-700">层级关系</p>
-            <span className="text-[11px] text-slate-400">子资源向父资源申请容量，父资源总量为其上限</span>
+            <span className="text-[11px] text-slate-400">
+              子资源向父资源申请容量，父资源总量为其上限
+            </span>
           </div>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <Field label="父资源" hint="留空则为顶层资源">
@@ -445,7 +486,12 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
                   })),
                   // 当前父资源不在候选里（跨类型 / 超出分页）时补一项，保证下拉能回显
                   ...(pickedParent && !parentCandidates.some((r) => r.id === pickedParent.id)
-                    ? [{ value: String(pickedParent.id), label: `${pickedParent.code} · ${pickedParent.name}` }]
+                    ? [
+                        {
+                          value: String(pickedParent.id),
+                          label: `${pickedParent.code} · ${pickedParent.name}`,
+                        },
+                      ]
                     : []),
                 ]}
                 onChange={(e) => {
@@ -544,7 +590,10 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
                         value={(attrs[f.key] as number | string) ?? ''}
                         placeholder={f.placeholder}
                         onChange={(e) =>
-                          setAttrs({ ...attrs, [f.key]: e.target.value === '' ? undefined : Number(e.target.value) })
+                          setAttrs({
+                            ...attrs,
+                            [f.key]: e.target.value === '' ? undefined : Number(e.target.value),
+                          })
                         }
                       />
                       {f.unit && (
@@ -582,87 +631,96 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
         </div>
 
         {!isChild && (
-        <div className="rounded-lg border border-slate-200 p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-700">容量设置</p>
-            <Switch
-              checked={capacityTotal.trim() !== ''}
-              label="启用容量管理"
-              hint={capacityTotal.trim() !== '' ? '已启用' : '未启用'}
-              onChange={(next) => {
-                if (!next) {
-                  setCapacityTotal('');
-                  return;
-                }
-                setCapacityTotal(capacityTotal.trim() === '' ? '1024' : capacityTotal);
-              }}
-            />
-          </div>
-          {capacityTotal.trim() !== '' ? (
-            <div className="mt-3 grid gap-4 sm:grid-cols-3">
-              <Field
-                label="总容量"
-                required
-                error={errors['capacityTotal']}
-                hint={
-                  isEdit && (initial?.capacityAllocated ?? 0) > 0
-                    ? `最小 ${initial?.capacityAllocated}（已占用），剩余容量不能为负${
-                        capacityTotal.trim() !== '' && Number.isFinite(Number(capacityTotal))
-                          ? `；当前剩余 ${Number(capacityTotal) - (initial?.capacityAllocated ?? 0)}`
-                          : ''
-                      }`
-                    : '调小后必须 ≥ 已占用（槽位 + 子资源）'
-                }
-              >
-                <Input
-                  type="number"
-                  min={isEdit ? (initial?.capacityAllocated ?? 0) : 0}
-                  value={capacityTotal}
-                  onChange={(e) => setCapacityTotal(e.target.value)}
-                  placeholder="如：20480"
-                />
-              </Field>
-              <Field label="容量单位">
-                <Input
-                  value={capacityUnit}
-                  onChange={(e) => setCapacityUnit(e.target.value)}
-                  placeholder="GB / TB / 核"
-                />
-              </Field>
-              <Field label="容量说明">
-                <Input
-                  value={capacityRemark}
-                  onChange={(e) => setCapacityRemark(e.target.value)}
-                  placeholder="如：共享存储池配额"
-                />
-              </Field>
+          <div className="rounded-lg border border-slate-200 p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-700">容量设置</p>
+              <Switch
+                checked={capacityTotal.trim() !== ''}
+                label="启用容量管理"
+                hint={capacityTotal.trim() !== '' ? '已启用' : '未启用'}
+                onChange={(next) => {
+                  if (!next) {
+                    setCapacityTotal('');
+                    return;
+                  }
+                  setCapacityTotal(capacityTotal.trim() === '' ? '1024' : capacityTotal);
+                }}
+              />
             </div>
-          ) : (
-            <p className="mt-2 text-xs text-slate-500">
-              启用后，各项目环境槽位引用该资源时必须填写申请容量，且占用总量不得超过总容量；调小容量时会校验现有占用。
-            </p>
-          )}
-          {isEdit && initial?.capacityTotal !== null && (
-            <p className="mt-2 text-xs text-slate-500">
-              当前已占用 {initial?.capacityAllocated ?? 0}
-              {initial?.capacityUnit ? ` ${initial.capacityUnit}` : ''}
-              {initial?.capacityTotal ? ` / ${initial.capacityTotal}${initial.capacityUnit ? ` ${initial.capacityUnit}` : ''}` : ''}
-              （其中子资源 {initial?.childAllocated ?? 0}），调小后不能小于已占用量。
-            </p>
-          )}
-        </div>
+            {capacityTotal.trim() !== '' ? (
+              <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                <Field
+                  label="总容量"
+                  required
+                  error={errors['capacityTotal']}
+                  hint={
+                    isEdit && (initial?.capacityAllocated ?? 0) > 0
+                      ? `最小 ${initial?.capacityAllocated}（已占用），剩余容量不能为负${
+                          capacityTotal.trim() !== '' && Number.isFinite(Number(capacityTotal))
+                            ? `；当前剩余 ${Number(capacityTotal) - (initial?.capacityAllocated ?? 0)}`
+                            : ''
+                        }`
+                      : '调小后必须 ≥ 已占用（槽位 + 子资源）'
+                  }
+                >
+                  <Input
+                    type="number"
+                    min={isEdit ? (initial?.capacityAllocated ?? 0) : 0}
+                    value={capacityTotal}
+                    onChange={(e) => setCapacityTotal(e.target.value)}
+                    placeholder="如：20480"
+                  />
+                </Field>
+                <Field label="容量单位">
+                  <Input
+                    value={capacityUnit}
+                    onChange={(e) => setCapacityUnit(e.target.value)}
+                    placeholder="GB / TB / 核"
+                  />
+                </Field>
+                <Field label="容量说明">
+                  <Input
+                    value={capacityRemark}
+                    onChange={(e) => setCapacityRemark(e.target.value)}
+                    placeholder="如：共享存储池配额"
+                  />
+                </Field>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-slate-500">
+                启用后，各项目环境槽位引用该资源时必须填写申请容量，且占用总量不得超过总容量；调小容量时会校验现有占用。
+              </p>
+            )}
+            {isEdit && initial?.capacityTotal !== null && (
+              <p className="mt-2 text-xs text-slate-500">
+                当前已占用 {initial?.capacityAllocated ?? 0}
+                {initial?.capacityUnit ? ` ${initial.capacityUnit}` : ''}
+                {initial?.capacityTotal
+                  ? ` / ${initial.capacityTotal}${initial.capacityUnit ? ` ${initial.capacityUnit}` : ''}`
+                  : ''}
+                （其中子资源 {initial?.childAllocated ?? 0}），调小后不能小于已占用量。
+              </p>
+            )}
+          </div>
         )}
 
         {isChild && pickedParent && (
           <div className="rounded-lg border border-brand-200 bg-brand-50/50 p-3 text-xs text-brand-800">
             子资源 <span className="font-semibold">{name || '未命名'}</span> 的总容量固定为申请额度
-            <span className="font-semibold"> {demandAmount || '—'} {pickedParent.capacityUnit ?? ''}</span>
+            <span className="font-semibold">
+              {' '}
+              {demandAmount || '—'} {pickedParent.capacityUnit ?? ''}
+            </span>
             ，由父资源 <span className="font-semibold">{pickedParent.code}</span> 的容量池统一约束。
           </div>
         )}
 
         <Field label="备注">
-          <Textarea value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="用途、变更窗口等说明" />
+          <Textarea
+            value={remark}
+            onChange={(e) => setRemark(e.target.value)}
+            placeholder="用途、变更窗口等说明"
+          />
         </Field>
       </div>
     </Modal>

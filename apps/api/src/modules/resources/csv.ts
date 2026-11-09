@@ -1,7 +1,10 @@
 /** 极简 CSV 解析/生成：支持引号包裹、逗号转义、CRLF、BOM，不引入额外依赖 */
 
 export function parseCsv(text: string): { header: string[]; rows: Record<string, string>[] } {
-  const clean = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const clean = text
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
   const lines: string[][] = [];
   let row: string[] = [];
   let cell = '';

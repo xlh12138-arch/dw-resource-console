@@ -90,12 +90,22 @@ export function ProjectDetailPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [activeEnv, setActiveEnv] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ProjectEnvDto | null>(null);
-  const [assignSlot, setAssignSlot] = useState<{ env: ProjectEnvDetail; slot: EnvSlotDto } | null>(null);
+  const [assignSlot, setAssignSlot] = useState<{ env: ProjectEnvDetail; slot: EnvSlotDto } | null>(
+    null,
+  );
   const [pendingDeleteSlot, setPendingDeleteSlot] = useState<EnvSlotDto | null>(null);
   const [pendingDetach, setPendingDetach] = useState<ResourceDto | null>(null);
-  const [renewTarget, setRenewTarget] = useState<{ env: ProjectEnvDetail; slot: EnvSlotDto } | null>(null);
-  const [editSlot, setEditSlot] = useState<{ env: ProjectEnvDetail; slot: EnvSlotDto } | null>(null);
-  const [pendingRelease, setPendingRelease] = useState<{ env: ProjectEnvDetail; slot: EnvSlotDto } | null>(null);
+  const [renewTarget, setRenewTarget] = useState<{
+    env: ProjectEnvDetail;
+    slot: EnvSlotDto;
+  } | null>(null);
+  const [editSlot, setEditSlot] = useState<{ env: ProjectEnvDetail; slot: EnvSlotDto } | null>(
+    null,
+  );
+  const [pendingRelease, setPendingRelease] = useState<{
+    env: ProjectEnvDetail;
+    slot: EnvSlotDto;
+  } | null>(null);
   const [editEnv, setEditEnv] = useState<ProjectEnvDto | null>(null);
   const [envView, setEnvView] = useState<'slots' | 'timeline'>('slots');
 
@@ -137,7 +147,8 @@ export function ProjectDetailPage() {
   });
 
   const removeSlot = useMutation({
-    mutationFn: ({ envId, slotId }: { envId: number; slotId: number }) => envApi.removeSlot(envId, slotId),
+    mutationFn: ({ envId, slotId }: { envId: number; slotId: number }) =>
+      envApi.removeSlot(envId, slotId),
     onSuccess: () => {
       push('success', '槽位已删除');
       setPendingDeleteSlot(null);
@@ -148,7 +159,8 @@ export function ProjectDetailPage() {
 
   /** 一键释放：立即释放占用（含容量），槽位本身保留，等待重新分配 */
   const release = useMutation({
-    mutationFn: ({ envId, slotId }: { envId: number; slotId: number }) => envApi.release(envId, slotId),
+    mutationFn: ({ envId, slotId }: { envId: number; slotId: number }) =>
+      envApi.release(envId, slotId),
     onSuccess: () => {
       push('success', '已释放占用，容量已回收');
       setPendingRelease(null);
@@ -204,7 +216,9 @@ export function ProjectDetailPage() {
     slotRefs.set(ref.resourceId, (slotRefs.get(ref.resourceId) ?? 0) + 1);
   }
   /** 本项目超期未释放的占用，按超期天数倒序 */
-  const overdueRefs = (data.slotRefs ?? []).filter((r) => r.overdueDays > 0).sort((a, b) => b.overdueDays - a.overdueDays);
+  const overdueRefs = (data.slotRefs ?? [])
+    .filter((r) => r.overdueDays > 0)
+    .sort((a, b) => b.overdueDays - a.overdueDays);
 
   return (
     <div className="space-y-4">
@@ -228,7 +242,8 @@ export function ProjectDetailPage() {
           <>
             <p>
               <span className="font-mono">{data.code}</span>
-              {data.owner ? ` · 负责人 ${data.owner}` : ''} · {data.envCount} 套环境 · {data.resourceCount} 个资源
+              {data.owner ? ` · 负责人 ${data.owner}` : ''} · {data.envCount} 套环境 ·{' '}
+              {data.resourceCount} 个资源
             </p>
             {data.description && <p className="mt-1 max-w-2xl">{data.description}</p>}
           </>
@@ -277,7 +292,9 @@ export function ProjectDetailPage() {
                     title="在资源台账中查看该资源"
                     onClick={() => navigate(`/resources?id=${r.resourceId}`)}
                   >
-                    <span className="font-mono text-xs text-slate-500">{r.resourceCode ?? `#${r.resourceId}`}</span>{' '}
+                    <span className="font-mono text-xs text-slate-500">
+                      {r.resourceCode ?? `#${r.resourceId}`}
+                    </span>{' '}
                     <span className="text-slate-800">{r.resourceName ?? '—'}</span>
                   </button>
                 </Td>
@@ -292,7 +309,10 @@ export function ProjectDetailPage() {
                     }}
                   >
                     {r.envName}
-                    <EnvBadge code={r.environment ?? 'DEV'} label={r.environmentLabel ?? r.environment ?? '—'} />
+                    <EnvBadge
+                      code={r.environment ?? 'DEV'}
+                      label={r.environmentLabel ?? r.environment ?? '—'}
+                    />
                   </button>
                 </Td>
                 <Td className="text-xs text-slate-600">{r.slotRole}</Td>
@@ -387,7 +407,9 @@ export function ProjectDetailPage() {
                       <span>
                         槽位填充 {e.slotFilled}/{e.slotTotal}
                       </span>
-                      <span>{e.slotTotal ? Math.round((e.slotFilled / e.slotTotal) * 100) : 0}%</span>
+                      <span>
+                        {e.slotTotal ? Math.round((e.slotFilled / e.slotTotal) * 100) : 0}%
+                      </span>
                     </div>
                     <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                       <div
@@ -411,7 +433,11 @@ export function ProjectDetailPage() {
           desc="主归属该项目的资源，以及被该项目环境槽位引用的共享资源"
           action={
             canWrite && (
-              <Button variant="outline" size="sm" onClick={() => navigate(`/resources?projectId=${projectId}`)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/resources?projectId=${projectId}`)}
+              >
                 <Tag size={13} />
                 在资源台账中筛选
               </Button>
@@ -419,7 +445,10 @@ export function ProjectDetailPage() {
           }
         />
         {(resources.data?.items ?? []).length === 0 ? (
-          <EmptyState title="该项目暂无资源" desc="可在环境槽位中分配资源，或在资源台账里批量标注" />
+          <EmptyState
+            title="该项目暂无资源"
+            desc="可在环境槽位中分配资源，或在资源台账里批量标注"
+          />
         ) : (
           <Table
             head={
@@ -458,9 +487,7 @@ export function ProjectDetailPage() {
                   <Td>
                     <div className="flex flex-wrap items-center gap-1">
                       {owned ? <Badge tone="green">主归属</Badge> : null}
-                      {slotCount > 0 ? (
-                        <Badge tone="violet">槽位引用 ×{slotCount}</Badge>
-                      ) : null}
+                      {slotCount > 0 ? <Badge tone="violet">槽位引用 ×{slotCount}</Badge> : null}
                     </div>
                   </Td>
                   <Td className="text-right">
@@ -468,8 +495,14 @@ export function ProjectDetailPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        title={slotCount > 0 ? '移出项目（需同时解除槽位引用才会从列表消失）' : '取消项目标注'}
-                        aria-label={slotCount > 0 ? `将 ${r.name} 移出项目` : `取消 ${r.name} 的项目标注`}
+                        title={
+                          slotCount > 0
+                            ? '移出项目（需同时解除槽位引用才会从列表消失）'
+                            : '取消项目标注'
+                        }
+                        aria-label={
+                          slotCount > 0 ? `将 ${r.name} 移出项目` : `取消 ${r.name} 的项目标注`
+                        }
                         onClick={() => setPendingDetach(r)}
                       >
                         <Unlink size={13} className="text-slate-500" />
@@ -528,7 +561,9 @@ export function ProjectDetailPage() {
                   type="button"
                   onClick={() => setEnvView('slots')}
                   className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs ${
-                    envView === 'slots' ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                    envView === 'slots'
+                      ? 'bg-brand-600 text-white'
+                      : 'text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   <ListTree size={12} />
@@ -538,7 +573,9 @@ export function ProjectDetailPage() {
                   type="button"
                   onClick={() => setEnvView('timeline')}
                   className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs ${
-                    envView === 'timeline' ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                    envView === 'timeline'
+                      ? 'bg-brand-600 text-white'
+                      : 'text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   <GanttChartSquare size={12} />
@@ -551,8 +588,8 @@ export function ProjectDetailPage() {
               <div className="flex flex-wrap items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0 text-rose-600" />
                 <p className="min-w-0 flex-1 text-xs text-rose-800">
-                  本环境有 <span className="font-semibold">{env.overdueCount}</span> 个槽位已超期但未释放，
-                  容量仍被占用。可对超期槽位「一键续期」或直接「释放」。
+                  本环境有 <span className="font-semibold">{env.overdueCount}</span>{' '}
+                  个槽位已超期但未释放， 容量仍被占用。可对超期槽位「一键续期」或直接「释放」。
                 </p>
               </div>
             )}
@@ -573,11 +610,16 @@ export function ProjectDetailPage() {
                   }
                 >
                   {env.slots.map((slot) => (
-                    <tr key={slot.id} className={slot.overdueDays > 0 ? 'bg-rose-50/40' : undefined}>
+                    <tr
+                      key={slot.id}
+                      className={slot.overdueDays > 0 ? 'bg-rose-50/40' : undefined}
+                    >
                       <Td className="font-medium text-slate-800">
                         <div>{slot.slotRole}</div>
                         {slot.remark ? (
-                          <div className="mt-0.5 text-[11px] font-normal text-slate-400">{slot.remark}</div>
+                          <div className="mt-0.5 text-[11px] font-normal text-slate-400">
+                            {slot.remark}
+                          </div>
                         ) : null}
                       </Td>
                       <Td>
@@ -595,7 +637,9 @@ export function ProjectDetailPage() {
                       </Td>
                       <Td>
                         {slot.resourceId && slot.demandAmount !== null ? (
-                          <span className="text-xs font-medium text-slate-700">{slot.demandAmount}</span>
+                          <span className="text-xs font-medium text-slate-700">
+                            {slot.demandAmount}
+                          </span>
                         ) : (
                           <span className="text-xs text-slate-400">—</span>
                         )}
@@ -610,7 +654,9 @@ export function ProjectDetailPage() {
                               </span>
                             )}
                             {slot.renewCount > 0 && (
-                              <span className="ml-1 text-[11px] text-slate-400">已续 {slot.renewCount} 次</span>
+                              <span className="ml-1 text-[11px] text-slate-400">
+                                已续 {slot.renewCount} 次
+                              </span>
                             )}
                           </>
                         ) : (
@@ -620,7 +666,9 @@ export function ProjectDetailPage() {
                       <Td>
                         {slot.resourceId ? (
                           <div className="flex flex-wrap items-center gap-1">
-                            <Badge tone={SLOT_OCCUPANCY_STATE_TONES[slot.occupancyState ?? 'ACTIVE']}>
+                            <Badge
+                              tone={SLOT_OCCUPANCY_STATE_TONES[slot.occupancyState ?? 'ACTIVE']}
+                            >
                               {SLOT_OCCUPANCY_STATE_LABELS[slot.occupancyState ?? 'ACTIVE']}
                             </Badge>
                             {slot.notStarted && <Badge tone="blue">已预约</Badge>}
@@ -651,8 +699,16 @@ export function ProjectDetailPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              title={slot.resourceId ? '更换资源（原资源的占用容量自动释放）' : '分配资源'}
-                              aria-label={slot.resourceId ? `更换槽位 ${slot.slotRole} 的资源` : `为槽位 ${slot.slotRole} 分配资源`}
+                              title={
+                                slot.resourceId
+                                  ? '更换资源（原资源的占用容量自动释放）'
+                                  : '分配资源'
+                              }
+                              aria-label={
+                                slot.resourceId
+                                  ? `更换槽位 ${slot.slotRole} 的资源`
+                                  : `为槽位 ${slot.slotRole} 分配资源`
+                              }
                               onClick={() => setAssignSlot({ env, slot })}
                             >
                               <Link2 size={13} />
@@ -666,7 +722,12 @@ export function ProjectDetailPage() {
                               aria-label={`为槽位 ${slot.slotRole} 续期`}
                               onClick={() => setRenewTarget({ env, slot })}
                             >
-                              <CalendarClock size={13} className={slot.overdueDays > 0 ? 'text-rose-600' : 'text-slate-600'} />
+                              <CalendarClock
+                                size={13}
+                                className={
+                                  slot.overdueDays > 0 ? 'text-rose-600' : 'text-slate-600'
+                                }
+                              />
                             </Button>
                           )}
                           {canWrite && slot.resourceId && (
@@ -713,7 +774,10 @@ export function ProjectDetailPage() {
                     <Spinner className="h-5 w-5" />
                   </div>
                 ) : !envTimeline.data || envTimeline.data.entries.length === 0 ? (
-                  <EmptyState title="暂无占用记录" desc="为槽位分配资源后，会在此按时间段展示占用情况" />
+                  <EmptyState
+                    title="暂无占用记录"
+                    desc="为槽位分配资源后，会在此按时间段展示占用情况"
+                  />
                 ) : (
                   <>
                     <TimelineChart
@@ -806,7 +870,8 @@ export function ProjectDetailPage() {
               variant="danger"
               disabled={release.isPending}
               onClick={() =>
-                pendingRelease && release.mutate({ envId: pendingRelease.env.id, slotId: pendingRelease.slot.id })
+                pendingRelease &&
+                release.mutate({ envId: pendingRelease.env.id, slotId: pendingRelease.slot.id })
               }
             >
               {release.isPending ? '释放中…' : '确认释放'}
@@ -816,17 +881,20 @@ export function ProjectDetailPage() {
       >
         <div className="space-y-2 text-sm text-slate-700">
           <p>
-            确认释放槽位 <span className="font-medium">{pendingRelease?.slot.slotRole}</span> 占用的资源吗？
+            确认释放槽位 <span className="font-medium">{pendingRelease?.slot.slotRole}</span>{' '}
+            占用的资源吗？
           </p>
           <p className="text-xs text-slate-500">
             当前占用：{pendingRelease?.slot.resourceCode} {pendingRelease?.slot.resourceName}
-            {pendingRelease?.slot.demandAmount !== null ? `（申请 ${pendingRelease?.slot.demandAmount}）` : ''}
+            {pendingRelease?.slot.demandAmount !== null
+              ? `（申请 ${pendingRelease?.slot.demandAmount}）`
+              : ''}
             ，占用至 {pendingRelease?.slot.endAt ? fmtDate(pendingRelease.slot.endAt) : '长期'}。
           </p>
           {pendingRelease && pendingRelease.slot.overdueDays > 0 && (
             <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
-              该占用已超期 <span className="font-semibold">{pendingRelease.slot.overdueDays}</span> 天。
-              释放后立即回收容量，槽位保留可重新分配。
+              该占用已超期 <span className="font-semibold">{pendingRelease.slot.overdueDays}</span>{' '}
+              天。 释放后立即回收容量，槽位保留可重新分配。
             </p>
           )}
           <p className="text-xs text-slate-500">释放后槽位变为「待分配」，资源本身不会被删除。</p>
@@ -872,7 +940,11 @@ export function ProjectDetailPage() {
             <Button
               variant="danger"
               disabled={removeSlot.isPending}
-              onClick={() => env && pendingDeleteSlot && removeSlot.mutate({ envId: env.id, slotId: pendingDeleteSlot.id })}
+              onClick={() =>
+                env &&
+                pendingDeleteSlot &&
+                removeSlot.mutate({ envId: env.id, slotId: pendingDeleteSlot.id })
+              }
             >
               {removeSlot.isPending ? '删除中…' : '确认删除'}
             </Button>
@@ -886,7 +958,9 @@ export function ProjectDetailPage() {
           {pendingDeleteSlot?.resourceId ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               该槽位已绑定资源 {pendingDeleteSlot.resourceCode} {pendingDeleteSlot.resourceName}
-              {pendingDeleteSlot.demandAmount !== null ? `（占用 ${pendingDeleteSlot.demandAmount}）` : ''}
+              {pendingDeleteSlot.demandAmount !== null
+                ? `（占用 ${pendingDeleteSlot.demandAmount}）`
+                : ''}
               ，删除后绑定关系与占用容量一并释放，资源本身不会被删除。
             </p>
           ) : (
@@ -916,9 +990,14 @@ export function ProjectDetailPage() {
               </Button>
             ) : null}
             <Button
-              variant={pendingDetach && (slotRefs.get(pendingDetach.id) ?? 0) > 0 ? 'outline' : 'danger'}
+              variant={
+                pendingDetach && (slotRefs.get(pendingDetach.id) ?? 0) > 0 ? 'outline' : 'danger'
+              }
               disabled={detach.isPending}
-              onClick={() => pendingDetach && detach.mutate({ resourceId: pendingDetach.id, includeSlots: false })}
+              onClick={() =>
+                pendingDetach &&
+                detach.mutate({ resourceId: pendingDetach.id, includeSlots: false })
+              }
             >
               {detach.isPending ? '处理中…' : '仅取消项目标注'}
             </Button>
@@ -935,11 +1014,14 @@ export function ProjectDetailPage() {
               </p>
               {count > 0 ? (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  该资源还被本项目的 <span className="font-medium">{count}</span> 个环境槽位引用。仅取消项目标注后，它仍会出现在项目资源列表中（主归属 ∪ 槽位引用）；
-                  如需彻底移出，请选择「解除槽位并移出」。
+                  该资源还被本项目的 <span className="font-medium">{count}</span>{' '}
+                  个环境槽位引用。仅取消项目标注后，它仍会出现在项目资源列表中（主归属 ∪
+                  槽位引用）； 如需彻底移出，请选择「解除槽位并移出」。
                 </div>
               ) : (
-                <p className="text-xs text-slate-500">取消后该资源将不再属于本项目，资源本身不会被删除。</p>
+                <p className="text-xs text-slate-500">
+                  取消后该资源将不再属于本项目，资源本身不会被删除。
+                </p>
               )}
             </div>
           );
@@ -955,7 +1037,9 @@ function ApplyTemplateBar({ envId, onDone }: { envId: number; onDone: () => void
   const { push } = useToast();
   const [templateId, setTemplateId] = useState('');
   const [slotRole, setSlotRole] = useState('');
-  const [resourceType, setResourceType] = useState<string>(dict.activeTypes[0]?.code ?? 'BATCH_SCHED_SERVER');
+  const [resourceType, setResourceType] = useState<string>(
+    dict.activeTypes[0]?.code ?? 'BATCH_SCHED_SERVER',
+  );
 
   // 字典到位后校正一次：默认值可能不在启用类型里（内置兜底或类型被停用），否则下拉会显示空白
   useEffect(() => {
@@ -967,7 +1051,10 @@ function ApplyTemplateBar({ envId, onDone }: { envId: number; onDone: () => void
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dict.loading]);
 
-  const templates = useQuery({ queryKey: ['templates-options'], queryFn: () => templatesApi.options() });
+  const templates = useQuery({
+    queryKey: ['templates-options'],
+    queryFn: () => templatesApi.options(),
+  });
 
   const apply = useMutation({
     mutationFn: () => envApi.applyTemplate(envId, Number(templateId)),
@@ -1004,7 +1091,11 @@ function ApplyTemplateBar({ envId, onDone }: { envId: number; onDone: () => void
           />
         </Field>
       </div>
-      <Button variant="outline" disabled={!templateId || apply.isPending} onClick={() => apply.mutate()}>
+      <Button
+        variant="outline"
+        disabled={!templateId || apply.isPending}
+        onClick={() => apply.mutate()}
+      >
         <RefreshCw size={13} />
         追加
       </Button>
@@ -1020,10 +1111,18 @@ function ApplyTemplateBar({ envId, onDone }: { envId: number; onDone: () => void
       </div>
       <div className="w-40">
         <Field label="槽位名称">
-          <Input value={slotRole} onChange={(e) => setSlotRole(e.target.value)} placeholder="如：备用调度节点" />
+          <Input
+            value={slotRole}
+            onChange={(e) => setSlotRole(e.target.value)}
+            placeholder="如：备用调度节点"
+          />
         </Field>
       </div>
-      <Button variant="outline" disabled={!slotRole || addSlot.isPending} onClick={() => addSlot.mutate()}>
+      <Button
+        variant="outline"
+        disabled={!slotRole || addSlot.isPending}
+        onClick={() => addSlot.mutate()}
+      >
         <Plus size={13} />
         加槽位
       </Button>
@@ -1035,7 +1134,15 @@ function ApplyTemplateBar({ envId, onDone }: { envId: number; onDone: () => void
  * 编辑项目环境：环境创建后仍可修改名称、环境类型、运行状态、负责人与说明。
  * 环境类型变更只影响本环境的标识，不会重建槽位。
  */
-function EditEnvModal({ env, onClose, onSaved }: { env: ProjectEnvDto | null; onClose: () => void; onSaved: () => void }) {
+function EditEnvModal({
+  env,
+  onClose,
+  onSaved,
+}: {
+  env: ProjectEnvDto | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const dict = useDict();
   const { push } = useToast();
   const [name, setName] = useState('');
@@ -1104,7 +1211,11 @@ function EditEnvModal({ env, onClose, onSaved }: { env: ProjectEnvDto | null; on
         {error && <ErrorBanner message={error} />}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="环境名称" required>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="如：生产环境" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="如：生产环境"
+            />
           </Field>
           <Field label="环境类型" required>
             <Select
@@ -1121,16 +1232,24 @@ function EditEnvModal({ env, onClose, onSaved }: { env: ProjectEnvDto | null; on
             />
           </Field>
           <Field label="负责人">
-            <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="如：张伟" />
+            <Input
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+              placeholder="如：张伟"
+            />
           </Field>
         </div>
         <Field label="环境说明">
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="用途、上线窗口等" />
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="用途、上线窗口等"
+          />
         </Field>
         <p className="text-[11px] text-slate-500">
           环境编码 {env ? <span className="font-mono">{env.environment}</span> : null}
-          {env?.templateName ? ` · 套用模板 ${env.templateName}` : ' · 自定义环境'}，槽位填充 {env?.slotFilled ?? 0}/
-          {env?.slotTotal ?? 0}
+          {env?.templateName ? ` · 套用模板 ${env.templateName}` : ' · 自定义环境'}，槽位填充{' '}
+          {env?.slotFilled ?? 0}/{env?.slotTotal ?? 0}
         </p>
       </div>
     </Modal>
@@ -1211,7 +1330,10 @@ function CreateEnvModal({
       footer={
         <>
           <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
-          <Button disabled={!name || !environment || mutation.isPending} onClick={() => mutation.mutate()}>
+          <Button
+            disabled={!name || !environment || mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
             {mutation.isPending ? '创建中…' : '创建环境'}
           </Button>
         </>
@@ -1260,7 +1382,11 @@ function CreateEnvModal({
             />
           </Field>
           <Field label="负责人">
-            <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="如：张伟" />
+            <Input
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+              placeholder="如：张伟"
+            />
           </Field>
         </div>
 
@@ -1280,7 +1406,11 @@ function CreateEnvModal({
         )}
 
         <Field label="环境说明">
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="用途、上线窗口等" />
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="用途、上线窗口等"
+          />
         </Field>
       </div>
     </Modal>
@@ -1370,7 +1500,8 @@ function AssignSlotModal({
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
-        const next = (err.details as { warnings?: SlotAssignWarning[] } | undefined)?.warnings ?? [];
+        const next =
+          (err.details as { warnings?: SlotAssignWarning[] } | undefined)?.warnings ?? [];
         if (next.length > 0) {
           setWarnings(next);
           setError('');
@@ -1409,7 +1540,13 @@ function AssignSlotModal({
         <>
           <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
           <Button disabled={!canSubmit || assign.isPending} onClick={() => assign.mutate()}>
-            {assign.isPending ? '提交中…' : warnings.length > 0 ? '我已确认，继续保存' : slot.resourceId ? '确认更换' : '确认绑定'}
+            {assign.isPending
+              ? '提交中…'
+              : warnings.length > 0
+                ? '我已确认，继续保存'
+                : slot.resourceId
+                  ? '确认更换'
+                  : '确认绑定'}
           </Button>
         </>
       }
@@ -1419,7 +1556,8 @@ function AssignSlotModal({
         {slot.resourceId && (
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
             <p>
-              当前绑定：<span className="font-mono text-slate-500">{slot.resourceCode}</span> {slot.resourceName}
+              当前绑定：<span className="font-mono text-slate-500">{slot.resourceCode}</span>{' '}
+              {slot.resourceName}
               {slot.demandAmount !== null ? `（占用 ${slot.demandAmount}）` : ''}
             </p>
             <p className="mt-0.5 text-slate-500">
@@ -1441,9 +1579,11 @@ function AssignSlotModal({
                     {w.references.map((r) => (
                       <li key={`${r.slotId}`} className="list-disc">
                         {r.projectName ?? '未归属项目'} / {r.envName}
-                        <span className="text-amber-700">（{r.environmentLabel}）</span> · 槽位「{r.slotRole}」
-                        {r.amount !== null ? ` · 占用 ${r.amount}` : ''}
-                        {r.startAt ? ` · ${fmtDate(r.startAt)} → ${r.endAt ? fmtDate(r.endAt) : '长期'}` : ''}
+                        <span className="text-amber-700">（{r.environmentLabel}）</span> · 槽位「
+                        {r.slotRole}」{r.amount !== null ? ` · 占用 ${r.amount}` : ''}
+                        {r.startAt
+                          ? ` · ${fmtDate(r.startAt)} → ${r.endAt ? fmtDate(r.endAt) : '长期'}`
+                          : ''}
                       </li>
                     ))}
                   </ul>
@@ -1504,9 +1644,7 @@ function AssignSlotModal({
           </div>
         </div>
 
-        {periodInvalid && (
-          <p className="text-xs text-rose-600">结束时间必须晚于开始时间</p>
-        )}
+        {periodInvalid && <p className="text-xs text-rose-600">结束时间必须晚于开始时间</p>}
 
         {demandRequired && (
           <div className="w-64">
@@ -1582,9 +1720,11 @@ function AssignSlotModal({
                     <ul className="mt-1 space-y-0.5 text-[11px] text-slate-500">
                       {c.usedBy.slice(0, 3).map((r) => (
                         <li key={r.slotId}>
-                          {r.projectName ?? '未归属项目'} / {r.envName}（{r.environmentLabel}）· 「{r.slotRole}」
-                          {r.amount !== null ? ` · 占用 ${r.amount}` : ''}
-                          {r.startAt ? ` · ${fmtDate(r.startAt)} → ${r.endAt ? fmtDate(r.endAt) : '长期'}` : ''}
+                          {r.projectName ?? '未归属项目'} / {r.envName}（{r.environmentLabel}）· 「
+                          {r.slotRole}」{r.amount !== null ? ` · 占用 ${r.amount}` : ''}
+                          {r.startAt
+                            ? ` · ${fmtDate(r.startAt)} → ${r.endAt ? fmtDate(r.endAt) : '长期'}`
+                            : ''}
                         </li>
                       ))}
                       {c.usedBy.length > 3 && <li>…等 {c.usedBy.length} 处引用</li>}
@@ -1666,7 +1806,11 @@ function EditSlotModal({
           />
         </Field>
         <Field label="槽位名称" required>
-          <Input value={slotRole} onChange={(e) => setSlotRole(e.target.value)} placeholder="如：备用调度节点" />
+          <Input
+            value={slotRole}
+            onChange={(e) => setSlotRole(e.target.value)}
+            placeholder="如：备用调度节点"
+          />
         </Field>
         <Field label="备注" hint="用于补充槽位用途、配额说明或交付要求">
           <Textarea value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="可选" />
@@ -1708,6 +1852,8 @@ function RenewSlotModal({
     setDays('90');
     setDate('');
     setError('');
+    // 只在切换到另一个槽位时重置，不随 state 对象身份变化重复执行
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.slot.id]);
 
   const renew = useMutation({
@@ -1730,9 +1876,7 @@ function RenewSlotModal({
 
   if (!state || !slot) return null;
 
-  const invalid =
-    (mode === 'days' && (!days || Number(days) < 1)) ||
-    (mode === 'date' && !date);
+  const invalid = (mode === 'days' && (!days || Number(days) < 1)) || (mode === 'date' && !date);
 
   return (
     <Modal
@@ -1768,11 +1912,13 @@ function RenewSlotModal({
         </div>
 
         <div className="flex flex-wrap gap-1.5">
-          {([
-            ['days', '顺延若干天'],
-            ['date', '指定结束日期'],
-            ['forever', '转为长期'],
-          ] as const).map(([value, label]) => (
+          {(
+            [
+              ['days', '顺延若干天'],
+              ['date', '指定结束日期'],
+              ['forever', '转为长期'],
+            ] as const
+          ).map(([value, label]) => (
             <button
               key={value}
               type="button"
@@ -1793,7 +1939,12 @@ function RenewSlotModal({
           <div className="space-y-2">
             <div className="w-40">
               <Field label="顺延天数" required hint="已超期时从今天重新起算">
-                <Input type="number" min={1} value={days} onChange={(e) => setDays(e.target.value)} />
+                <Input
+                  type="number"
+                  min={1}
+                  value={days}
+                  onChange={(e) => setDays(e.target.value)}
+                />
               </Field>
             </div>
             <div className="flex flex-wrap gap-1.5">

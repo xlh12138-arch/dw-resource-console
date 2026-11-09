@@ -30,6 +30,5 @@ await withTransaction(async () => {
   await db.delete(resourceTypes);
   await db.delete(environmentDict);
 });
-// eslint-disable-next-line no-console
 console.log('[db] 已清空业务数据与字典配置（含项目、项目环境、环境模板、资源类型与环境字典）');
 process.exit(0);

@@ -55,7 +55,10 @@ function buildWhere(q: ResourceQuery, scope?: ResourceScope) {
   if (q.owner) clauses.push(like(resources.owner, `%${q.owner}%`));
   // 标签支持逗号分隔多值，语义为「同时包含」
   if (q.tag) {
-    for (const tag of q.tag.split(',').map((t) => t.trim()).filter(Boolean)) {
+    for (const tag of q.tag
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean)) {
       clauses.push(sql`cast(${resources.tags} as text) like ${`%"${tag}"%`}`);
     }
   }
@@ -78,7 +81,8 @@ function buildWhere(q: ResourceQuery, scope?: ResourceScope) {
   const scopeClauses = [];
   if (q.projectId) scopeClauses.push(eq(resources.projectId, q.projectId));
   if (q.projectEnvId) scopeClauses.push(eq(resources.projectEnvId, q.projectEnvId));
-  if (scope?.slotResourceIds?.length) scopeClauses.push(inArray(resources.id, scope.slotResourceIds));
+  if (scope?.slotResourceIds?.length)
+    scopeClauses.push(inArray(resources.id, scope.slotResourceIds));
   if (scopeClauses.length > 0) clauses.push(or(...scopeClauses));
 
   return clauses.length ? and(...clauses) : undefined;
@@ -93,10 +97,7 @@ export const resourceRepository = {
         ? sql`${resources.attrs} ->> ${attrKey}`
         : sql`json_extract(${resources.attrs}, ${`$.${attrKey}`})`
       : SORT_COLUMNS[q.sortBy as keyof typeof SORT_COLUMNS];
-    const [{ value: total }] = await db
-      .select({ value: count() })
-      .from(resources)
-      .where(where);
+    const [{ value: total }] = await db.select({ value: count() }).from(resources).where(where);
     const rows = await db
       .select()
       .from(resources)
@@ -109,7 +110,10 @@ export const resourceRepository = {
   },
 
   listAll(q: Partial<ResourceQuery> = {}, scope?: ResourceScope): Promise<ResourceRow[]> {
-    return db.select().from(resources).where(buildWhere(q as ResourceQuery, scope));
+    return db
+      .select()
+      .from(resources)
+      .where(buildWhere(q as ResourceQuery, scope));
   },
 
   findById(id: number): Promise<ResourceRow | undefined> {
@@ -196,9 +200,7 @@ export const resourceRepository = {
       .select({ value: count() })
       .from(resources)
       .where(
-        sql`${resources.createdAt} >= ${
-          config.db.driver === 'postgres' ? since : since.getTime()
-        }`,
+        sql`${resources.createdAt} >= ${config.db.driver === 'postgres' ? since : since.getTime()}`,
       );
     return value;
   },
@@ -209,8 +211,13 @@ export const resourceRepository = {
    * - childAllocated：被子资源申请的容量
    * 两者之和即「已占用」，一次查询完成，避免列表页逐行统计（N+1）。
    */
-  async capacityUsageByResources(ids: number[]): Promise<
-    Map<number, { allocated: number; slotCount: number; slotAllocated: number; childAllocated: number }>
+  async capacityUsageByResources(
+    ids: number[],
+  ): Promise<
+    Map<
+      number,
+      { allocated: number; slotCount: number; slotAllocated: number; childAllocated: number }
+    >
   > {
     const map = new Map<
       number,
@@ -224,7 +231,12 @@ export const resourceRepository = {
       .where(inArray(envSlots.resourceId, ids));
     for (const r of slotRows) {
       if (r.resourceId === null) continue;
-      const cur = map.get(r.resourceId) ?? { allocated: 0, slotCount: 0, slotAllocated: 0, childAllocated: 0 };
+      const cur = map.get(r.resourceId) ?? {
+        allocated: 0,
+        slotCount: 0,
+        slotAllocated: 0,
+        childAllocated: 0,
+      };
       cur.allocated += r.amount ?? 0;
       cur.slotAllocated += r.amount ?? 0;
       cur.slotCount += 1;
@@ -237,7 +249,12 @@ export const resourceRepository = {
       .where(inArray(resources.parentId, ids));
     for (const r of childRows) {
       if (r.parentId === null) continue;
-      const cur = map.get(r.parentId) ?? { allocated: 0, slotCount: 0, slotAllocated: 0, childAllocated: 0 };
+      const cur = map.get(r.parentId) ?? {
+        allocated: 0,
+        slotCount: 0,
+        slotAllocated: 0,
+        childAllocated: 0,
+      };
       cur.allocated += r.demand ?? 0;
       cur.childAllocated += r.demand ?? 0;
       map.set(r.parentId, cur);
@@ -247,7 +264,11 @@ export const resourceRepository = {
 
   /** 直接子资源 */
   async listChildren(parentId: number): Promise<ResourceRow[]> {
-    return db.select().from(resources).where(eq(resources.parentId, parentId)).orderBy(asc(resources.id));
+    return db
+      .select()
+      .from(resources)
+      .where(eq(resources.parentId, parentId))
+      .orderBy(asc(resources.id));
   },
 
   /** 批量取多个父资源下的子资源，避免列表页逐行查询 */

@@ -18,7 +18,25 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Badge, Button, Card, CardHeader, EmptyState, ErrorBanner, Field, Input, Modal, ModalCancelButton, PageHeader, Select, Spinner, Switch, Table, Td, Th } from '../components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  ErrorBanner,
+  Field,
+  Input,
+  Modal,
+  ModalCancelButton,
+  PageHeader,
+  Select,
+  Spinner,
+  Switch,
+  Table,
+  Td,
+  Th,
+} from '../components/ui';
 import { ColorPicker } from '../components/color-picker';
 import { EnvBadge } from '../components/env-badge';
 import { useToast } from '../components/toast';
@@ -34,7 +52,9 @@ import { dictApi, type ResourceTypeFieldInput } from '../lib/endpoints';
 function ReferenceList({ references }: { references: DictReferences | null }) {
   if (!references) return null;
   if (references.total === 0) {
-    return <p className="text-sm text-slate-500">该字典项当前没有被任何对象引用，可以安全修改或删除。</p>;
+    return (
+      <p className="text-sm text-slate-500">该字典项当前没有被任何对象引用，可以安全修改或删除。</p>
+    );
   }
   return (
     <div className="space-y-3">
@@ -50,7 +70,9 @@ function ReferenceList({ references }: { references: DictReferences | null }) {
               <Badge tone="amber">{g.count}</Badge>
             </div>
             {g.samples.length > 0 && (
-              <p className="mt-1 truncate text-xs text-slate-500">{g.samples.map((s) => s.name).join('、')}</p>
+              <p className="mt-1 truncate text-xs text-slate-500">
+                {g.samples.map((s) => s.name).join('、')}
+              </p>
             )}
           </li>
         ))}
@@ -80,7 +102,12 @@ function ConflictModal({ state, onClose }: { state: ConflictState | null; onClos
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>
-          <Button onClick={() => { state.retry(); onClose(); }}>
+          <Button
+            onClick={() => {
+              state.retry();
+              onClose();
+            }}
+          >
             一键同步修改
           </Button>
         </>
@@ -225,7 +252,10 @@ function FieldEditor({
 
             {f.fieldType === 'SELECT' && (
               <div className="mt-2">
-                <Field label="下拉选项" hint="格式：值:显示名，多个用英文逗号分隔，如 MASTER:主调度">
+                <Field
+                  label="下拉选项"
+                  hint="格式：值:显示名，多个用英文逗号分隔，如 MASTER:主调度"
+                >
                   <Input
                     value={(f.options ?? []).map((o) => `${o.value}:${o.label}`).join(',')}
                     placeholder="MASTER:主调度,AGENT:执行代理"
@@ -249,7 +279,11 @@ function FieldEditor({
             )}
 
             <div className="mt-2 flex flex-wrap items-center gap-4">
-              <Switch checked={f.required} label="必填" onChange={(v) => patch(f.uid, 'required', v)} />
+              <Switch
+                checked={f.required}
+                label="必填"
+                onChange={(v) => patch(f.uid, 'required', v)}
+              />
               <Switch
                 checked={f.isIp}
                 label="IP 字段（参与占用检测）"
@@ -261,7 +295,9 @@ function FieldEditor({
                 label="列表关键列"
                 hint="在资源台账中展示该属性"
                 onChange={(on) =>
-                  onListColumnsChange(on ? [...listColumns, f.key] : listColumns.filter((k) => k !== f.key))
+                  onListColumnsChange(
+                    on ? [...listColumns, f.key] : listColumns.filter((k) => k !== f.key),
+                  )
                 }
               />
               <div className="ml-auto flex items-center gap-1">
@@ -315,7 +351,10 @@ export function ResourceTypePanel() {
   const canWrite = canDo('resource:write');
   const canDelete = canDo('resource:delete');
 
-  const list = useQuery({ queryKey: ['dict', 'resource-types'], queryFn: () => dictApi.types(true) });
+  const list = useQuery({
+    queryKey: ['dict', 'resource-types'],
+    queryFn: () => dictApi.types(true),
+  });
 
   const [editing, setEditing] = useState<ResourceTypeDetail | null>(null);
   const [open, setOpen] = useState(false);
@@ -398,7 +437,9 @@ export function ResourceTypePanel() {
   const save = useMutation({
     mutationFn: async (sync: boolean) => {
       const payload = {
-        ...(editing ? { code: form.code !== editing.code ? form.code : undefined } : { code: form.code }),
+        ...(editing
+          ? { code: form.code !== editing.code ? form.code : undefined }
+          : { code: form.code }),
         label: form.label,
         prefix: form.prefix,
         description: form.description || undefined,
@@ -447,7 +488,8 @@ export function ResourceTypePanel() {
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
-        const refs = (err.details as { references?: DictReferences } | undefined)?.references ?? null;
+        const refs =
+          (err.details as { references?: DictReferences } | undefined)?.references ?? null;
         setConflict({
           message: err.message,
           references: refs,
@@ -472,7 +514,8 @@ export function ResourceTypePanel() {
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
-        const refs = (err.details as { references?: DictReferences } | undefined)?.references ?? null;
+        const refs =
+          (err.details as { references?: DictReferences } | undefined)?.references ?? null;
         if (deleting) {
           setRefTarget(deleting.code);
           void refs;
@@ -503,7 +546,8 @@ export function ResourceTypePanel() {
   });
 
   const syncAttrs = useMutation({
-    mutationFn: (code: string) => dictApi.syncTypeAttrs(code, { dropUnknown: true, keyRenames: [] }),
+    mutationFn: (code: string) =>
+      dictApi.syncTypeAttrs(code, { dropUnknown: true, keyRenames: [] }),
     onSuccess: (res) => {
       push('success', `已同步 ${res.updated} 条资源的属性字段`);
       setPendingSync(null);
@@ -697,11 +741,20 @@ export function ResourceTypePanel() {
         title={editing ? `编辑资源类型 · ${editing.label}` : '新增资源类型'}
         desc="字段定义保存后，资源表单与 CSV 导入会立即按新定义校验"
         onClose={() => setOpen(false)}
-        onSave={() => { setFormError(''); save.mutate(false); }}
+        onSave={() => {
+          setFormError('');
+          save.mutate(false);
+        }}
         footer={
           <>
             <ModalCancelButton onClick={() => setOpen(false)}>取消</ModalCancelButton>
-            <Button onClick={() => { setFormError(''); save.mutate(false); }} disabled={save.isPending}>
+            <Button
+              onClick={() => {
+                setFormError('');
+                save.mutate(false);
+              }}
+              disabled={save.isPending}
+            >
               {save.isPending ? '保存中…' : '保存'}
             </Button>
           </>
@@ -711,17 +764,29 @@ export function ResourceTypePanel() {
           {formError && <ErrorBanner message={formError} issues={formIssues} />}
           <div className="grid gap-3 sm:grid-cols-4">
             <Field label="类型编码" required hint="改编码会影响已引用对象，保存时会提示同步">
-              <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="GDS_SERVER" />
+              <Input
+                value={form.code}
+                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                placeholder="GDS_SERVER"
+              />
             </Field>
             <Field label="类型名称" required>
-              <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="GDS 服务器" />
+              <Input
+                value={form.label}
+                onChange={(e) => setForm({ ...form, label: e.target.value })}
+                placeholder="GDS 服务器"
+              />
             </Field>
             <Field
               label="资源编码前缀"
               required
               hint="用于自动生成 GDS-0001；修改后会同步更新该类型已有资源编码"
             >
-              <Input value={form.prefix} onChange={(e) => setForm({ ...form, prefix: e.target.value })} placeholder="GDS" />
+              <Input
+                value={form.prefix}
+                onChange={(e) => setForm({ ...form, prefix: e.target.value })}
+                placeholder="GDS"
+              />
             </Field>
             <Field label="排序">
               <Input
@@ -733,10 +798,18 @@ export function ResourceTypePanel() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="说明">
-              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="用途说明" />
+              <Input
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="用途说明"
+              />
             </Field>
             <div className="flex items-center gap-6 pt-6">
-              <Switch checked={form.enabled} label="启用" onChange={(v) => setForm({ ...form, enabled: v })} />
+              <Switch
+                checked={form.enabled}
+                label="启用"
+                onChange={(v) => setForm({ ...form, enabled: v })}
+              />
               <Switch
                 checked={form.ipUniqueByPort}
                 label="按 IP+端口判重"
@@ -780,8 +853,8 @@ export function ResourceTypePanel() {
           </p>
           <p className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs text-brand-800">
             系统会把该类型下所有形如 <span className="font-mono">XXX-0001</span> 或{' '}
-            <span className="font-mono">XXX_0001</span> 的自动编码统一改为当前前缀，保留分隔符和序号。
-            不匹配该格式的自定义编码不会被修改。
+            <span className="font-mono">XXX_0001</span>{' '}
+            的自动编码统一改为当前前缀，保留分隔符和序号。 不匹配该格式的自定义编码不会被修改。
           </p>
           <p className="text-xs text-slate-500">同步操作会更新资源更新时间并写入审计日志。</p>
         </div>
@@ -832,13 +905,17 @@ export function ResourceTypePanel() {
             <>
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                该类型已被 {deleting.referenceCount} 个对象引用，请选择要迁移到的类型，引用会一并更新。
+                该类型已被 {deleting.referenceCount}{' '}
+                个对象引用，请选择要迁移到的类型，引用会一并更新。
               </div>
               <Field label="迁移到">
                 <Select
                   value={migrateTo}
                   placeholder="请选择目标类型"
-                  options={otherTypes.map((t) => ({ value: t.code, label: `${t.label}（${t.code}）` }))}
+                  options={otherTypes.map((t) => ({
+                    value: t.code,
+                    label: `${t.label}（${t.code}）`,
+                  }))}
                   onChange={(e) => setMigrateTo(e.target.value)}
                 />
               </Field>
@@ -874,7 +951,10 @@ export function EnvironmentPanel() {
   const canWrite = canDo('resource:write');
   const canDelete = canDo('resource:delete');
 
-  const list = useQuery({ queryKey: ['dict', 'environments'], queryFn: () => dictApi.environments(true) });
+  const list = useQuery({
+    queryKey: ['dict', 'environments'],
+    queryFn: () => dictApi.environments(true),
+  });
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<EnvironmentDto | null>(null);
@@ -884,9 +964,21 @@ export function EnvironmentPanel() {
   const [migrateTo, setMigrateTo] = useState('');
   const [formError, setFormError] = useState('');
   const [formIssues, setFormIssues] = useState<FieldIssue[]>([]);
-  const [form, setForm] = useState({ code: '', label: '', tone: 'gray', color: '', description: '', enabled: true, sortOrder: 0 });
+  const [form, setForm] = useState({
+    code: '',
+    label: '',
+    tone: 'gray',
+    color: '',
+    description: '',
+    enabled: true,
+    sortOrder: 0,
+  });
   /** 环境改名后，名称仍是旧值的项目环境数量 + 一键同步（带上改名后的环境名称） */
-  const [pendingNameSync, setPendingNameSync] = useState<{ code: string; count: number; label: string } | null>(null);
+  const [pendingNameSync, setPendingNameSync] = useState<{
+    code: string;
+    count: number;
+    label: string;
+  } | null>(null);
 
   const openCreate = () => {
     setEditing(null);
@@ -947,7 +1039,11 @@ export function EnvironmentPanel() {
       );
       setOpen(false);
       if (res && res.pendingNameSync > 0) {
-        setPendingNameSync({ code: res.detail.code, count: res.pendingNameSync, label: res.detail.label });
+        setPendingNameSync({
+          code: res.detail.code,
+          count: res.pendingNameSync,
+          label: res.detail.label,
+        });
       }
       void queryClient.invalidateQueries({ queryKey: ['dict'] });
       void queryClient.invalidateQueries({ queryKey: ['project'] });
@@ -956,7 +1052,8 @@ export function EnvironmentPanel() {
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
-        const refs = (err.details as { references?: DictReferences } | undefined)?.references ?? null;
+        const refs =
+          (err.details as { references?: DictReferences } | undefined)?.references ?? null;
         setConflict({ message: err.message, references: refs, retry: () => save.mutate(true) });
         return;
       }
@@ -970,7 +1067,10 @@ export function EnvironmentPanel() {
     mutationFn: ({ code, label }: { code: string; label: string }) =>
       dictApi.updateEnvironment(code, { label, syncNames: true }),
     onSuccess: (res) => {
-      push('success', res.nameSynced > 0 ? `已同步 ${res.nameSynced} 个项目环境的名称` : '没有需要同步的项目环境');
+      push(
+        'success',
+        res.nameSynced > 0 ? `已同步 ${res.nameSynced} 个项目环境的名称` : '没有需要同步的项目环境',
+      );
       setPendingNameSync(null);
       void queryClient.invalidateQueries({ queryKey: ['dict'] });
       void queryClient.invalidateQueries({ queryKey: ['project'] });
@@ -1031,12 +1131,15 @@ export function EnvironmentPanel() {
       {pendingNameSync ? (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
           <span>
-            有 <span className="font-medium">{pendingNameSync.count}</span> 个项目环境的名称仍是旧环境名称，项目里的标签与字典不一致。
+            有 <span className="font-medium">{pendingNameSync.count}</span>{' '}
+            个项目环境的名称仍是旧环境名称，项目里的标签与字典不一致。
           </span>
           <Button
             size="sm"
             disabled={syncNames.isPending}
-            onClick={() => syncNames.mutate({ code: pendingNameSync.code, label: pendingNameSync.label })}
+            onClick={() =>
+              syncNames.mutate({ code: pendingNameSync.code, label: pendingNameSync.label })
+            }
           >
             <RefreshCw size={13} />
             {syncNames.isPending ? '同步中…' : '一键同步名称'}
@@ -1159,11 +1262,20 @@ export function EnvironmentPanel() {
         width="max-w-xl"
         title={editing ? `编辑环境 · ${editing.label}` : '新增环境'}
         onClose={() => setOpen(false)}
-        onSave={() => { setFormError(''); save.mutate(false); }}
+        onSave={() => {
+          setFormError('');
+          save.mutate(false);
+        }}
         footer={
           <>
             <ModalCancelButton onClick={() => setOpen(false)}>取消</ModalCancelButton>
-            <Button onClick={() => { setFormError(''); save.mutate(false); }} disabled={save.isPending}>
+            <Button
+              onClick={() => {
+                setFormError('');
+                save.mutate(false);
+              }}
+              disabled={save.isPending}
+            >
               {save.isPending ? '保存中…' : '保存'}
             </Button>
           </>
@@ -1173,10 +1285,18 @@ export function EnvironmentPanel() {
           {formError && <ErrorBanner message={formError} issues={formIssues} />}
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="环境编码" required hint="改编码会影响已引用对象，保存时会提示同步">
-              <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="UAT" />
+              <Input
+                value={form.code}
+                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                placeholder="UAT"
+              />
             </Field>
             <Field label="环境名称" required>
-              <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="生产环境" />
+              <Input
+                value={form.label}
+                onChange={(e) => setForm({ ...form, label: e.target.value })}
+                placeholder="生产环境"
+              />
             </Field>
             <Field label="排序">
               <Input
@@ -1194,9 +1314,17 @@ export function EnvironmentPanel() {
             />
           </div>
           <Field label="说明">
-            <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="如：生产环境，变更需走审批" />
+            <Input
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="如：生产环境，变更需走审批"
+            />
           </Field>
-          <Switch checked={form.enabled} label="启用" onChange={(v) => setForm({ ...form, enabled: v })} />
+          <Switch
+            checked={form.enabled}
+            label="启用"
+            onChange={(v) => setForm({ ...form, enabled: v })}
+          />
         </div>
       </Modal>
 
@@ -1213,7 +1341,11 @@ export function EnvironmentPanel() {
           </Button>
         }
       >
-        {references.isLoading ? <Spinner className="h-5 w-5" /> : <ReferenceList references={references.data ?? null} />}
+        {references.isLoading ? (
+          <Spinner className="h-5 w-5" />
+        ) : (
+          <ReferenceList references={references.data ?? null} />
+        )}
       </Modal>
 
       <Modal

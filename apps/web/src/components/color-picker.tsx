@@ -122,7 +122,10 @@ export function ColorPicker({
 
         <div className="space-y-1">
           <p className="text-[11px] font-medium text-slate-500">
-            RGB 值<span className="ml-1 font-normal text-slate-400">支持 37,99,235 或 rgb(37,99,235)</span>
+            RGB 值
+            <span className="ml-1 font-normal text-slate-400">
+              支持 37,99,235 或 rgb(37,99,235)
+            </span>
           </p>
           <div className="flex items-center gap-1.5">
             {(['r', 'g', 'b'] as const).map((channel) => (

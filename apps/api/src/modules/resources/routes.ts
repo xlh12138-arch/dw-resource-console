@@ -65,7 +65,9 @@ export const resourceRoutes: FastifyPluginAsyncZod = async (app) => {
     '/resources/tags',
     {
       ...guard,
-      schema: { response: { 200: z.array(z.object({ tag: z.string(), count: z.number().int() })) } },
+      schema: {
+        response: { 200: z.array(z.object({ tag: z.string(), count: z.number().int() })) },
+      },
     },
     async () => resourceRepository.tagCounts(),
   );
@@ -86,7 +88,9 @@ export const resourceRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: { body: bulkDeleteSchema, response: { 200: bulkDeleteResultSchema } },
     },
     async (request) =>
-      withTransaction(() => resourceService.bulkRemove(request.body.ids, actorOf(request), request.id)),
+      withTransaction(() =>
+        resourceService.bulkRemove(request.body.ids, actorOf(request), request.id),
+      ),
   );
 
   // 详情：在资源 DTO 之上补充容量明细与「被哪些项目/环境引用」
@@ -102,7 +106,16 @@ export const resourceRoutes: FastifyPluginAsyncZod = async (app) => {
       ...guard,
       schema: {
         params: idParams,
-        response: { 200: z.array(z.object({ action: z.string(), actorName: z.string(), createdAt: z.string(), changes: z.unknown() })) },
+        response: {
+          200: z.array(
+            z.object({
+              action: z.string(),
+              actorName: z.string(),
+              createdAt: z.string(),
+              changes: z.unknown(),
+            }),
+          ),
+        },
       },
     },
     async (request) => {
@@ -163,7 +176,9 @@ export const resourceRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: { params: idParams, response: { 200: z.object({ id: z.number() }) } },
     },
     async (request) =>
-      withTransaction(() => resourceService.remove(request.params.id, actorOf(request), request.id)),
+      withTransaction(() =>
+        resourceService.remove(request.params.id, actorOf(request), request.id),
+      ),
   );
 
   /** 供前端表单使用的「同类型已有资源」下拉（如 GDS 上游节点选择） */
@@ -172,7 +187,15 @@ export const resourceRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       ...guard,
       schema: {
-        params: z.object({ type: z.enum(['BATCH_SCHED_SERVER', 'BATCH_SCHED_PLATFORM_IP', 'COLLECT_EXCHANGE_PLATFORM_IP', 'NAS', 'GDS_SERVER']) }),
+        params: z.object({
+          type: z.enum([
+            'BATCH_SCHED_SERVER',
+            'BATCH_SCHED_PLATFORM_IP',
+            'COLLECT_EXCHANGE_PLATFORM_IP',
+            'NAS',
+            'GDS_SERVER',
+          ]),
+        }),
         response: { 200: z.array(z.object({ code: z.string(), name: z.string() })) },
       },
     },

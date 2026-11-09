@@ -53,7 +53,10 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.get(
     '/projects',
-    { ...read, schema: { querystring: projectQuerySchema, response: { 200: pagedSchema(projectSchema) } } },
+    {
+      ...read,
+      schema: { querystring: projectQuerySchema, response: { 200: pagedSchema(projectSchema) } },
+    },
     async (request) => projectService.list(request.query),
   );
 
@@ -82,7 +85,10 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.patch(
     '/projects/:id',
-    { ...write, schema: { params: idParams, body: projectUpdateSchema, response: { 200: projectSchema } } },
+    {
+      ...write,
+      schema: { params: idParams, body: projectUpdateSchema, response: { 200: projectSchema } },
+    },
     async (request) =>
       withTransaction(() =>
         projectService.update(request.params.id, request.body, actorOf(request), request.id),
@@ -130,7 +136,10 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       ...write,
       schema: {
-        params: z.object({ id: z.coerce.number().int().positive(), resourceId: z.coerce.number().int().positive() }),
+        params: z.object({
+          id: z.coerce.number().int().positive(),
+          resourceId: z.coerce.number().int().positive(),
+        }),
         body: projectDetachSchema.default({ includeSlots: false }),
         response: { 200: projectDetachResultSchema },
       },
@@ -159,7 +168,11 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
     '/project-environments/:id',
     {
       ...write,
-      schema: { params: envIdParams, body: projectEnvUpdateSchema, response: { 200: projectEnvDetailSchema } },
+      schema: {
+        params: envIdParams,
+        body: projectEnvUpdateSchema,
+        response: { 200: projectEnvDetailSchema },
+      },
     },
     async (request) =>
       withTransaction(() =>
@@ -180,7 +193,11 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
     '/project-environments/:id/slots',
     {
       ...write,
-      schema: { params: envIdParams, body: envSlotCreateSchema, response: { 200: projectEnvDetailSchema } },
+      schema: {
+        params: envIdParams,
+        body: envSlotCreateSchema,
+        response: { 200: projectEnvDetailSchema },
+      },
     },
     async (request) =>
       withTransaction(() =>
@@ -239,7 +256,11 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
         params: slotParams,
         body: envSlotAssignSchema,
         response: {
-          200: z.object({ slot: envSlotSchema, env: projectEnvDetailSchema, warnings: z.array(slotAssignWarningSchema) }),
+          200: z.object({
+            slot: envSlotSchema,
+            env: projectEnvDetailSchema,
+            warnings: z.array(slotAssignWarningSchema),
+          }),
         },
       },
     },
@@ -401,7 +422,13 @@ export const templateRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.get(
     '/env-templates',
-    { ...read, schema: { querystring: envTemplateQuerySchema, response: { 200: pagedSchema(envTemplateSchema) } } },
+    {
+      ...read,
+      schema: {
+        querystring: envTemplateQuerySchema,
+        response: { 200: pagedSchema(envTemplateSchema) },
+      },
+    },
     async (request) => templateService.list(request.query),
   );
 
@@ -413,7 +440,10 @@ export const templateRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.post(
     '/env-templates',
-    { ...write, schema: { body: envTemplateCreateSchema, response: { 201: envTemplateDetailSchema } } },
+    {
+      ...write,
+      schema: { body: envTemplateCreateSchema, response: { 201: envTemplateDetailSchema } },
+    },
     async (request, reply) => {
       const created = await withTransaction(() =>
         templateService.create(request.body, actorOf(request), request.id),
@@ -432,7 +462,11 @@ export const templateRoutes: FastifyPluginAsyncZod = async (app) => {
     '/env-templates/:id',
     {
       ...write,
-      schema: { params: idParams, body: envTemplateUpdateSchema, response: { 200: envTemplateDetailSchema } },
+      schema: {
+        params: idParams,
+        body: envTemplateUpdateSchema,
+        response: { 200: envTemplateDetailSchema },
+      },
     },
     async (request) =>
       withTransaction(() =>
@@ -444,7 +478,9 @@ export const templateRoutes: FastifyPluginAsyncZod = async (app) => {
     '/env-templates/:id',
     { ...drop, schema: { params: idParams, response: { 200: z.object({ id: z.number() }) } } },
     async (request) =>
-      withTransaction(() => templateService.remove(request.params.id, actorOf(request), request.id)),
+      withTransaction(() =>
+        templateService.remove(request.params.id, actorOf(request), request.id),
+      ),
   );
 
   app.post(
@@ -462,7 +498,11 @@ export const templateRoutes: FastifyPluginAsyncZod = async (app) => {
     '/env-templates/:id/instantiate',
     {
       ...write,
-      schema: { params: idParams, body: instantiateTemplateSchema, response: { 201: projectEnvDetailSchema } },
+      schema: {
+        params: idParams,
+        body: instantiateTemplateSchema,
+        response: { 201: projectEnvDetailSchema },
+      },
     },
     async (request, reply) => {
       const env = await withTransaction(() =>

@@ -56,9 +56,22 @@ export const userService = {
       targetId: String(id),
       targetName: user.username,
       changes: [
-        ...(patch.displayName ? [{ field: 'displayName', label: '姓名', from: before.displayName, to: patch.displayName }] : []),
-        ...(patch.role ? [{ field: 'role', label: '角色', from: before.role, to: patch.role }] : []),
-        ...(patch.status ? [{ field: 'status', label: '状态', from: before.status, to: patch.status }] : []),
+        ...(patch.displayName
+          ? [
+              {
+                field: 'displayName',
+                label: '姓名',
+                from: before.displayName,
+                to: patch.displayName,
+              },
+            ]
+          : []),
+        ...(patch.role
+          ? [{ field: 'role', label: '角色', from: before.role, to: patch.role }]
+          : []),
+        ...(patch.status
+          ? [{ field: 'status', label: '状态', from: before.status, to: patch.status }]
+          : []),
       ],
       requestId,
     });

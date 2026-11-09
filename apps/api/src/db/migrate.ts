@@ -5,6 +5,5 @@
 import { runAllMigrations } from './auto-migrate.js';
 
 await runAllMigrations();
-// eslint-disable-next-line no-console
 console.log('[db] 迁移完成');
 process.exit(0);

@@ -94,9 +94,7 @@ export function normalizeHexColor(input: string): string | null {
 export function rgbToHex(r: number, g: number, b: number): string | null {
   const valid = [r, g, b].every((v) => Number.isFinite(v) && v >= 0 && v <= 255);
   if (!valid) return null;
-  const hex = [r, g, b]
-    .map((v) => Math.round(v).toString(16).padStart(2, '0'))
-    .join('');
+  const hex = [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
   return `#${hex}`;
 }
 

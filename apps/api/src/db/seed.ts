@@ -345,8 +345,18 @@ const TEMPLATES: Parameters<typeof templateService.create>[0][] = [
     description: '生产标准配置：双调度节点 + 调度/采集平台地址 + 共享存储 + GDS 主备节点',
     items: [
       { resourceType: 'BATCH_SCHED_SERVER', slotRole: '调度节点', quantity: 2, required: true },
-      { resourceType: 'BATCH_SCHED_PLATFORM_IP', slotRole: '批量调度平台入口', quantity: 1, required: true },
-      { resourceType: 'COLLECT_EXCHANGE_PLATFORM_IP', slotRole: '采集交换平台入口', quantity: 1, required: true },
+      {
+        resourceType: 'BATCH_SCHED_PLATFORM_IP',
+        slotRole: '批量调度平台入口',
+        quantity: 1,
+        required: true,
+      },
+      {
+        resourceType: 'COLLECT_EXCHANGE_PLATFORM_IP',
+        slotRole: '采集交换平台入口',
+        quantity: 1,
+        required: true,
+      },
       { resourceType: 'NAS', slotRole: 'ETL 共享存储', quantity: 1, required: true },
       { resourceType: 'GDS_SERVER', slotRole: 'GDS 节点', quantity: 2, required: true },
     ],
@@ -364,7 +374,12 @@ const TEMPLATES: Parameters<typeof templateService.create>[0][] = [
     name: '采集交换专项',
     description: '以采集交换为主的专项：双平台地址 + 双 GDS 代理',
     items: [
-      { resourceType: 'COLLECT_EXCHANGE_PLATFORM_IP', slotRole: '采集交换入口', quantity: 2, required: true },
+      {
+        resourceType: 'COLLECT_EXCHANGE_PLATFORM_IP',
+        slotRole: '采集交换入口',
+        quantity: 2,
+        required: true,
+      },
       { resourceType: 'GDS_SERVER', slotRole: 'GDS 采集代理', quantity: 2, required: true },
     ],
   },
@@ -392,7 +407,12 @@ const PROJECTS: {
     envs: [
       { name: '生产环境', environment: 'PROD', template: '标准数仓项目-生产', status: 'RUNNING' },
       { name: '产品测试环境', environment: 'PT', template: '标准数仓项目-生产', status: 'RUNNING' },
-      { name: '用户测试环境', environment: 'UAT', template: '轻量项目-开发测试', status: 'BUILDING' },
+      {
+        name: '用户测试环境',
+        environment: 'UAT',
+        template: '轻量项目-开发测试',
+        status: 'BUILDING',
+      },
       { name: '开发环境', environment: 'DEV', template: '轻量项目-开发测试', status: 'PLANNING' },
     ],
   },
@@ -409,7 +429,9 @@ const PROJECTS: {
     name: '监管报送-1104',
     owner: '赵敏',
     description: '监管报送数据采集与交换',
-    envs: [{ name: '用户测试环境', environment: 'UAT', template: '采集交换专项', status: 'BUILDING' }],
+    envs: [
+      { name: '用户测试环境', environment: 'UAT', template: '采集交换专项', status: 'BUILDING' },
+    ],
   },
 ];
 
@@ -437,7 +459,15 @@ function demoPeriod(): { startAt: string; endAt: string | null } {
   return { startAt: new Date(now - 30 * day).toISOString(), endAt: null };
 }
 
-async function autoFill(env: { id: number; projectId: number; environment: string; slots: { id: number; resourceType: string; resourceId: number | null }[] }, limit: number) {
+async function autoFill(
+  env: {
+    id: number;
+    projectId: number;
+    environment: string;
+    slots: { id: number; resourceType: string; resourceId: number | null }[];
+  },
+  limit: number,
+) {
   let filled = 0;
   for (const slot of env.slots) {
     if (slot.resourceId !== null || filled >= limit) continue;
@@ -447,7 +477,10 @@ async function autoFill(env: { id: number; projectId: number; environment: strin
     });
     // 子资源更「具体」，优先分配给项目环境，用来演示父子资源与容量申请
     const pickable = (rows: typeof candidates) =>
-      rows.filter((c) => !usedResourceIds.has(c.id) && (c.projectId === null || c.projectId === env.projectId));
+      rows.filter(
+        (c) =>
+          !usedResourceIds.has(c.id) && (c.projectId === null || c.projectId === env.projectId),
+      );
     let available = pickable(candidates);
     // 生产环境通常复用已有机房资源：同环境无候选时回退到全量同类型资源（形成跨环境引用）
     if (available.length === 0 && env.environment === 'PROD') {
@@ -460,13 +493,18 @@ async function autoFill(env: { id: number; projectId: number; environment: strin
       ? Math.max(1, Math.round(pick.capacityTotal * (pick.parentId ? 0.5 : 0.1)))
       : null;
     const period = demoPeriod();
-    await projectEnvService.assignSlot(env.id, slot.id, {
-      resourceId: pick.id,
-      amount,
-      acknowledge: true,
-      startAt: period.startAt,
-      endAt: period.endAt,
-    }, actor);
+    await projectEnvService.assignSlot(
+      env.id,
+      slot.id,
+      {
+        resourceId: pick.id,
+        amount,
+        acknowledge: true,
+        startAt: period.startAt,
+        endAt: period.endAt,
+      },
+      actor,
+    );
     usedResourceIds.add(pick.id);
     fillSeq += 1;
     filled += 1;
@@ -479,7 +517,6 @@ async function seedTemplates(): Promise<void> {
   if (existing.length > 0) return;
   for (const template of TEMPLATES) {
     const created = await templateService.create(template, actor);
-    // eslint-disable-next-line no-console
     console.log(`[seed] 模板 ${created.code} ${created.name}（${created.slotCount} 个槽位）`);
   }
 }
@@ -509,7 +546,6 @@ async function seedProjects(): Promise<void> {
         actor,
       );
       const filled = await autoFill({ ...env, projectId: project.id }, 6);
-      // eslint-disable-next-line no-console
       console.log(
         `[seed] 项目 ${project.code} ${project.name} / ${env.name}（模板 ${env.templateName ?? '无'}，已填充 ${filled}/${env.slotTotal}）`,
       );
@@ -518,13 +554,12 @@ async function seedProjects(): Promise<void> {
 }
 
 await runMigrations();
-  await seedDemoDict();
+await seedDemoDict();
 await authService.ensureBootstrapAdmin();
 
 await withTransaction(async () => {
   const existing = await db.select({ id: resources.id }).from(resources).limit(1);
   if (existing.length > 0) {
-    // eslint-disable-next-line no-console
     console.log('[seed] 已存在资源数据，跳过资源初始化（如需重置请先执行 npm run db:reset）');
   } else {
     // 先建父资源，再按 parentName 建子资源；用 map 记录名称 → id
@@ -533,26 +568,24 @@ await withTransaction(async () => {
       const { parentName: _parentName, demandAmount: _demand, ...payload } = seed;
       const created = await resourceService.create(payload, actor);
       resourceIdByName.set(created.name, created.id);
-      // eslint-disable-next-line no-console
       console.log(`[seed] ${created.code} ${created.name} (${created.type})`);
     }
     for (const seed of SEEDS.filter((s) => s.parentName)) {
       const parentId = resourceIdByName.get(seed.parentName!);
       if (!parentId) {
-        // eslint-disable-next-line no-console
         console.warn(`[seed] 跳过子资源 ${seed.name}：父资源 ${seed.parentName} 不存在`);
         continue;
       }
       const { parentName: _parentName, ...payload } = seed;
       const created = await resourceService.create({ ...payload, parentId }, actor);
       resourceIdByName.set(created.name, created.id);
-      // eslint-disable-next-line no-console
       console.log(
         `[seed]   └ ${created.code} ${created.name} (子资源，向父资源申请 ${seed.demandAmount ?? 0})`,
       );
     }
-    // eslint-disable-next-line no-console
-    console.log(`[seed] 完成，共写入 ${SEEDS.length} 条资源；管理员账号 ${config.auth.bootstrapAdmin.username}`);
+    console.log(
+      `[seed] 完成，共写入 ${SEEDS.length} 条资源；管理员账号 ${config.auth.bootstrapAdmin.username}`,
+    );
   }
 
   await seedTemplates();

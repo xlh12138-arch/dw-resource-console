@@ -1,4 +1,10 @@
-import { randomBytes, randomInt, randomUUID, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import {
+  randomBytes,
+  randomInt,
+  randomUUID,
+  scrypt as scryptCb,
+  timingSafeEqual,
+} from 'node:crypto';
 import { promisify } from 'node:util';
 
 const scrypt = promisify(scryptCb) as (

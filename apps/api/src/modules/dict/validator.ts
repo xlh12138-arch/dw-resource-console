@@ -105,7 +105,8 @@ function fieldSchema(field: RuntimeField): z.ZodTypeAny {
 }
 
 export function buildAttrsSchema(fields: RuntimeField[]): z.ZodType<Record<string, unknown>> {
-  if (fields.length === 0) return z.record(z.string(), z.unknown()) as z.ZodType<Record<string, unknown>>;
+  if (fields.length === 0)
+    return z.record(z.string(), z.unknown()) as z.ZodType<Record<string, unknown>>;
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const f of fields) shape[f.key] = fieldSchema(f);
   // 允许携带未知字段（历史数据 / 导入冗余列），已知字段仍强校验
@@ -126,9 +127,9 @@ export async function getTypeMeta(code: string): Promise<TypeMeta> {
     schema = buildAttrsSchema(fields);
   } else if (code in RESOURCE_ATTRS_SCHEMAS) {
     // 兜底：字典尚未初始化时使用内置静态 schema
-    schema = RESOURCE_ATTRS_SCHEMAS[code as keyof typeof RESOURCE_ATTRS_SCHEMAS] as unknown as z.ZodType<
-      Record<string, unknown>
-    >;
+    schema = RESOURCE_ATTRS_SCHEMAS[
+      code as keyof typeof RESOURCE_ATTRS_SCHEMAS
+    ] as unknown as z.ZodType<Record<string, unknown>>;
   } else {
     schema = z.record(z.string(), z.unknown()) as z.ZodType<Record<string, unknown>>;
   }
@@ -191,11 +192,12 @@ export function normalizeAttrs(
   }
   for (const f of fields) {
     if (value[f.key] === undefined && f.defaultValue !== null && f.defaultValue !== '') {
-      value[f.key] = f.fieldType === 'NUMBER' || f.fieldType === 'INTEGER' || f.fieldType === 'PORT'
-        ? Number(f.defaultValue)
-        : f.fieldType === 'BOOLEAN'
-          ? ['true', '1', 'yes'].includes(f.defaultValue)
-          : f.defaultValue;
+      value[f.key] =
+        f.fieldType === 'NUMBER' || f.fieldType === 'INTEGER' || f.fieldType === 'PORT'
+          ? Number(f.defaultValue)
+          : f.fieldType === 'BOOLEAN'
+            ? ['true', '1', 'yes'].includes(f.defaultValue)
+            : f.defaultValue;
     }
   }
 

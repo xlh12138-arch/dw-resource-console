@@ -8,7 +8,9 @@ interface ToastItem {
   message: string;
 }
 
-const ToastContext = createContext<{ push: (tone: ToastTone, message: string) => void } | null>(null);
+const ToastContext = createContext<{ push: (tone: ToastTone, message: string) => void } | null>(
+  null,
+);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);

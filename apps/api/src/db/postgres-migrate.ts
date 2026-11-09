@@ -19,7 +19,9 @@ async function executeRows<T>(statement: SQL): Promise<T[]> {
 }
 
 async function execute(statement: SQL): Promise<PgQueryResult<unknown>> {
-  return (db as unknown as { execute(query: SQL): Promise<PgQueryResult<unknown>> }).execute(statement);
+  return (db as unknown as { execute(query: SQL): Promise<PgQueryResult<unknown>> }).execute(
+    statement,
+  );
 }
 
 function quoteIdentifier(value: string): string {

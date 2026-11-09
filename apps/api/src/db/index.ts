@@ -36,9 +36,7 @@ export function getPostgresPool(): Pool {
   return pgPool;
 }
 
-function createPostgresDatabase(
-  schema: typeof import('./schema.pg.js'),
-): Db {
+function createPostgresDatabase(schema: typeof import('./schema.pg.js')): Db {
   pgPool = new Pool({
     connectionString: config.db.url,
     max: config.db.poolMax,

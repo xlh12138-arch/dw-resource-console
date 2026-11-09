@@ -14,14 +14,9 @@ import {
  * 基础校验原语
  * ------------------------------------------------------------------ */
 
-const IPV4_RE =
-  /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+const IPV4_RE = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 
-export const ipv4 = z
-  .string()
-  .trim()
-  .regex(IPV4_RE, 'IP 地址格式不正确')
-  .describe('IPv4 地址');
+export const ipv4 = z.string().trim().regex(IPV4_RE, 'IP 地址格式不正确').describe('IPv4 地址');
 
 export const port = z.coerce.number().int().min(1).max(65535);
 
@@ -216,14 +211,14 @@ export const resourceQuerySchema = z.object({
     .optional(),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(20),
-    /** 公共列或动态属性列（attr:<字段 key>） */
-    sortBy: z
-      .string()
-      .regex(
-        /^(updatedAt|createdAt|name|code|type|environment|status|datacenter|owner|attr:[A-Za-z][A-Za-z0-9_]*)$/,
-        '不支持按该列排序',
-      )
-      .default('updatedAt'),
+  /** 公共列或动态属性列（attr:<字段 key>） */
+  sortBy: z
+    .string()
+    .regex(
+      /^(updatedAt|createdAt|name|code|type|environment|status|datacenter|owner|attr:[A-Za-z][A-Za-z0-9_]*)$/,
+      '不支持按该列排序',
+    )
+    .default('updatedAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
@@ -748,7 +743,9 @@ export const envSlotPeriodSchema = z
     startAt: z.string().datetime({ offset: true }).or(z.string().date()).nullable().optional(),
     endAt: z.string().datetime({ offset: true }).or(z.string().date()).nullable().optional(),
   })
-  .refine((v) => v.startAt !== undefined || v.endAt !== undefined, { message: '至少需要更新一个时间' })
+  .refine((v) => v.startAt !== undefined || v.endAt !== undefined, {
+    message: '至少需要更新一个时间',
+  })
   .refine((v) => !v.startAt || !v.endAt || new Date(v.endAt) > new Date(v.startAt), {
     message: '结束时间必须晚于开始时间',
     path: ['endAt'],
@@ -946,7 +943,9 @@ export const projectSlotRefSchema = z.object({
 
 export const projectDetailSchema = projectSchema.extend({
   environments: z.array(projectEnvSchema),
-  byType: z.array(z.object({ type: resourceTypeCodeSchema, label: z.string(), count: z.number().int() })),
+  byType: z.array(
+    z.object({ type: resourceTypeCodeSchema, label: z.string(), count: z.number().int() }),
+  ),
   /** 本项目所有环境槽位绑定的资源，前端据此判断资源为何出现在项目资源列表中 */
   slotRefs: z.array(projectSlotRefSchema),
   /** 项目下超期占用的槽位数 */
@@ -1103,7 +1102,9 @@ export const overdueProjectGroupSchema = z.object({
 
 export const statsOverviewSchema = z.object({
   total: z.number().int(),
-  byType: z.array(z.object({ type: resourceTypeCodeSchema, label: z.string(), count: z.number().int() })),
+  byType: z.array(
+    z.object({ type: resourceTypeCodeSchema, label: z.string(), count: z.number().int() }),
+  ),
   byEnvironment: z.array(
     z.object({ environment: environmentCodeSchema, label: z.string(), count: z.number().int() }),
   ),
@@ -1121,7 +1122,9 @@ export const statsOverviewSchema = z.object({
   createdLast7Days: z.number().int(),
   recentUpdated: z.array(resourceSchema),
   /** 按项目维度的资源分布（含未标注项目的数量） */
-  byProject: z.array(z.object({ projectId: z.number().int().nullable(), name: z.string(), count: z.number().int() })),
+  byProject: z.array(
+    z.object({ projectId: z.number().int().nullable(), name: z.string(), count: z.number().int() }),
+  ),
   /** 按标签分布：点击标签可直接在台账中筛选 */
   byTag: z.array(z.object({ tag: z.string(), count: z.number().int() })),
   /** 父子资源层级概览 */
@@ -1186,7 +1189,13 @@ export type AttrFieldDef = {
 
 export const ATTR_FIELDS: Record<ResourceType, AttrFieldDef[]> = {
   BATCH_SCHED_SERVER: [
-    { key: 'hostname', label: '主机名', kind: 'text', required: true, placeholder: 'dw-bs-node-01' },
+    {
+      key: 'hostname',
+      label: '主机名',
+      kind: 'text',
+      required: true,
+      placeholder: 'dw-bs-node-01',
+    },
     { key: 'mgmtIp', label: '管理 IP', kind: 'text', required: true, placeholder: '10.10.1.11' },
     {
       key: 'osType',
@@ -1219,7 +1228,13 @@ export const ATTR_FIELDS: Record<ResourceType, AttrFieldDef[]> = {
     { key: 'schedDomain', label: '调度域', kind: 'text', placeholder: '如 ETL_CORE' },
   ],
   BATCH_SCHED_PLATFORM_IP: [
-    { key: 'platformName', label: '平台名称', kind: 'text', required: true, placeholder: '批量调度平台-生产' },
+    {
+      key: 'platformName',
+      label: '平台名称',
+      kind: 'text',
+      required: true,
+      placeholder: '批量调度平台-生产',
+    },
     { key: 'ip', label: '服务 IP', kind: 'text', required: true, placeholder: '10.20.1.10' },
     { key: 'port', label: '服务端口', kind: 'number', required: true, placeholder: '8443' },
     {
@@ -1241,7 +1256,13 @@ export const ATTR_FIELDS: Record<ResourceType, AttrFieldDef[]> = {
     { key: 'vip', label: '是否 VIP', kind: 'switch' },
   ],
   COLLECT_EXCHANGE_PLATFORM_IP: [
-    { key: 'platformName', label: '平台名称', kind: 'text', required: true, placeholder: '采集交换平台-生产' },
+    {
+      key: 'platformName',
+      label: '平台名称',
+      kind: 'text',
+      required: true,
+      placeholder: '采集交换平台-生产',
+    },
     { key: 'ip', label: '服务 IP', kind: 'text', required: true, placeholder: '10.30.1.10' },
     { key: 'port', label: '服务端口', kind: 'number', required: true, placeholder: '9001' },
     {
@@ -1264,8 +1285,20 @@ export const ATTR_FIELDS: Record<ResourceType, AttrFieldDef[]> = {
   ],
   NAS: [
     { key: 'clusterName', label: '存储集群', kind: 'text', placeholder: 'NAS-CLUSTER-A' },
-    { key: 'exportPath', label: '共享路径', kind: 'text', required: true, placeholder: '/vol/dw_etl' },
-    { key: 'mountPoint', label: '挂载点', kind: 'text', required: true, placeholder: '/mnt/dw_etl' },
+    {
+      key: 'exportPath',
+      label: '共享路径',
+      kind: 'text',
+      required: true,
+      placeholder: '/vol/dw_etl',
+    },
+    {
+      key: 'mountPoint',
+      label: '挂载点',
+      kind: 'text',
+      required: true,
+      placeholder: '/mnt/dw_etl',
+    },
     {
       key: 'protocol',
       label: '共享协议',
@@ -1351,7 +1384,16 @@ export type {
  * ------------------------------------------------------------------ */
 
 /** 属性字段的控件类型 */
-export const FIELD_TYPES = ['TEXT', 'TEXTAREA', 'NUMBER', 'INTEGER', 'IP', 'PORT', 'SELECT', 'BOOLEAN'] as const;
+export const FIELD_TYPES = [
+  'TEXT',
+  'TEXTAREA',
+  'NUMBER',
+  'INTEGER',
+  'IP',
+  'PORT',
+  'SELECT',
+  'BOOLEAN',
+] as const;
 export type FieldType = (typeof FIELD_TYPES)[number];
 export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   TEXT: '单行文本',
@@ -1376,7 +1418,10 @@ export const FIELD_TYPE_KINDS: Record<FieldType, AttrFieldDef['kind']> = {
   BOOLEAN: 'switch',
 };
 
-export const dictOptionSchema = z.object({ value: z.string().trim().min(1).max(32), label: z.string().trim().min(1).max(32) });
+export const dictOptionSchema = z.object({
+  value: z.string().trim().min(1).max(32),
+  label: z.string().trim().min(1).max(32),
+});
 
 export const resourceTypeFieldInputSchema = z.object({
   id: z.coerce.number().int().positive().optional(),
@@ -1442,7 +1487,10 @@ export const resourceTypeUpdateSchema = z
     /** true = 同步更新所有已引用该类型的对象；false/缺省且存在引用时返回 409 提示 */
     sync: z.coerce.boolean().default(false),
     /** 字段标识重命名：把存量资源 attrs 中的旧 key 改成新 key */
-    keyRenames: z.array(z.object({ from: z.string(), to: z.string() })).max(60).default([]),
+    keyRenames: z
+      .array(z.object({ from: z.string(), to: z.string() }))
+      .max(60)
+      .default([]),
     /** 是否清理存量资源中已不存在的字段 */
     dropUnknownFields: z.coerce.boolean().default(false),
   })
@@ -1591,7 +1639,10 @@ export const environmentMutationSchema = z.object({
 
 /** 属性字段同步请求 */
 export const dictSyncAttrsSchema = z.object({
-  keyRenames: z.array(z.object({ from: z.string(), to: z.string() })).max(60).default([]),
+  keyRenames: z
+    .array(z.object({ from: z.string(), to: z.string() }))
+    .max(60)
+    .default([]),
   dropUnknown: z.coerce.boolean().default(false),
 });
 

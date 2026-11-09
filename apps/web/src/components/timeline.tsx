@@ -57,7 +57,10 @@ export function TimelineChart({
   while (cursor.getTime() <= to) {
     const pct = ((cursor.getTime() - from) / span) * 100;
     if (pct >= 0 && pct <= 100) {
-      months.push({ label: `${cursor.getFullYear()}.${String(cursor.getMonth() + 1).padStart(2, '0')}`, pct });
+      months.push({
+        label: `${cursor.getFullYear()}.${String(cursor.getMonth() + 1).padStart(2, '0')}`,
+        pct,
+      });
     }
     cursor.setMonth(cursor.getMonth() + (span > 500 * 86400000 ? 3 : 2));
   }
@@ -118,7 +121,9 @@ export function TimelineChart({
           ) : (
             bars.map((bar) => {
               const s = new Date(bar.startAt).getTime();
-              const e = bar.endAt ? new Date(bar.endAt).getTime() : Math.min(to, today + 180 * 86400000);
+              const e = bar.endAt
+                ? new Date(bar.endAt).getTime()
+                : Math.min(to, today + 180 * 86400000);
               const left = Math.min(100, Math.max(0, ((s - from) / span) * 100));
               const width = Math.max(0.8, Math.min(100 - left, ((e - s) / span) * 100));
               return (
@@ -148,7 +153,9 @@ export function TimelineChart({
           )}
         </div>
       </div>
-      {capacityUnit ? <p className="mt-2 text-[11px] text-slate-400">容量单位：{capacityUnit}</p> : null}
+      {capacityUnit ? (
+        <p className="mt-2 text-[11px] text-slate-400">容量单位：{capacityUnit}</p>
+      ) : null}
     </div>
   );
 }

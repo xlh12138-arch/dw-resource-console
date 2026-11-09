@@ -163,7 +163,15 @@ export function DictProvider({ children }: { children: ReactNode }) {
       loading: types.isLoading || environments.isLoading || meta.isLoading,
       refresh,
     };
-  }, [types.data, types.isLoading, environments.data, environments.isLoading, meta.data, meta.isLoading, refresh]);
+  }, [
+    types.data,
+    types.isLoading,
+    environments.data,
+    environments.isLoading,
+    meta.data,
+    meta.isLoading,
+    refresh,
+  ]);
 
   return <DictContext.Provider value={value}>{children}</DictContext.Provider>;
 }

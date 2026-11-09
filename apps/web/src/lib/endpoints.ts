@@ -82,9 +82,11 @@ export const resourcesApi = {
   bulkRemove: (ids: number[]) =>
     api.post<{ deleted: number; ids: number[] }>('/resources/bulk-delete', { ids }),
   checkIp: (ip: string) =>
-    api.get<{ ip: string; available: boolean; conflicts: { code: string; name: string; typeLabel: string }[] }>(
-      `/resources/check-ip${toQuery({ ip })}`,
-    ),
+    api.get<{
+      ip: string;
+      available: boolean;
+      conflicts: { code: string; name: string; typeLabel: string }[];
+    }>(`/resources/check-ip${toQuery({ ip })}`),
   exportCsv: (query: ResourceQuery) => api.text(`/resources/export${toQuery(query)}`),
   importCsv: (body: { type: string; csv: string; onConflict: 'skip' | 'overwrite' }) =>
     api.post<{
@@ -100,7 +102,9 @@ export const resourcesApi = {
       }[];
     }>('/resources/import', body),
   audit: (id: number) =>
-    api.get<{ action: string; actorName: string; createdAt: string; changes: unknown }[]>(`/resources/${id}/audit`),
+    api.get<{ action: string; actorName: string; createdAt: string; changes: unknown }[]>(
+      `/resources/${id}/audit`,
+    ),
   /** 子资源清单 */
   children: (id: number) => api.get<ResourceChild[]>(`/resources/${id}/children`),
   /** 资源占用时间轴（跨项目 / 跨环境，含超期与共用） */
@@ -132,8 +136,10 @@ export const projectsApi = {
     description?: string;
     status?: string;
   }) => api.post<ProjectDto>('/projects', body),
-  update: (id: number, body: { name?: string; owner?: string; description?: string; status?: string }) =>
-    api.patch<ProjectDto>(`/projects/${id}`, body),
+  update: (
+    id: number,
+    body: { name?: string; owner?: string; description?: string; status?: string },
+  ) => api.patch<ProjectDto>(`/projects/${id}`, body),
   remove: (id: number) => api.del<{ id: number }>(`/projects/${id}`),
   envs: (projectId: number) => api.get<ProjectEnvDto[]>(`/projects/${projectId}/environments`),
   createEnv: (projectId: number, body: Record<string, unknown>) =>
@@ -166,7 +172,9 @@ export const envApi = {
     ),
   /** 槽位候选资源：含跨环境 / 已被占用 / 时间重叠 / 容量余量提示 */
   candidates: (id: number, slotId: number, period?: { startAt?: string; endAt?: string }) =>
-    api.get<SlotCandidates>(`/project-environments/${id}/slots/${slotId}/candidates${toQuery(period ?? {})}`),
+    api.get<SlotCandidates>(
+      `/project-environments/${id}/slots/${slotId}/candidates${toQuery(period ?? {})}`,
+    ),
   /** 绑定资源：amount 为申请的容量，startAt/endAt 为占用期限（endAt 为空表示长期） */
   assign: (
     id: number,
@@ -184,7 +192,9 @@ export const envApi = {
       body,
     ),
   unassign: (id: number, slotId: number) =>
-    api.del<{ slot: EnvSlotDto; env: ProjectEnvDetail }>(`/project-environments/${id}/slots/${slotId}/assign`),
+    api.del<{ slot: EnvSlotDto; env: ProjectEnvDetail }>(
+      `/project-environments/${id}/slots/${slotId}/assign`,
+    ),
   /** 续期：endAt 为新的结束时间（null 表示长期），days 为顺延天数 */
   renew: (id: number, slotId: number, body: { endAt?: string | null; days?: number }) =>
     api.post<{ slot: EnvSlotDto; env: ProjectEnvDetail; message: string }>(
@@ -198,7 +208,11 @@ export const envApi = {
       {},
     ),
   /** 调整占用期限 */
-  updatePeriod: (id: number, slotId: number, body: { startAt?: string | null; endAt?: string | null }) =>
+  updatePeriod: (
+    id: number,
+    slotId: number,
+    body: { startAt?: string | null; endAt?: string | null },
+  ) =>
     api.patch<{ slot: EnvSlotDto; env: ProjectEnvDetail }>(
       `/project-environments/${id}/slots/${slotId}/period`,
       body,
@@ -226,8 +240,12 @@ export const templatesApi = {
     api.get<Paged<EnvTemplateDto>>(`/env-templates${toQuery(query)}`),
   options: () => api.get<EnvTemplateDto[]>('/env-templates/options'),
   get: (id: number) => api.get<EnvTemplateDetail>(`/env-templates/${id}`),
-  create: (body: { name: string; code?: string; description?: string; items: TemplateItemInput[] }) =>
-    api.post<EnvTemplateDetail>('/env-templates', body),
+  create: (body: {
+    name: string;
+    code?: string;
+    description?: string;
+    items: TemplateItemInput[];
+  }) => api.post<EnvTemplateDetail>('/env-templates', body),
   update: (
     id: number,
     body: { name?: string; description?: string; items?: TemplateItemInput[] },
@@ -236,7 +254,13 @@ export const templatesApi = {
   clone: (id: number) => api.post<EnvTemplateDetail>(`/env-templates/${id}/clone`),
   instantiate: (
     id: number,
-    body: { projectId: number; name: string; environment: string; owner?: string; description?: string },
+    body: {
+      projectId: number;
+      name: string;
+      environment: string;
+      owner?: string;
+      description?: string;
+    },
   ) => api.post<ProjectEnvDetail>(`/env-templates/${id}/instantiate`, body),
 };
 
@@ -245,8 +269,13 @@ export const statsApi = {
 };
 
 export const auditApi = {
-  list: (query: { action?: string; actor?: string; targetType?: string; page?: number; pageSize?: number }) =>
-    api.get<Paged<AuditLogDto>>(`/audit-logs${toQuery(query)}`),
+  list: (query: {
+    action?: string;
+    actor?: string;
+    targetType?: string;
+    page?: number;
+    pageSize?: number;
+  }) => api.get<Paged<AuditLogDto>>(`/audit-logs${toQuery(query)}`),
 };
 
 export const usersApi = {
@@ -268,18 +297,18 @@ export const metaApi = {
       environments: { value: string; label: string; tone: string }[];
       statuses: { value: string; label: string }[];
       roles: { value: string; label: string }[];
-        attrFields: Record<
-          string,
-          {
-            key: string;
-            label: string;
-            kind: string;
-            required?: boolean;
-            defaultValue?: string;
-            unit?: string;
-            options?: { value: string; label: string }[];
-          }[]
-        >;
+      attrFields: Record<
+        string,
+        {
+          key: string;
+          label: string;
+          kind: string;
+          required?: boolean;
+          defaultValue?: string;
+          unit?: string;
+          options?: { value: string; label: string }[];
+        }[]
+      >;
       typeColumns: Record<string, string[]>;
     }>('/meta'),
 };
@@ -339,7 +368,8 @@ export interface EnvironmentInput {
 export const dictApi = {
   types: (includeDisabled = true) =>
     api.get<ResourceTypeDto[]>(`/resource-types${toQuery({ includeDisabled })}`),
-  typeOptions: () => api.get<{ value: string; label: string; prefix: string }[]>('/resource-types/options'),
+  typeOptions: () =>
+    api.get<{ value: string; label: string; prefix: string }[]>('/resource-types/options'),
   type: (code: string) => api.get<ResourceTypeDetail>(`/resource-types/${code}`),
   typeReferences: (code: string) => api.get<DictReferences>(`/resource-types/${code}/references`),
   createType: (body: ResourceTypeInput) =>
@@ -349,10 +379,7 @@ export const dictApi = {
       resourceCodeSynced: number;
       pendingAttrSync: number;
       references: DictReferences | null;
-    }>(
-      '/resource-types',
-      body,
-    ),
+    }>('/resource-types', body),
   updateType: (code: string, body: ResourceTypeUpdatePayload) =>
     api.patch<{
       detail: ResourceTypeDetail;
@@ -360,24 +387,27 @@ export const dictApi = {
       resourceCodeSynced: number;
       pendingAttrSync: number;
       references: DictReferences | null;
-    }>(
-      `/resource-types/${code}`,
-      body,
-    ),
+    }>(`/resource-types/${code}`, body),
   removeType: (code: string, migrateTo?: string) =>
     api.del<DictSyncResult>(`/resource-types/${code}`, migrateTo ? { migrateTo } : undefined),
-  syncTypeAttrs: (code: string, body: { keyRenames?: { from: string; to: string }[]; dropUnknown?: boolean }) =>
-    api.post<{ updated: number; pending: number }>(`/resource-types/${code}/sync-attrs`, body),
+  syncTypeAttrs: (
+    code: string,
+    body: { keyRenames?: { from: string; to: string }[]; dropUnknown?: boolean },
+  ) => api.post<{ updated: number; pending: number }>(`/resource-types/${code}/sync-attrs`, body),
   syncTypeResourceCodes: (code: string) =>
     api.post<{ code: string; prefix: string; updated: number }>(
       `/resource-types/${code}/sync-resource-codes`,
       {},
     ),
 
-  environments: (includeDisabled = true) => api.get<EnvironmentDto[]>(`/environments${toQuery({ includeDisabled })}`),
-  environmentOptions: () => api.get<{ value: string; label: string; tone: string }[]>('/environments/options'),
-  environmentReferences: (code: string) => api.get<DictReferences>(`/environments/${code}/references`),
-  createEnvironment: (body: EnvironmentInput) => api.post<EnvironmentMutationResult>('/environments', body),
+  environments: (includeDisabled = true) =>
+    api.get<EnvironmentDto[]>(`/environments${toQuery({ includeDisabled })}`),
+  environmentOptions: () =>
+    api.get<{ value: string; label: string; tone: string }[]>('/environments/options'),
+  environmentReferences: (code: string) =>
+    api.get<DictReferences>(`/environments/${code}/references`),
+  createEnvironment: (body: EnvironmentInput) =>
+    api.post<EnvironmentMutationResult>('/environments', body),
   updateEnvironment: (
     code: string,
     body: Partial<EnvironmentInput> & { sync?: boolean; syncNames?: boolean },

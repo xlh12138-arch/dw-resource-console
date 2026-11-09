@@ -46,7 +46,6 @@ export const authService = {
       return Number(viewerResult.changes) + Number(otherResult.changes);
     });
     if (changed > 0) {
-      // eslint-disable-next-line no-console
       console.log(
         `[auth] 已归一 ${changed} 个历史账号的角色（VIEWER → READONLY，其余旧值 → USER）`,
       );
@@ -83,7 +82,6 @@ export const authService = {
         role: 'READONLY',
       });
     });
-    // eslint-disable-next-line no-console
     console.log(
       `[auth] 已初始化默认账号：${config.auth.bootstrapAdmin.username} / ${config.auth.bootstrapAdmin.password}（ADMIN），user / User@12345（USER），readonly / Readonly@12345（READONLY）`,
     );
@@ -181,7 +179,10 @@ export const authService = {
         .from(refreshTokens)
         .where(eq(refreshTokens.tokenHash, sha256(token)));
       if (row) {
-        await db.update(refreshTokens).set({ revokedAt: new Date() }).where(eq(refreshTokens.id, row.id));
+        await db
+          .update(refreshTokens)
+          .set({ revokedAt: new Date() })
+          .where(eq(refreshTokens.id, row.id));
       }
       await auditRepository.record({
         actorId: actor.id,

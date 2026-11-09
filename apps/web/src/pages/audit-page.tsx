@@ -70,7 +70,8 @@ export function AuditPage() {
       }),
   });
 
-  const patch = (next: Partial<typeof filters>) => setFilters((prev) => ({ ...prev, ...next, page: 1 }));
+  const patch = (next: Partial<typeof filters>) =>
+    setFilters((prev) => ({ ...prev, ...next, page: 1 }));
   const rows = query.data?.items ?? [];
 
   return (
@@ -84,7 +85,10 @@ export function AuditPage() {
               <Select
                 value={filters.action ?? ''}
                 placeholder="全部"
-                options={AUDIT_ACTIONS.map((a) => ({ value: a, label: AUDIT_ACTION_LABELS[a as AuditAction] }))}
+                options={AUDIT_ACTIONS.map((a) => ({
+                  value: a,
+                  label: AUDIT_ACTION_LABELS[a as AuditAction],
+                }))}
                 onChange={(e) => patch({ action: e.target.value })}
               />
             </Field>
@@ -111,7 +115,12 @@ export function AuditPage() {
               />
             </Field>
           </div>
-          <Button variant="ghost" onClick={() => setFilters({ action: '', actor: '', targetType: '', page: 1, pageSize: 20 })}>
+          <Button
+            variant="ghost"
+            onClick={() =>
+              setFilters({ action: '', actor: '', targetType: '', page: 1, pageSize: 20 })
+            }
+          >
             重置
           </Button>
         </div>
@@ -162,14 +171,19 @@ export function AuditPage() {
                   </Badge>
                 </Td>
                 <Td className="text-xs">
-                  <span className="text-slate-400">{AUDIT_TARGET_TYPE_LABELS[log.targetType]} · </span>
+                  <span className="text-slate-400">
+                    {AUDIT_TARGET_TYPE_LABELS[log.targetType]} ·{' '}
+                  </span>
                   {log.targetName ?? '—'}
                 </Td>
                 <Td className="max-w-md text-xs text-slate-600">
                   {log.changes && log.changes.length > 0
                     ? log.changes
                         .slice(0, 3)
-                        .map((c) => `${c.label ?? c.field}: ${formatAuditValue(c.from)} → ${formatAuditValue(c.to)}`)
+                        .map(
+                          (c) =>
+                            `${c.label ?? c.field}: ${formatAuditValue(c.from)} → ${formatAuditValue(c.to)}`,
+                        )
                         .join('；')
                     : '—'}
                 </Td>

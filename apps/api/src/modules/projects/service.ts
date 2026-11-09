@@ -27,7 +27,11 @@ import { environmentLabelOf, environmentService } from '../dict/service.js';
 import { getTypeMeta } from '../dict/validator.js';
 import { resourceRepository, resourceRefRepository } from '../resources/repository.js';
 import { loadProjectLabels } from '../resources/mapper.js';
-import { assertCapacityAvailable, capacityUsageOf, otherProjectUsageOf } from '../resources/service.js';
+import {
+  assertCapacityAvailable,
+  capacityUsageOf,
+  otherProjectUsageOf,
+} from '../resources/service.js';
 import {
   projectEnvRepository,
   projectRepository,
@@ -138,7 +142,16 @@ function toSlotDto(
 }
 
 function toTemplateDto(
-  row: { id: number; code: string; name: string; description: string | null; builtin: boolean; createdByName: string | null; createdAt: Date; updatedAt: Date },
+  row: {
+    id: number;
+    code: string;
+    name: string;
+    description: string | null;
+    builtin: boolean;
+    createdByName: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
   items: { quantity: number }[],
   usageCount: number,
 ): EnvTemplateDto {
@@ -232,7 +245,9 @@ async function capacityCheckFor(
 /** 项目关联的资源 = 主归属该项目的资源 ∪ 该项目各环境槽位绑定的资源 */
 export async function projectResourceIds(projectId: number): Promise<number[]> {
   const owned = await resourceRepository.listAll({ projectId });
-  const envIds = await projectEnvRepository.listByProject(projectId).then((rows) => rows.map((r) => r.id));
+  const envIds = await projectEnvRepository
+    .listByProject(projectId)
+    .then((rows) => rows.map((r) => r.id));
   const referenced = await slotRepository.resourceIdsByEnvs(envIds);
   return [...new Set([...owned.map((r) => r.id), ...referenced])];
 }
@@ -281,7 +296,9 @@ export const projectService = {
     const envs: ProjectEnvDto[] = [];
     for (const env of envRows) {
       const { total, filled } = await projectEnvRepository.slotStat(env.id);
-      const template = env.templateId ? await templateRepository.findById(env.templateId) : undefined;
+      const template = env.templateId
+        ? await templateRepository.findById(env.templateId)
+        : undefined;
       envs.push(await toEnvDto(env, row.name, template?.name ?? null, total, filled));
     }
 
@@ -307,7 +324,13 @@ export const projectService = {
   },
 
   async create(
-    input: { code?: string; name: string; description?: string; owner?: string; status?: 'ACTIVE' | 'ARCHIVED' },
+    input: {
+      code?: string;
+      name: string;
+      description?: string;
+      owner?: string;
+      status?: 'ACTIVE' | 'ARCHIVED';
+    },
     actor: Actor,
     requestId?: string,
   ): Promise<ProjectDto> {
@@ -333,7 +356,9 @@ export const projectService = {
       targetType: 'PROJECT',
       targetId: String(row.id),
       targetName: `${row.code} ${row.name}`,
-      changes: [{ field: '*', label: '创建项目', from: null, to: { code: row.code, name: row.name } }],
+      changes: [
+        { field: '*', label: '创建项目', from: null, to: { code: row.code, name: row.name } },
+      ],
       requestId,
     });
     return toProjectDto(row, 0, 0);
@@ -379,7 +404,9 @@ export const projectService = {
     if (!before) throw notFound(`项目 ${id} 不存在`);
     const envs = await projectEnvRepository.listByProject(id);
     if (envs.length > 0) {
-      throw conflict(`项目「${before.name}」下仍有 ${envs.length} 套环境，请先删除环境后再归档或删除项目`);
+      throw conflict(
+        `项目「${before.name}」下仍有 ${envs.length} 套环境，请先删除环境后再归档或删除项目`,
+      );
     }
     // 先解除资源的项目归属，避免遗留外键指向已删除的项目
     await resourceProjectRepository.clearProjectRefs(id);
@@ -391,7 +418,9 @@ export const projectService = {
       targetType: 'PROJECT',
       targetId: String(id),
       targetName: `${before.code} ${before.name}`,
-      changes: [{ field: '*', label: '删除项目', from: { code: before.code, name: before.name }, to: null }],
+      changes: [
+        { field: '*', label: '删除项目', from: { code: before.code, name: before.name }, to: null },
+      ],
       requestId,
     });
     return { id };
@@ -475,7 +504,9 @@ export const projectEnvService = {
     const out: ProjectEnvDto[] = [];
     for (const env of rows) {
       const { total, filled } = await projectEnvRepository.slotStat(env.id);
-      const template = env.templateId ? await templateRepository.findById(env.templateId) : undefined;
+      const template = env.templateId
+        ? await templateRepository.findById(env.templateId)
+        : undefined;
       out.push(await toEnvDto(env, project.name, template?.name ?? null, total, filled));
     }
     return out;
@@ -502,7 +533,8 @@ export const projectEnvService = {
   ) {
     const project = await projectRepository.findById(input.projectId);
     if (!project) throw notFound(`项目 ${input.projectId} 不存在`);
-    if (project.status === 'ARCHIVED') throw badRequest(`项目「${project.name}」已归档，无法新建环境`);
+    if (project.status === 'ARCHIVED')
+      throw badRequest(`项目「${project.name}」已归档，无法新建环境`);
     if (await projectEnvRepository.findByName(input.projectId, input.name)) {
       throw conflict(`项目「${project.name}」下已存在同名环境「${input.name}」`);
     }
@@ -540,7 +572,9 @@ export const projectEnvService = {
       changes: [
         {
           field: '*',
-          label: template ? `套用模板 ${template.name} 创建环境（生成 ${created} 个槽位）` : '创建空白环境',
+          label: template
+            ? `套用模板 ${template.name} 创建环境（生成 ${created} 个槽位）`
+            : '创建空白环境',
           from: null,
           to: { name: row.name, environment: row.environment, templateId: row.templateId },
         },
@@ -664,7 +698,7 @@ export const projectEnvService = {
           endAt: ref.endAt ? new Date(ref.endAt).toISOString() : null,
           overdueDays: overdueDaysOf(ref.endAt),
           occupancyState: occupancyStateOf(ref.startAt, ref.endAt) ?? 'ACTIVE',
-        notStarted: notStartedOf(ref.startAt),
+          notStarted: notStartedOf(ref.startAt),
         });
       }
       const crossEnvironment = r.environment !== env.environment;
@@ -736,7 +770,8 @@ export const projectEnvService = {
 
     // 同环境且未被占用的排前面，跨环境/已被占用的靠后但仍可选
     items.sort((a, b) => {
-      const score = (x: SlotCandidate) => (x.crossEnvironment ? 2 : 0) + (x.usedByOtherProject ? 1 : 0);
+      const score = (x: SlotCandidate) =>
+        (x.crossEnvironment ? 2 : 0) + (x.usedByOtherProject ? 1 : 0);
       return score(a) - score(b);
     });
 
@@ -772,7 +807,12 @@ export const projectEnvService = {
     const env = await projectEnvRepository.findById(envId);
     if (!env) throw notFound(`项目环境 ${envId} 不存在`);
     const created = await createSlots(envId, [
-      { resourceType: input.resourceType, slotRole: input.slotRole, quantity: input.quantity ?? 1, remark: input.remark },
+      {
+        resourceType: input.resourceType,
+        slotRole: input.slotRole,
+        quantity: input.quantity ?? 1,
+        remark: input.remark,
+      },
     ]);
     await auditRepository.record({
       actorId: actor.id,
@@ -781,7 +821,9 @@ export const projectEnvService = {
       targetType: 'ENVIRONMENT',
       targetId: String(envId),
       targetName: env.name,
-      changes: [{ field: 'slots', label: `新增 ${created.length} 个槽位`, from: null, to: input.slotRole }],
+      changes: [
+        { field: 'slots', label: `新增 ${created.length} 个槽位`, from: null, to: input.slotRole },
+      ],
       requestId,
     });
     return buildEnvDetail(env);
@@ -826,7 +868,14 @@ export const projectEnvService = {
       targetName: env.name,
       changes: [
         ...(input.resourceType !== undefined && nextType !== slot.resourceType
-          ? [{ field: 'resourceType', label: '槽位需求类型', from: slot.resourceType, to: nextType }]
+          ? [
+              {
+                field: 'resourceType',
+                label: '槽位需求类型',
+                from: slot.resourceType,
+                to: nextType,
+              },
+            ]
           : []),
         ...(input.slotRole !== undefined && input.slotRole !== slot.slotRole
           ? [{ field: 'slotRole', label: '槽位名称', from: slot.slotRole, to: input.slotRole }]
@@ -893,8 +942,7 @@ export const projectEnvService = {
      * - 未来开始时间同样算占用，容量立即扣除，只在前端标注「未开始」
      */
     const startAt = parseTime(input.startAt ?? null, false) ?? slot.startAt ?? new Date();
-    const endAt =
-      input.endAt !== undefined ? parseTime(input.endAt) : (slot.endAt ?? null);
+    const endAt = input.endAt !== undefined ? parseTime(input.endAt) : (slot.endAt ?? null);
     if (endAt && endAt.getTime() <= startAt.getTime()) {
       throw validationError('占用结束时间必须晚于开始时间', { field: 'endAt' });
     }
@@ -915,10 +963,10 @@ export const projectEnvService = {
     const usedByOtherProject = usedBy.length > 0;
 
     // —— 时间区间重叠：同一资源在同一时段被多个槽位占用属于并发共用
-    const allRefs = (await resourceRefRepository.listByResource(resource.id)).filter((r) => r.slotId !== slotId);
-    const overlapping = allRefs.filter((r) =>
-      periodsOverlap(startAt, endAt, r.startAt, r.endAt),
+    const allRefs = (await resourceRefRepository.listByResource(resource.id)).filter(
+      (r) => r.slotId !== slotId,
     );
+    const overlapping = allRefs.filter((r) => periodsOverlap(startAt, endAt, r.startAt, r.endAt));
     const overlapRefs: SlotAssignWarning['references'] = [];
     const refLabels = await loadProjectLabels();
     for (const r of overlapping) {
@@ -992,7 +1040,11 @@ export const projectEnvService = {
     });
     // 资源尚未标注主归属项目时，随槽位绑定自动补标（已有归属则保持，视为共享引用）
     if (resource.projectId === null) {
-      await resourceProjectRepository.setProject([resource.id], env.projectId, resource.projectEnvId);
+      await resourceProjectRepository.setProject(
+        [resource.id],
+        env.projectId,
+        resource.projectEnvId,
+      );
     }
     await auditRepository.record({
       actorId: actor.id,
@@ -1136,7 +1188,8 @@ export const projectEnvService = {
     if (!env) throw notFound(`项目环境 ${envId} 不存在`);
     const slot = await slotRepository.findById(slotId);
     if (!slot || slot.environmentId !== envId) throw notFound(`槽位 ${slotId} 不存在`);
-    if (slot.resourceId === null) throw badRequest('该槽位尚未绑定资源，请先分配资源再设置占用期限');
+    if (slot.resourceId === null)
+      throw badRequest('该槽位尚未绑定资源，请先分配资源再设置占用期限');
 
     const nextStart = input.startAt !== undefined ? parseTime(input.startAt, false) : slot.startAt;
     const nextEnd = input.endAt !== undefined ? parseTime(input.endAt) : slot.endAt;
@@ -1192,9 +1245,7 @@ export const projectEnvService = {
       const resource = await resourceRepository.findById(slot.resourceId!);
       const startAt = slot.startAt ?? slot.createdAt ?? now;
       const others = (refsMap.get(slot.resourceId!) ?? []).filter((r) => r.slotId !== slot.id);
-      const shared = others.some((r) =>
-        periodsOverlap(startAt, slot.endAt, r.startAt, r.endAt),
-      );
+      const shared = others.some((r) => periodsOverlap(startAt, slot.endAt, r.startAt, r.endAt));
       entries.push({
         slotId: slot.id,
         slotRole: slot.slotRole,
@@ -1216,7 +1267,11 @@ export const projectEnvService = {
     const ends = entries.filter((e) => e.endAt).map((e) => new Date(e.endAt!).getTime());
     const hasLongTerm = entries.some((e) => e.endAt === null);
     const min = Math.min(now.getTime() - 45 * DAY_MS, ...starts);
-    const max = Math.max(now.getTime() + 45 * DAY_MS, ...ends, hasLongTerm ? now.getTime() + 180 * DAY_MS : now.getTime());
+    const max = Math.max(
+      now.getTime() + 45 * DAY_MS,
+      ...ends,
+      hasLongTerm ? now.getTime() + 180 * DAY_MS : now.getTime(),
+    );
 
     return {
       env: {
@@ -1227,7 +1282,11 @@ export const projectEnvService = {
         environment: env.environment,
         environmentLabel: await envLabelOf(env.environment),
       },
-      range: { from: new Date(min).toISOString(), to: new Date(max).toISOString(), today: now.toISOString() },
+      range: {
+        from: new Date(min).toISOString(),
+        to: new Date(max).toISOString(),
+        today: now.toISOString(),
+      },
       entries,
       expiredCount: entries.filter((e) => e.occupancyState === 'EXPIRED').length,
     };
@@ -1264,7 +1323,12 @@ export const projectEnvService = {
       targetId: String(envId),
       targetName: `${env.name} · ${slot.slotRole}`,
       changes: [
-        { field: `slot.${slotId}`, label: `槽位「${slot.slotRole}」解绑资源`, from: resource ? `${resource.code} ${resource.name}` : null, to: null },
+        {
+          field: `slot.${slotId}`,
+          label: `槽位「${slot.slotRole}」解绑资源`,
+          from: resource ? `${resource.code} ${resource.name}` : null,
+          to: null,
+        },
       ],
       requestId,
     });
@@ -1328,7 +1392,14 @@ export const projectEnvService = {
       targetType: 'ENVIRONMENT',
       targetId: String(envId),
       targetName: env.name,
-      changes: [{ field: 'templateId', label: `追加套用模板 ${template.name}`, from: null, to: `${created.length} 个槽位` }],
+      changes: [
+        {
+          field: 'templateId',
+          label: `追加套用模板 ${template.name}`,
+          from: null,
+          to: `${created.length} 个槽位`,
+        },
+      ],
       requestId,
     });
     return buildEnvDetail((await projectEnvRepository.findById(envId))!);
@@ -1384,7 +1455,13 @@ export const templateService = {
       code?: string;
       name: string;
       description?: string;
-      items: { resourceType: string; slotRole: string; quantity?: number; required?: boolean; remark?: string }[];
+      items: {
+        resourceType: string;
+        slotRole: string;
+        quantity?: number;
+        required?: boolean;
+        remark?: string;
+      }[];
     },
     actor: Actor,
     requestId?: string,
@@ -1439,7 +1516,13 @@ export const templateService = {
     patch: {
       name?: string;
       description?: string;
-      items?: { resourceType: string; slotRole: string; quantity?: number; required?: boolean; remark?: string }[];
+      items?: {
+        resourceType: string;
+        slotRole: string;
+        quantity?: number;
+        required?: boolean;
+        remark?: string;
+      }[];
     },
     actor: Actor,
     requestId?: string,
@@ -1533,7 +1616,13 @@ export const templateService = {
   /** 一步到位：基于模板在项目下创建环境 */
   async instantiate(
     templateId: number,
-    input: { projectId: number; name: string; environment: string; owner?: string; description?: string },
+    input: {
+      projectId: number;
+      name: string;
+      environment: string;
+      owner?: string;
+      description?: string;
+    },
     actor: Actor,
     requestId?: string,
   ) {
@@ -1590,13 +1679,17 @@ async function buildEnvDetail(env: ProjectEnvRow) {
   const template = env.templateId ? await templateRepository.findById(env.templateId) : undefined;
   const { total, filled } = await projectEnvRepository.slotStat(env.id);
   const slots = await slotRepository.listByEnv(env.id);
-  const resourceIds = [...new Set(slots.map((s) => s.resourceId).filter((id): id is number => id !== null))];
+  const resourceIds = [
+    ...new Set(slots.map((s) => s.resourceId).filter((id): id is number => id !== null)),
+  ];
   const resourceMap = new Map<number, ResourceRow>();
   for (const id of resourceIds) {
     const r = await resourceRepository.findById(id);
     if (r) resourceMap.set(id, r);
   }
-  const slotDtos = slots.map((s) => toSlotDto(s, s.resourceId ? resourceMap.get(s.resourceId) ?? null : null));
+  const slotDtos = slots.map((s) =>
+    toSlotDto(s, s.resourceId ? (resourceMap.get(s.resourceId) ?? null) : null),
+  );
   return {
     ...(await toEnvDto(env, project?.name ?? '—', template?.name ?? null, total, filled)),
     slots: slotDtos,
@@ -1645,7 +1738,9 @@ async function slotRefsOfProject(projectId: number) {
   const [envDict, typeLabels] = await Promise.all([
     environmentService.list(true),
     Promise.all(
-      [...new Set(resourceRows.map((r) => r.type))].map(async (type) => [type, (await getTypeMeta(type)).label] as const),
+      [...new Set(resourceRows.map((r) => r.type))].map(
+        async (type) => [type, (await getTypeMeta(type)).label] as const,
+      ),
     ),
   ]);
   const envLabelMap = new Map(envDict.map((e) => [e.code, e.label]));

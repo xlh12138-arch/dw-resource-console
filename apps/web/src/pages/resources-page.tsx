@@ -22,7 +22,6 @@ import { useSearchParams } from 'react-router';
 import {
   RESOURCE_STATUSES,
   RESOURCE_STATUS_LABELS,
-
   type ResourceDto,
   type ResourceStatus,
 } from '@dw/shared';
@@ -42,7 +41,25 @@ import { useAuth } from '../lib/auth';
 import { ResourceDetailModal } from '../components/resource-detail';
 import { ResourceFormModal } from '../components/resource-form';
 import { useToast } from '../components/toast';
-import { Button, Card, ClickableBadge, EmptyState, ErrorBanner, Field, Input, Modal, ModalCancelButton, PageHeader, Pagination, Select, Spinner, Td, Th, Table, Textarea } from '../components/ui';
+import {
+  Button,
+  Card,
+  ClickableBadge,
+  EmptyState,
+  ErrorBanner,
+  Field,
+  Input,
+  Modal,
+  ModalCancelButton,
+  PageHeader,
+  Pagination,
+  Select,
+  Spinner,
+  Td,
+  Th,
+  Table,
+  Textarea,
+} from '../components/ui';
 import { EnvBadge } from '../components/env-badge';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -58,7 +75,9 @@ function capacityUsed(r: ResourceDto): number {
 
 function capacityLeft(r: ResourceDto): number {
   if (r.capacityTotal === null) return 0;
-  return r.capacityPeakAvailable ?? r.capacityAvailable ?? Math.max(0, r.capacityTotal - capacityUsed(r));
+  return (
+    r.capacityPeakAvailable ?? r.capacityAvailable ?? Math.max(0, r.capacityTotal - capacityUsed(r))
+  );
 }
 
 /** 资源状态 → 徽标配色（台账列表与筛选标签共用） */
@@ -180,7 +199,8 @@ export function ResourcesPage() {
       (prev) => {
         const next = new URLSearchParams(prev);
         for (const [key, value] of Object.entries(patch)) {
-          if (value === undefined || value === null || value === '' || value === false) next.delete(key);
+          if (value === undefined || value === null || value === '' || value === false)
+            next.delete(key);
           else next.set(key, String(value));
         }
         if (resetPage) next.delete('page');
@@ -196,7 +216,11 @@ export function ResourcesPage() {
     setFilter({ [key]: current === String(value) ? undefined : value });
   };
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [formState, setFormState] = useState<{ open: boolean; initial: ResourceDto | null; type: string }>({
+  const [formState, setFormState] = useState<{
+    open: boolean;
+    initial: ResourceDto | null;
+    type: string;
+  }>({
     open: false,
     initial: null,
     type: '',
@@ -227,12 +251,19 @@ export function ResourcesPage() {
     placeholderData: keepPreviousData,
   });
 
-  const projects = useQuery({ queryKey: ['projects-options'], queryFn: () => projectsApi.options() });
+  const projects = useQuery({
+    queryKey: ['projects-options'],
+    queryFn: () => projectsApi.options(),
+  });
   const tags = useQuery({ queryKey: ['resource-tags'], queryFn: () => resourcesApi.tags() });
 
   /** 选中的标签集合（多标签取「同时包含」） */
   const activeTags = useMemo(
-    () => (query.tag ?? '').split(',').map((t) => t.trim()).filter(Boolean),
+    () =>
+      (query.tag ?? '')
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean),
     [query.tag],
   );
 
@@ -287,14 +318,24 @@ export function ResourcesPage() {
   const sortBy: NonNullable<ResourceQuery['sortBy']> = query.sortBy ?? 'updatedAt';
   const sortOrder: 'asc' | 'desc' = query.sortOrder ?? 'desc';
   const sortColumn = (key: string) => {
-    const defaultOrder: 'asc' | 'desc' = key.startsWith('attr:') || key === 'name' || key === 'code' || key === 'type' || key === 'environment' || key === 'status' || key === 'owner'
-      ? 'asc'
-      : 'desc';
+    const defaultOrder: 'asc' | 'desc' =
+      key.startsWith('attr:') ||
+      key === 'name' ||
+      key === 'code' ||
+      key === 'type' ||
+      key === 'environment' ||
+      key === 'status' ||
+      key === 'owner'
+        ? 'asc'
+        : 'desc';
     setFilter({
       sortBy: key,
-      sortOrder: sortBy === key && sortOrder === defaultOrder
-        ? (defaultOrder === 'asc' ? 'desc' : 'asc')
-        : defaultOrder,
+      sortOrder:
+        sortBy === key && sortOrder === defaultOrder
+          ? defaultOrder === 'asc'
+            ? 'desc'
+            : 'asc'
+          : defaultOrder,
     });
   };
   /** 按 id 精确定位时，列表里就是这一条，用它的编码回显筛选标签 */
@@ -308,59 +349,66 @@ export function ResourcesPage() {
         title="资源台账"
         actions={
           <>
-          <Button
-            variant="outline"
-            title={selected.length > 0 ? `仅导出已勾选的 ${selected.length} 个资源` : '导出当前筛选结果'}
-            onClick={async () => {
-              try {
-                // 有勾选时只按勾选的 id 导出，忽略当前筛选；未勾选时保持导出筛选结果
-                const exportQuery: ResourceQuery = selected.length > 0
-                  ? { ids: selected.join(',') }
-                  : query;
-                const csv = await resourcesApi.exportCsv(exportQuery);
-                if (!csv) {
-                  push('error', '所选资源已不存在，请刷新后重试');
-                  return;
-                }
-                download(`resources-${new Date().toISOString().slice(0, 10)}.csv`, csv);
-                push(
-                  'success',
-                  selected.length > 0
-                    ? `已导出勾选的 ${selected.length} 个资源`
-                    : '已导出当前筛选结果',
-                );
-              } catch (err) {
-                push('error', friendlyMessage(err));
+            <Button
+              variant="outline"
+              title={
+                selected.length > 0
+                  ? `仅导出已勾选的 ${selected.length} 个资源`
+                  : '导出当前筛选结果'
               }
-            }}
-          >
-            <Download size={14} />
-            导出 CSV{selected.length > 0 ? `（已选 ${selected.length}）` : ''}
-          </Button>
-          {canWrite && selected.length > 0 && (
-            <Button variant="outline" onClick={() => setBulkOpen(true)}>
-              <Tag size={14} />
-              标注项目（{selected.length}）
+              onClick={async () => {
+                try {
+                  // 有勾选时只按勾选的 id 导出，忽略当前筛选；未勾选时保持导出筛选结果
+                  const exportQuery: ResourceQuery =
+                    selected.length > 0 ? { ids: selected.join(',') } : query;
+                  const csv = await resourcesApi.exportCsv(exportQuery);
+                  if (!csv) {
+                    push('error', '所选资源已不存在，请刷新后重试');
+                    return;
+                  }
+                  download(`resources-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+                  push(
+                    'success',
+                    selected.length > 0
+                      ? `已导出勾选的 ${selected.length} 个资源`
+                      : '已导出当前筛选结果',
+                  );
+                } catch (err) {
+                  push('error', friendlyMessage(err));
+                }
+              }}
+            >
+              <Download size={14} />
+              导出 CSV{selected.length > 0 ? `（已选 ${selected.length}）` : ''}
             </Button>
-          )}
-          {canDelete && selected.length > 0 && (
-            <Button variant="danger" onClick={() => setBulkDeleteOpen(true)}>
-              <Trash2 size={14} />
-              删除（{selected.length}）
-            </Button>
-          )}
-          {canWrite && (
-            <>
-              <Button variant="outline" onClick={() => setImportOpen(true)}>
-                <Upload size={14} />
-                批量导入
+            {canWrite && selected.length > 0 && (
+              <Button variant="outline" onClick={() => setBulkOpen(true)}>
+                <Tag size={14} />
+                标注项目（{selected.length}）
               </Button>
-              <Button onClick={() => setFormState({ open: true, initial: null, type: query.type ?? '' })}>
-                <Plus size={14} />
-                新增资源
+            )}
+            {canDelete && selected.length > 0 && (
+              <Button variant="danger" onClick={() => setBulkDeleteOpen(true)}>
+                <Trash2 size={14} />
+                删除（{selected.length}）
               </Button>
-            </>
-          )}
+            )}
+            {canWrite && (
+              <>
+                <Button variant="outline" onClick={() => setImportOpen(true)}>
+                  <Upload size={14} />
+                  批量导入
+                </Button>
+                <Button
+                  onClick={() =>
+                    setFormState({ open: true, initial: null, type: query.type ?? '' })
+                  }
+                >
+                  <Plus size={14} />
+                  新增资源
+                </Button>
+              </>
+            )}
           </>
         }
       />
@@ -370,7 +418,10 @@ export function ResourcesPage() {
           <div className="min-w-56 flex-1">
             <Field label="关键字">
               <div className="relative">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search
+                  size={15}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
                 <Input
                   className="pl-9"
                   value={keyword}
@@ -405,7 +456,10 @@ export function ResourcesPage() {
               <Select
                 value={query.status ?? ''}
                 placeholder="全部"
-                options={RESOURCE_STATUSES.map((s) => ({ value: s, label: RESOURCE_STATUS_LABELS[s] }))}
+                options={RESOURCE_STATUSES.map((s) => ({
+                  value: s,
+                  label: RESOURCE_STATUS_LABELS[s],
+                }))}
                 onChange={(e) => setFilter({ status: e.target.value || undefined })}
               />
             </Field>
@@ -413,7 +467,9 @@ export function ResourcesPage() {
           <div className="w-40">
             <Field label="所属项目">
               <Select
-                value={query.unassigned ? '__none__' : (query.projectId ? String(query.projectId) : '')}
+                value={
+                  query.unassigned ? '__none__' : query.projectId ? String(query.projectId) : ''
+                }
                 placeholder="全部项目"
                 fallbackLabel="当前筛选项目"
                 options={[
@@ -445,7 +501,10 @@ export function ResourcesPage() {
                 value={activeTags.length === 1 ? activeTags[0] : ''}
                 placeholder="全部标签"
                 fallbackLabel="当前筛选标签"
-                options={(tags.data ?? []).map((t) => ({ value: t.tag, label: `#${t.tag}（${t.count}）` }))}
+                options={(tags.data ?? []).map((t) => ({
+                  value: t.tag,
+                  label: `#${t.tag}（${t.count}）`,
+                }))}
                 onChange={(e) => applyTag(e.target.value ? [e.target.value] : [])}
               />
             </Field>
@@ -499,10 +558,16 @@ export function ResourcesPage() {
           <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-5 py-2.5 text-xs text-slate-500">
             <span>当前筛选：</span>
             {query.q ? (
-              <FilterChip label={`关键字：${query.q}`} onRemove={() => setFilter({ q: undefined })} />
+              <FilterChip
+                label={`关键字：${query.q}`}
+                onRemove={() => setFilter({ q: undefined })}
+              />
             ) : null}
             {query.type ? (
-              <FilterChip label={`类型：${dict.typeLabel(query.type)}`} onRemove={() => setFilter({ type: undefined })} />
+              <FilterChip
+                label={`类型：${dict.typeLabel(query.type)}`}
+                onRemove={() => setFilter({ type: undefined })}
+              />
             ) : null}
             {query.environment ? (
               <FilterChip
@@ -519,7 +584,10 @@ export function ResourcesPage() {
               />
             ) : null}
             {query.datacenter ? (
-              <FilterChip label={`机房：${query.datacenter}`} onRemove={() => setFilter({ datacenter: undefined })} />
+              <FilterChip
+                label={`机房：${query.datacenter}`}
+                onRemove={() => setFilter({ datacenter: undefined })}
+              />
             ) : null}
             {query.projectId ? (
               <FilterChip
@@ -528,7 +596,10 @@ export function ResourcesPage() {
               />
             ) : null}
             {query.unassigned ? (
-              <FilterChip label="未标注项目" onRemove={() => setFilter({ unassigned: undefined })} />
+              <FilterChip
+                label="未标注项目"
+                onRemove={() => setFilter({ unassigned: undefined })}
+              />
             ) : null}
             {query.id ? (
               <FilterChip
@@ -569,7 +640,12 @@ export function ResourcesPage() {
             desc="调整筛选条件，或新增一条资源记录"
             action={
               canWrite && (
-                <Button size="sm" onClick={() => setFormState({ open: true, initial: null, type: query.type ?? '' })}>
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    setFormState({ open: true, initial: null, type: query.type ?? '' })
+                  }
+                >
                   新增资源
                 </Button>
               )
@@ -589,9 +665,27 @@ export function ResourcesPage() {
                     onChange={(e) => setSelected(e.target.checked ? rows.map((r) => r.id) : [])}
                   />
                 </Th>
-                <SortableTh label="编码" sortKey="code" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
-                <SortableTh label="名称" sortKey="name" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
-                <SortableTh label="类型" sortKey="type" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
+                <SortableTh
+                  label="编码"
+                  sortKey="code"
+                  currentSort={sortBy}
+                  currentOrder={sortOrder}
+                  onSort={sortColumn}
+                />
+                <SortableTh
+                  label="名称"
+                  sortKey="name"
+                  currentSort={sortBy}
+                  currentOrder={sortOrder}
+                  onSort={sortColumn}
+                />
+                <SortableTh
+                  label="类型"
+                  sortKey="type"
+                  currentSort={sortBy}
+                  currentOrder={sortOrder}
+                  onSort={sortColumn}
+                />
                 {primaryAttrKey ? (
                   <SortableTh
                     label="关键属性"
@@ -605,11 +699,35 @@ export function ResourcesPage() {
                 )}
                 <Th>所属项目</Th>
                 <Th>标签</Th>
-                <SortableTh label="环境" sortKey="environment" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
+                <SortableTh
+                  label="环境"
+                  sortKey="environment"
+                  currentSort={sortBy}
+                  currentOrder={sortOrder}
+                  onSort={sortColumn}
+                />
                 <Th>容量</Th>
-                <SortableTh label="状态" sortKey="status" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
-                <SortableTh label="负责人" sortKey="owner" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
-                <SortableTh label="更新时间" sortKey="updatedAt" currentSort={sortBy} currentOrder={sortOrder} onSort={sortColumn} />
+                <SortableTh
+                  label="状态"
+                  sortKey="status"
+                  currentSort={sortBy}
+                  currentOrder={sortOrder}
+                  onSort={sortColumn}
+                />
+                <SortableTh
+                  label="负责人"
+                  sortKey="owner"
+                  currentSort={sortBy}
+                  currentOrder={sortOrder}
+                  onSort={sortColumn}
+                />
+                <SortableTh
+                  label="更新时间"
+                  sortKey="updatedAt"
+                  currentSort={sortBy}
+                  currentOrder={sortOrder}
+                  onSort={sortColumn}
+                />
                 <Th className="sticky right-0 z-20 w-24 bg-slate-50 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.55)]">
                   操作
                 </Th>
@@ -656,7 +774,9 @@ export function ResourcesPage() {
                         <ClickableBadge
                           tone="blue"
                           title={`查看父资源 ${r.parentName ?? r.parentCode}`}
-                          onClick={() => setFilter({ id: r.parentId, parentId: undefined, rootOnly: undefined })}
+                          onClick={() =>
+                            setFilter({ id: r.parentId, parentId: undefined, rootOnly: undefined })
+                          }
                         >
                           <FolderTree size={10} className="mr-1" />
                           父：{r.parentName ?? r.parentCode}
@@ -666,7 +786,9 @@ export function ResourcesPage() {
                         <ClickableBadge
                           tone="amber"
                           title="查看该资源下的子资源"
-                          onClick={() => setFilter({ parentId: r.id, id: undefined, rootOnly: undefined })}
+                          onClick={() =>
+                            setFilter({ parentId: r.id, id: undefined, rootOnly: undefined })
+                          }
                         >
                           子资源 ×{r.childCount}
                         </ClickableBadge>
@@ -677,7 +799,11 @@ export function ResourcesPage() {
                 <Td>
                   <ClickableBadge
                     tone="blue"
-                    title={query.type === r.type ? '取消类型筛选' : `按类型「${dict.typeLabel(r.type)}」筛选`}
+                    title={
+                      query.type === r.type
+                        ? '取消类型筛选'
+                        : `按类型「${dict.typeLabel(r.type)}」筛选`
+                    }
                     onClick={() => toggleFilter('type', r.type)}
                   >
                     {dict.typeLabel(r.type)}
@@ -689,7 +815,9 @@ export function ResourcesPage() {
                     if (keys.length === 0) {
                       return <span className="text-xs text-slate-400">未设置关键属性</span>;
                     }
-                    const labels = new Map(dict.attrFields(r.type).map((field) => [field.key, field.label]));
+                    const labels = new Map(
+                      dict.attrFields(r.type).map((field) => [field.key, field.label]),
+                    );
                     return (
                       <span className="text-xs text-slate-600">
                         {keys
@@ -703,7 +831,11 @@ export function ResourcesPage() {
                   {r.projectName && r.projectId ? (
                     <ClickableBadge
                       tone="violet"
-                      title={query.projectId === r.projectId ? '取消项目筛选' : `按项目「${r.projectName}」筛选`}
+                      title={
+                        query.projectId === r.projectId
+                          ? '取消项目筛选'
+                          : `按项目「${r.projectName}」筛选`
+                      }
                       onClick={() => toggleFilter('projectId', String(r.projectId))}
                     >
                       {r.projectName}
@@ -718,7 +850,12 @@ export function ResourcesPage() {
                       <span className="text-xs text-slate-400">—</span>
                     ) : (
                       r.tags.map((t) => (
-                        <ClickableBadge key={t} tone="gray" title={`按标签 #${t} 筛选`} onClick={() => toggleTag(t)}>
+                        <ClickableBadge
+                          key={t}
+                          tone="gray"
+                          title={`按标签 #${t} 筛选`}
+                          onClick={() => toggleTag(t)}
+                        >
                           #{t}
                         </ClickableBadge>
                       ))
@@ -728,7 +865,11 @@ export function ResourcesPage() {
                 <Td>
                   <button
                     type="button"
-                    title={query.environment === r.environment ? '取消环境筛选' : `按环境「${dict.envLabel(r.environment)}」筛选`}
+                    title={
+                      query.environment === r.environment
+                        ? '取消环境筛选'
+                        : `按环境「${dict.envLabel(r.environment)}」筛选`
+                    }
                     onClick={() => toggleFilter('environment', r.environment)}
                   >
                     <EnvBadge code={r.environment} label={dict.envLabel(r.environment)} />
@@ -771,7 +912,9 @@ export function ResourcesPage() {
                         </p>
                       ) : null}
                       {r.capacityPeak !== null && r.capacityAllocated > r.capacityPeak + 0.01 ? (
-                        <p className="mt-0.5 text-[10px] text-brand-600">错峰复用 · 峰值 {r.capacityPeak}</p>
+                        <p className="mt-0.5 text-[10px] text-brand-600">
+                          错峰复用 · 峰值 {r.capacityPeak}
+                        </p>
                       ) : null}
                     </div>
                   ) : (
@@ -781,7 +924,11 @@ export function ResourcesPage() {
                 <Td>
                   <ClickableBadge
                     tone={statusTone(r.status)}
-                    title={query.status === r.status ? '取消状态筛选' : `按状态「${RESOURCE_STATUS_LABELS[r.status]}」筛选`}
+                    title={
+                      query.status === r.status
+                        ? '取消状态筛选'
+                        : `按状态「${RESOURCE_STATUS_LABELS[r.status]}」筛选`
+                    }
                     onClick={() => toggleFilter('status', r.status)}
                   >
                     {RESOURCE_STATUS_LABELS[r.status]}
@@ -994,7 +1141,10 @@ function ImportIssueList({ issues }: { issues: ImportIssue[] }) {
           </thead>
           <tbody>
             {issues.slice(0, 200).map((issue, i) => (
-              <tr key={`${issue.row}-${issue.field}-${i}`} className="border-t border-rose-100 text-rose-700">
+              <tr
+                key={`${issue.row}-${issue.field}-${i}`}
+                className="border-t border-rose-100 text-rose-700"
+              >
                 <td className="px-3 py-1.5 font-mono">{issue.row}</td>
                 <td className="font-mono">{issue.column || '—'}</td>
                 <td className="truncate" title={`${issue.label}（${issue.field}）`}>
@@ -1060,13 +1210,11 @@ function ImportModal({
       setOnConflict('skip');
       resetParsed();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultType]);
 
   // 资源类型变了，模板列与必填规则也变了，旧的解析结果必须作废
   useEffect(() => {
     resetParsed();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type]);
 
   const mutation = useMutation({
@@ -1176,7 +1324,11 @@ function ImportModal({
   };
 
   const sample = [
-    'name,environment,status,owner,' + columns.filter((c) => c.group === 'attr').map((c) => c.key).join(','),
+    'name,environment,status,owner,' +
+      columns
+        .filter((c) => c.group === 'attr')
+        .map((c) => c.key)
+        .join(','),
     '示例资源,PROD,IN_USE,张三,',
   ].join('\n');
 
@@ -1203,7 +1355,9 @@ function ImportModal({
           <button
             type="button"
             className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              mode === 'excel' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              mode === 'excel'
+                ? 'bg-white text-brand-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
             onClick={() => setMode('excel')}
           >
@@ -1212,7 +1366,9 @@ function ImportModal({
           <button
             type="button"
             className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              mode === 'csv' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              mode === 'csv'
+                ? 'bg-white text-brand-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
             onClick={() => setMode('csv')}
           >
@@ -1267,7 +1423,8 @@ function ImportModal({
             ))}
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-            红色带 * 为必填，其余为选填；列与必填规则取自该资源类型的字典属性定义，字典改了模板会同步变化。
+            红色带 *
+            为必填，其余为选填；列与必填规则取自该资源类型的字典属性定义，字典改了模板会同步变化。
           </p>
         </div>
 
@@ -1276,8 +1433,7 @@ function ImportModal({
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2.5">
               <div>
                 <p className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
-                  <FileSpreadsheet size={14} className="text-brand-600" />
-                  第 1 步 · 下载 Excel 模板
+                  <FileSpreadsheet size={14} className="text-brand-600" />第 1 步 · 下载 Excel 模板
                 </p>
                 <p className="mt-0.5 text-[11px] text-slate-500">
                   含「资源数据」与「填写说明」两个工作表，必填标红、下拉列已内置可选值
@@ -1296,7 +1452,9 @@ function ImportModal({
 
             <div className="space-y-2 rounded-lg border border-slate-200 px-3 py-2.5">
               <div>
-                <p className="text-xs font-medium text-slate-700">第 2 步 · 填写后上传 .xlsx 文件</p>
+                <p className="text-xs font-medium text-slate-700">
+                  第 2 步 · 填写后上传 .xlsx 文件
+                </p>
                 <p className="mt-0.5 text-[11px] text-slate-500">
                   上传后会先逐行逐列校验；有问题会列出行号、列标和字段，全部通过后才写入数据库
                 </p>
@@ -1311,8 +1469,11 @@ function ImportModal({
               {parsed && (
                 <p className="flex items-center gap-1.5 text-xs text-emerald-700">
                   <CheckCircle2 size={14} />
-                  已解析「{parsed.fileName}」：{parsed.rows.length} 行数据、{parsed.headers.length} 列
-                  {parsed.issues.length === 0 && parsed.rows.length > 0 ? '，校验通过，可以导入' : ''}
+                  已解析「{parsed.fileName}」：{parsed.rows.length} 行数据、{parsed.headers.length}{' '}
+                  列
+                  {parsed.issues.length === 0 && parsed.rows.length > 0
+                    ? '，校验通过，可以导入'
+                    : ''}
                 </p>
               )}
               {parsed && parsed.unknownColumns.length > 0 && (
@@ -1342,7 +1503,9 @@ function ImportModal({
 
         {localError && <ErrorBanner message={localError} />}
         {serverSummary && <ErrorBanner message={serverSummary} />}
-        <ImportIssueList issues={mode === 'excel' ? [...(parsed?.issues ?? []), ...serverIssues] : serverIssues} />
+        <ImportIssueList
+          issues={mode === 'excel' ? [...(parsed?.issues ?? []), ...serverIssues] : serverIssues}
+        />
         {blockedByIssues && (
           <p className="text-[11px] text-slate-500">
             修正 Excel 后重新上传即可再次校验；为避免产生半批数据，存在字段问题时不会提交导入。

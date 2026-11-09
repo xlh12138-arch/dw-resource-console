@@ -1,7 +1,21 @@
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+} from 'react';
 
 export function cn(...inputs: (string | false | null | undefined)[]): string {
   return twMerge(clsx(inputs));
@@ -20,7 +34,8 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: ButtonSize }) {
   const variants: Record<ButtonVariant, string> = {
     primary: 'bg-brand-600 text-white hover:bg-brand-700 disabled:bg-brand-400',
-    outline: 'border border-slate-300 bg-transparent text-slate-700 hover:border-brand-600 hover:bg-white',
+    outline:
+      'border border-slate-300 bg-transparent text-slate-700 hover:border-brand-600 hover:bg-white',
     ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
     danger: 'bg-rose-600 text-white hover:bg-rose-700 disabled:bg-rose-300',
   };
@@ -126,7 +141,8 @@ export function Select({
   const missing = current !== '' && !items.some((o) => o.value === current);
   // 窄列里长文案会被截断，默认把当前项的完整文案挂到 title 上，悬停即可看全
   const currentLabel =
-    items.find((o) => o.value === current)?.label ?? (missing ? (fallbackLabel ?? current) : undefined);
+    items.find((o) => o.value === current)?.label ??
+    (missing ? (fallbackLabel ?? current) : undefined);
 
   const ref = useRef<HTMLSelectElement | null>(null);
   // 选项晚于 value 到达时（字典 / 项目 / 候选资源都是异步的），这里补一次回写
@@ -196,7 +212,9 @@ export function Switch({
           )}
         />
       </span>
-      <span className={cn('select-none text-slate-700', !disabled && 'group-hover:text-slate-900')}>{label}</span>
+      <span className={cn('select-none text-slate-700', !disabled && 'group-hover:text-slate-900')}>
+        {label}
+      </span>
       {hint ? <span className="select-none text-[11px] text-slate-400">{hint}</span> : null}
     </button>
   );
@@ -225,10 +243,22 @@ export function PageHeader({
 }
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <section className={cn('rounded-[12px] border border-slate-200 bg-white', className)}>{children}</section>;
+  return (
+    <section className={cn('rounded-[12px] border border-slate-200 bg-white', className)}>
+      {children}
+    </section>
+  );
 }
 
-export function CardHeader({ title, desc, action }: { title: string; desc?: string; action?: ReactNode }) {
+export function CardHeader({
+  title,
+  desc,
+  action,
+}: {
+  title: string;
+  desc?: string;
+  action?: ReactNode;
+}) {
   return (
     <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
       <div>
@@ -311,14 +341,25 @@ export function ClickableBadge({
 export function Spinner({ className }: { className?: string }) {
   return (
     <div
-      className={cn('h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600', className)}
+      className={cn(
+        'h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600',
+        className,
+      )}
       role="status"
       aria-label="加载中"
     />
   );
 }
 
-export function EmptyState({ title, desc, action }: { title: string; desc?: string; action?: ReactNode }) {
+export function EmptyState({
+  title,
+  desc,
+  action,
+}: {
+  title: string;
+  desc?: string;
+  action?: ReactNode;
+}) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
       <p className="text-sm font-medium text-slate-700">{title}</p>
@@ -328,7 +369,13 @@ export function EmptyState({ title, desc, action }: { title: string; desc?: stri
   );
 }
 
-export function ErrorBanner({ message, issues }: { message: string; issues?: { field: string; message: string }[] }) {
+export function ErrorBanner({
+  message,
+  issues,
+}: {
+  message: string;
+  issues?: { field: string; message: string }[];
+}) {
   return (
     <div className="space-y-1 rounded-[8px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
       <p>{message}</p>
@@ -454,7 +501,8 @@ export function Modal({
   // 打开时锁住背景滚动并把焦点移入弹窗；关闭后恢复原来的焦点位置。
   useEffect(() => {
     if (!open) return;
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const frame = window.requestAnimationFrame(() => dialogRef.current?.focus());
@@ -523,7 +571,10 @@ export function Modal({
       }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (event.shiftKey && (document.activeElement === first || document.activeElement === scope)) {
+      if (
+        event.shiftKey &&
+        (document.activeElement === first || document.activeElement === scope)
+      ) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -538,10 +589,11 @@ export function Modal({
 
   useEffect(() => {
     if (!confirming) return;
+    const dialog = dialogRef.current;
     const frame = window.requestAnimationFrame(() => confirmRef.current?.focus());
     return () => {
       window.cancelAnimationFrame(frame);
-      if (dialogRef.current?.isConnected) dialogRef.current.focus();
+      if (dialog?.isConnected) dialog.focus();
     };
   }, [confirming]);
 
@@ -562,40 +614,53 @@ export function Modal({
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-[#07160f]/70 p-4 backdrop-blur-[2px] sm:p-8"
     >
       <ModalGuardContext.Provider value={guard}>
-      <div
-        ref={dialogRef}
-        className={cn('w-full rounded-[12px] border border-white/20 bg-[#fbfbf8] shadow-2xl', width)}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={desc ? descId : undefined}
-        tabIndex={-1}
-        // 捕获表单里的输入 / 选择 / 开关，用于关闭时的「未保存」提示
-        onInputCapture={() => setTouched(true)}
-        onChangeCapture={() => setTouched(true)}
-        onClickCapture={(event) => {
-          const el = event.target as HTMLElement | null;
-          if (el?.closest?.('[role="switch"], [data-dirty="1"]')) setTouched(true);
-        }}
-      >
-        <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-          <div>
-            <h3 id={titleId} className="text-base font-medium text-slate-900">{title}</h3>
-            {desc && <p id={descId} className="mt-0.5 text-xs text-slate-500">{desc}</p>}
-          </div>
-          <button
-            type="button"
-            onClick={requestClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
-            aria-label="关闭"
-            title="关闭（ESC）"
-          >
-            ✕
-          </button>
-        </header>
-        <div className="px-5 py-4">{children}</div>
-        {footer && <footer className="flex justify-end gap-2 border-t border-slate-200 bg-white/60 px-5 py-3">{footer}</footer>}
-      </div>
+        <div
+          ref={dialogRef}
+          className={cn(
+            'w-full rounded-[12px] border border-white/20 bg-[#fbfbf8] shadow-2xl',
+            width,
+          )}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={desc ? descId : undefined}
+          tabIndex={-1}
+          // 捕获表单里的输入 / 选择 / 开关，用于关闭时的「未保存」提示
+          onInputCapture={() => setTouched(true)}
+          onChangeCapture={() => setTouched(true)}
+          onClickCapture={(event) => {
+            const el = event.target as HTMLElement | null;
+            if (el?.closest?.('[role="switch"], [data-dirty="1"]')) setTouched(true);
+          }}
+        >
+          <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+            <div>
+              <h3 id={titleId} className="text-base font-medium text-slate-900">
+                {title}
+              </h3>
+              {desc && (
+                <p id={descId} className="mt-0.5 text-xs text-slate-500">
+                  {desc}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={requestClose}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+              aria-label="关闭"
+              title="关闭（ESC）"
+            >
+              ✕
+            </button>
+          </header>
+          <div className="px-5 py-4">{children}</div>
+          {footer && (
+            <footer className="flex justify-end gap-2 border-t border-slate-200 bg-white/60 px-5 py-3">
+              {footer}
+            </footer>
+          )}
+        </div>
       </ModalGuardContext.Provider>
 
       {confirming && touched && (
@@ -609,7 +674,9 @@ export function Modal({
             aria-describedby={confirmDescId}
             tabIndex={-1}
           >
-            <h4 id={confirmTitleId} className="text-sm font-semibold text-slate-900">有未保存的修改</h4>
+            <h4 id={confirmTitleId} className="text-sm font-semibold text-slate-900">
+              有未保存的修改
+            </h4>
             <p id={confirmDescId} className="mt-1.5 text-xs text-slate-600">
               「{title}」中的内容已修改，关闭前请选择是否保存。
               {dirtyHint ? <span className="mt-1 block text-slate-500">{dirtyHint}</span> : null}
@@ -689,7 +756,12 @@ export function Pagination({
         <span className="px-2">
           {page} / {totalPages}
         </span>
-        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page >= totalPages}
+          onClick={() => onChange(page + 1)}
+        >
           下一页
         </Button>
       </div>
@@ -728,7 +800,11 @@ export function Th({
   ariaSort?: 'ascending' | 'descending' | 'none' | 'other';
 }) {
   return (
-    <th scope="col" aria-sort={ariaSort} className={cn('whitespace-nowrap px-4 py-3 font-medium', className)}>
+    <th
+      scope="col"
+      aria-sort={ariaSort}
+      className={cn('whitespace-nowrap px-4 py-3 font-medium', className)}
+    >
       {children}
     </th>
   );

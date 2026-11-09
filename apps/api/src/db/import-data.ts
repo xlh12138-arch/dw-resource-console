@@ -47,7 +47,9 @@ async function main(): Promise<void> {
       `SELECT 1 FROM ${schema}.${quoteIdentifier('__dw_data_imports')} WHERE file_hash = $1 LIMIT 1`,
       [hash],
     );
-    const force = ['1', 'true', 'yes', 'on'].includes(String(process.env.DB_IMPORT_FORCE || '').toLowerCase());
+    const force = ['1', 'true', 'yes', 'on'].includes(
+      String(process.env.DB_IMPORT_FORCE || '').toLowerCase(),
+    );
     if (existing.rowCount && !force) {
       await client.query('ROLLBACK');
       console.log(`[db-import] 文件 ${fileName} 已导入过，跳过`);

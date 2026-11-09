@@ -21,7 +21,10 @@ function collectIssues(validation: unknown): Issue[] {
           : typeof item.instancePath === 'string'
             ? item.instancePath
             : '';
-    const field = raw.replace(/^\//, '').replace(/\//g, '.').replace(/^(body|params|querystring|query)\./, '');
+    const field = raw
+      .replace(/^\//, '')
+      .replace(/\//g, '.')
+      .replace(/^(body|params|querystring|query)\./, '');
     const message = typeof item.message === 'string' ? item.message : '校验失败';
     out.push({ field: field || ('attrs' in item ? 'attrs' : ''), message });
   }
@@ -91,7 +94,11 @@ const errorHandlerImpl: FastifyPluginAsyncZod = async (app) => {
 
   app.setNotFoundHandler((request, reply) =>
     reply.status(404).send({
-      error: { code: 'NOT_FOUND', message: `接口不存在: ${request.method} ${request.url}`, requestId: request.id },
+      error: {
+        code: 'NOT_FOUND',
+        message: `接口不存在: ${request.method} ${request.url}`,
+        requestId: request.id,
+      },
     }),
   );
 };

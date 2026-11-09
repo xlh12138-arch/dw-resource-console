@@ -107,15 +107,25 @@ export const resourceTypeService = {
     const row = await resourceTypeRepository.findByCode(code);
     if (!row) throw notFound(`资源类型 ${code} 不存在`);
     const refs = await dictReferenceRepository.resourceTypeRefs(code);
-    return { code, label: row.label, kind: 'RESOURCE_TYPE', total: refs.total, groups: refs.groups };
+    return {
+      code,
+      label: row.label,
+      kind: 'RESOURCE_TYPE',
+      total: refs.total,
+      groups: refs.groups,
+    };
   },
 
-  async create(input: ResourceTypeCreateInput, actor: Actor, requestId?: string): Promise<ResourceTypeDetail> {
+  async create(
+    input: ResourceTypeCreateInput,
+    actor: Actor,
+    requestId?: string,
+  ): Promise<ResourceTypeDetail> {
     if (await resourceTypeRepository.exists(input.code)) {
       throw conflict(`资源类型编码 ${input.code} 已存在`);
     }
     await this.assertFields(input.fields);
-      await resourceTypeRepository.create({
+    await resourceTypeRepository.create({
       code: input.code,
       label: input.label,
       prefix: input.prefix,
@@ -157,13 +167,17 @@ export const resourceTypeService = {
   },
 
   /** 字段定义自检：key 唯一、下拉必须有选项 */
-  async assertFields(fields: { key: string; label: string; fieldType: string; options?: unknown }[]) {
+  async assertFields(
+    fields: { key: string; label: string; fieldType: string; options?: unknown }[],
+  ) {
     const seen = new Set<string>();
     for (const f of fields) {
       if (seen.has(f.key)) throw validationError(`字段标识 ${f.key} 重复`, { field: 'fields' });
       seen.add(f.key);
       if (f.fieldType === 'SELECT' && (!f.options || (f.options as unknown[]).length === 0)) {
-        throw validationError(`字段 ${f.label || f.key} 为下拉选择，至少需要一个选项`, { field: 'fields' });
+        throw validationError(`字段 ${f.label || f.key} 为下拉选择，至少需要一个选项`, {
+          field: 'fields',
+        });
       }
     }
   },
@@ -196,10 +210,19 @@ export const resourceTypeService = {
 
     const refs = await dictReferenceRepository.resourceTypeRefs(code);
     if (codeChanged && refs.total > 0 && !input.sync) {
-      throw conflict(`资源类型「${before.label}」已被 ${refs.total} 个对象引用，修改类型编码需要同步更新这些引用`, {
-        needSync: true,
-        references: { code, label: before.label, kind: 'RESOURCE_TYPE', total: refs.total, groups: refs.groups },
-      });
+      throw conflict(
+        `资源类型「${before.label}」已被 ${refs.total} 个对象引用，修改类型编码需要同步更新这些引用`,
+        {
+          needSync: true,
+          references: {
+            code,
+            label: before.label,
+            kind: 'RESOURCE_TYPE',
+            total: refs.total,
+            groups: refs.groups,
+          },
+        },
+      );
     }
 
     if (input.fields) await this.assertFields(input.fields);
@@ -291,10 +314,28 @@ export const resourceTypeService = {
             ]
           : []),
         ...(resourceCodeSynced > 0
-          ? [{ field: 'resourceCode', label: '同步资源编码', from: null, to: `${resourceCodeSynced} 条资源` }]
+          ? [
+              {
+                field: 'resourceCode',
+                label: '同步资源编码',
+                from: null,
+                to: `${resourceCodeSynced} 条资源`,
+              },
+            ]
           : []),
-        ...(input.fields ? [{ field: 'fields', label: '属性字段', from: null, to: `${input.fields.length} 个字段` }] : []),
-        ...(attrSynced > 0 ? [{ field: 'attrs', label: '同步资源属性', from: null, to: `${attrSynced} 条资源` }] : []),
+        ...(input.fields
+          ? [
+              {
+                field: 'fields',
+                label: '属性字段',
+                from: null,
+                to: `${input.fields.length} 个字段`,
+              },
+            ]
+          : []),
+        ...(attrSynced > 0
+          ? [{ field: 'attrs', label: '同步资源属性', from: null, to: `${attrSynced} 条资源` }]
+          : []),
       ],
       requestId,
     });
@@ -380,7 +421,11 @@ export const resourceTypeService = {
   /** 编码变更：把资源 / 模板条目 / 环境槽位上的旧编码批量改为新编码 */
   async syncCode(from: string, to: string): Promise<DictSyncResult> {
     const [resRows] = await Promise.all([
-      db.update(resources).set({ type: to, updatedAt: new Date() }).where(eq(resources.type, from)).returning(),
+      db
+        .update(resources)
+        .set({ type: to, updatedAt: new Date() })
+        .where(eq(resources.type, from))
+        .returning(),
     ]);
     const itemRows = await db
       .update(envTemplateItems)
@@ -422,7 +467,10 @@ export const resourceTypeService = {
         dropUnknown: opts.dropUnknown,
       });
       if (!isChanged) continue;
-      await db.update(resources).set({ attrs: value, updatedAt: new Date() }).where(eq(resources.id, row.id));
+      await db
+        .update(resources)
+        .set({ attrs: value, updatedAt: new Date() })
+        .where(eq(resources.id, row.id));
       changed += 1;
     }
     return changed;
@@ -433,7 +481,10 @@ export const resourceTypeService = {
     const meta = await getTypeMeta(code);
     if (meta.fields.length === 0) return 0;
     const known = new Set(meta.fields.map((f) => f.key));
-    const rows = await db.select({ attrs: resources.attrs }).from(resources).where(eq(resources.type, code));
+    const rows = await db
+      .select({ attrs: resources.attrs })
+      .from(resources)
+      .where(eq(resources.type, code));
     return rows.filter((r) => {
       const keys = Object.keys((r.attrs ?? {}) as Record<string, unknown>);
       return keys.some((k) => !known.has(k));
@@ -451,10 +502,19 @@ export const resourceTypeService = {
     if (!before) throw notFound(`资源类型 ${code} 不存在`);
     const refs = await dictReferenceRepository.resourceTypeRefs(code);
     if (refs.total > 0 && !migrateTo) {
-      throw conflict(`资源类型「${before.label}」已被 ${refs.total} 个对象引用，请先选择要迁移到的类型`, {
-        needSync: true,
-        references: { code, label: before.label, kind: 'RESOURCE_TYPE', total: refs.total, groups: refs.groups },
-      });
+      throw conflict(
+        `资源类型「${before.label}」已被 ${refs.total} 个对象引用，请先选择要迁移到的类型`,
+        {
+          needSync: true,
+          references: {
+            code,
+            label: before.label,
+            kind: 'RESOURCE_TYPE',
+            total: refs.total,
+            groups: refs.groups,
+          },
+        },
+      );
     }
     let result: DictSyncResult = {
       code,
@@ -479,7 +539,9 @@ export const resourceTypeService = {
       targetName: `资源类型 ${before.label}`,
       changes: [
         { field: '*', label: '删除资源类型', from: code, to: migrateTo ?? null },
-        ...(result.total > 0 ? [{ field: 'migrate', label: '引用迁移至', from: code, to: migrateTo! }] : []),
+        ...(result.total > 0
+          ? [{ field: 'migrate', label: '引用迁移至', from: code, to: migrateTo! }]
+          : []),
       ],
       requestId,
     });
@@ -496,7 +558,9 @@ export const environmentService = {
     const rows = includeDisabled
       ? await environmentRepository.listAll()
       : await environmentRepository.listEnabled();
-    const refs = await Promise.all(rows.map((r) => dictReferenceRepository.environmentRefs(r.code)));
+    const refs = await Promise.all(
+      rows.map((r) => dictReferenceRepository.environmentRefs(r.code)),
+    );
     return rows.map((r, i) => toEnvDto(r, refs[i].total));
   },
 
@@ -507,14 +571,20 @@ export const environmentService = {
     return { code, label: row.label, kind: 'ENVIRONMENT', total: refs.total, groups: refs.groups };
   },
 
-  async create(input: EnvironmentDictCreateInput, actor: Actor, requestId?: string): Promise<EnvironmentDto> {
-    if (await environmentRepository.exists(input.code)) throw conflict(`环境编码 ${input.code} 已存在`);
-      const row = await environmentRepository.create({
+  async create(
+    input: EnvironmentDictCreateInput,
+    actor: Actor,
+    requestId?: string,
+  ): Promise<EnvironmentDto> {
+    if (await environmentRepository.exists(input.code))
+      throw conflict(`环境编码 ${input.code} 已存在`);
+    const row = await environmentRepository.create({
       code: input.code,
       label: input.label,
       tone: input.tone,
       // 未显式指定时按历史预设补默认色，其余环境留空（前端按 tone 兜底）
-      color: input.color ?? ENVIRONMENT_COLORS[input.code as keyof typeof ENVIRONMENT_COLORS] ?? null,
+      color:
+        input.color ?? ENVIRONMENT_COLORS[input.code as keyof typeof ENVIRONMENT_COLORS] ?? null,
       description: input.description ?? null,
       enabled: input.enabled,
       builtin: false,
@@ -550,7 +620,12 @@ export const environmentService = {
     },
     actor: Actor,
     requestId?: string,
-  ): Promise<{ detail: EnvironmentDto; sync: DictSyncResult | null; pendingNameSync: number; nameSynced: number }> {
+  ): Promise<{
+    detail: EnvironmentDto;
+    sync: DictSyncResult | null;
+    pendingNameSync: number;
+    nameSynced: number;
+  }> {
     const before = await environmentRepository.findByCode(code);
     if (!before) throw notFound(`环境 ${code} 不存在`);
     const newCode = input.code?.trim() || code;
@@ -561,10 +636,19 @@ export const environmentService = {
 
     const refs = await dictReferenceRepository.environmentRefs(code);
     if (codeChanged && refs.total > 0 && !input.sync) {
-      throw conflict(`环境「${before.label}」已被 ${refs.total} 个对象引用，修改环境编码需要同步更新这些引用`, {
-        needSync: true,
-        references: { code, label: before.label, kind: 'ENVIRONMENT', total: refs.total, groups: refs.groups },
-      });
+      throw conflict(
+        `环境「${before.label}」已被 ${refs.total} 个对象引用，修改环境编码需要同步更新这些引用`,
+        {
+          needSync: true,
+          references: {
+            code,
+            label: before.label,
+            kind: 'ENVIRONMENT',
+            total: refs.total,
+            groups: refs.groups,
+          },
+        },
+      );
     }
 
     let sync: DictSyncResult | null = null;
@@ -582,7 +666,12 @@ export const environmentService = {
       sync = {
         code: newCode,
         previousCode: code,
-        updated: { resource: resRows.length, templateItem: 0, envSlot: 0, projectEnv: envRows.length },
+        updated: {
+          resource: resRows.length,
+          templateItem: 0,
+          envSlot: 0,
+          projectEnv: envRows.length,
+        },
         attrSynced: 0,
         total: resRows.length + envRows.length,
       };
@@ -610,7 +699,10 @@ export const environmentService = {
     const newLabel = after?.label ?? before.label;
     const targetNameFor = (name: string) =>
       name.endsWith('环境') && !newLabel.endsWith('环境') ? `${newLabel}环境` : newLabel;
-    const rows = await db.select().from(projectEnvironments).where(eq(projectEnvironments.environment, newCode));
+    const rows = await db
+      .select()
+      .from(projectEnvironments)
+      .where(eq(projectEnvironments.environment, newCode));
     const mismatched = rows.filter((r) => r.name !== targetNameFor(r.name));
     let pendingNameSync = 0;
     let nameSynced = 0;
@@ -663,15 +755,29 @@ export const environmentService = {
     return { detail: toEnvDto(after!, afterRefs.total), sync, pendingNameSync, nameSynced };
   },
 
-  async remove(code: string, migrateTo: string | undefined, actor: Actor, requestId?: string): Promise<DictSyncResult> {
+  async remove(
+    code: string,
+    migrateTo: string | undefined,
+    actor: Actor,
+    requestId?: string,
+  ): Promise<DictSyncResult> {
     const before = await environmentRepository.findByCode(code);
     if (!before) throw notFound(`环境 ${code} 不存在`);
     const refs = await dictReferenceRepository.environmentRefs(code);
     if (refs.total > 0 && !migrateTo) {
-      throw conflict(`环境「${before.label}」已被 ${refs.total} 个对象引用，请先选择要迁移到的环境`, {
-        needSync: true,
-        references: { code, label: before.label, kind: 'ENVIRONMENT', total: refs.total, groups: refs.groups },
-      });
+      throw conflict(
+        `环境「${before.label}」已被 ${refs.total} 个对象引用，请先选择要迁移到的环境`,
+        {
+          needSync: true,
+          references: {
+            code,
+            label: before.label,
+            kind: 'ENVIRONMENT',
+            total: refs.total,
+            groups: refs.groups,
+          },
+        },
+      );
     }
     let result: DictSyncResult = {
       code,
@@ -696,7 +802,12 @@ export const environmentService = {
       result = {
         code: migrateTo,
         previousCode: code,
-        updated: { resource: resRows.length, templateItem: 0, envSlot: 0, projectEnv: envRows.length },
+        updated: {
+          resource: resRows.length,
+          templateItem: 0,
+          envSlot: 0,
+          projectEnv: envRows.length,
+        },
         attrSynced: 0,
         total: resRows.length + envRows.length,
       };
@@ -731,18 +842,32 @@ export const dictGuard = {
   async assertType(code: string) {
     const meta = await getTypeMeta(code);
     if (!meta.exists) {
-      throw validationError(`资源类型 ${code} 不存在，请先到「字典配置」中维护`, { field: 'type', code });
+      throw validationError(`资源类型 ${code} 不存在，请先到「字典配置」中维护`, {
+        field: 'type',
+        code,
+      });
     }
     if (!meta.enabled) {
-      throw validationError(`资源类型 ${meta.label} 已停用，请先启用后再使用`, { field: 'type', code });
+      throw validationError(`资源类型 ${meta.label} 已停用，请先启用后再使用`, {
+        field: 'type',
+        code,
+      });
     }
     return meta;
   },
 
   async assertEnvironment(code: string) {
     const row = await environmentRepository.findByCode(code);
-    if (!row) throw validationError(`环境 ${code} 不存在，请先到「字典配置」中维护`, { field: 'environment', code });
-    if (!row.enabled) throw validationError(`环境 ${row.label} 已停用，请先启用后再使用`, { field: 'environment', code });
+    if (!row)
+      throw validationError(`环境 ${code} 不存在，请先到「字典配置」中维护`, {
+        field: 'environment',
+        code,
+      });
+    if (!row.enabled)
+      throw validationError(`环境 ${row.label} 已停用，请先启用后再使用`, {
+        field: 'environment',
+        code,
+      });
     return row;
   },
 };

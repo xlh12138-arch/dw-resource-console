@@ -80,7 +80,9 @@ export function fieldIssues(error: unknown): FieldIssue[] {
   const raw = error.details as unknown;
   const list = Array.isArray(raw)
     ? raw
-    : typeof raw === 'object' && raw !== null && Array.isArray((raw as { issues?: unknown[] }).issues)
+    : typeof raw === 'object' &&
+        raw !== null &&
+        Array.isArray((raw as { issues?: unknown[] }).issues)
       ? (raw as { issues: unknown[] }).issues
       : [];
   const out: FieldIssue[] = [];

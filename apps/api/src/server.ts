@@ -11,7 +11,9 @@ async function main(): Promise<void> {
     await authService.ensureBootstrapAdmin();
 
     await app.listen({ host: config.server.host, port: config.server.port });
-    app.log.info(`API 已启动: http://${config.server.host}:${config.server.port}${config.server.basePath}`);
+    app.log.info(
+      `API 已启动: http://${config.server.host}:${config.server.port}${config.server.basePath}`,
+    );
     app.log.info(`OpenAPI 文档: http://localhost:${config.server.port}/docs`);
 
     const shutdown = async (signal: string) => {

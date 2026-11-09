@@ -33,7 +33,10 @@ export const resourceTypes = appTable('resource_types', {
   prefix: text('prefix').notNull(),
   description: text('description'),
   ipUniqueByPort: boolean('ip_unique_by_port').notNull().default(false),
-  listColumns: jsonb('list_columns').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  listColumns: jsonb('list_columns')
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
   enabled: boolean('enabled').notNull().default(true),
   builtin: boolean('builtin').notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
@@ -61,7 +64,10 @@ export const resourceTypeFields = appTable(
     isIp: boolean('is_ip').notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
   },
-  (t) => [uniqueIndex('uq_type_field').on(t.typeCode, t.key), index('idx_type_field_type').on(t.typeCode)],
+  (t) => [
+    uniqueIndex('uq_type_field').on(t.typeCode, t.key),
+    index('idx_type_field_type').on(t.typeCode),
+  ],
 );
 
 export const environmentDict = appTable('environments', {
@@ -84,7 +90,9 @@ export const projects = appTable(
     name: text('name').notNull(),
     description: text('description'),
     owner: text('owner'),
-    status: text('status', { enum: ['ACTIVE', 'ARCHIVED'] }).notNull().default('ACTIVE'),
+    status: text('status', { enum: ['ACTIVE', 'ARCHIVED'] })
+      .notNull()
+      .default('ACTIVE'),
     createdById: integer('created_by_id'),
     createdByName: text('created_by_name'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
@@ -166,8 +174,12 @@ export const users = appTable(
     username: text('username').notNull(),
     displayName: text('display_name').notNull(),
     passwordHash: text('password_hash').notNull(),
-    role: text('role', { enum: ['ADMIN', 'USER', 'READONLY'] }).notNull().default('READONLY'),
-    status: text('status', { enum: ['ACTIVE', 'DISABLED'] }).notNull().default('ACTIVE'),
+    role: text('role', { enum: ['ADMIN', 'USER', 'READONLY'] })
+      .notNull()
+      .default('READONLY'),
+    status: text('status', { enum: ['ACTIVE', 'DISABLED'] })
+      .notNull()
+      .default('ACTIVE'),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true, mode: 'date' }),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
@@ -209,7 +221,10 @@ export const resources = appTable(
       .default('IN_USE'),
     datacenter: text('datacenter'),
     owner: text('owner'),
-    tags: jsonb('tags').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    tags: jsonb('tags')
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     remark: text('remark'),
     attrs: jsonb('attrs').$type<Record<string, unknown>>().notNull(),
     projectId: integer('project_id').references(() => projects.id, { onDelete: 'set null' }),
@@ -219,7 +234,9 @@ export const resources = appTable(
     capacityTotal: doublePrecision('capacity_total'),
     capacityUnit: text('capacity_unit'),
     capacityRemark: text('capacity_remark'),
-    parentId: integer('parent_id').references((): AnyPgColumn => resources.id, { onDelete: 'set null' }),
+    parentId: integer('parent_id').references((): AnyPgColumn => resources.id, {
+      onDelete: 'set null',
+    }),
     demandAmount: doublePrecision('demand_amount'),
     createdById: integer('created_by_id'),
     createdByName: text('created_by_name'),
@@ -274,15 +291,26 @@ export const auditLogs = appTable(
       enum: ['CREATE', 'UPDATE', 'DELETE', 'IMPORT', 'LOGIN', 'LOGOUT'],
     }).notNull(),
     targetType: text('target_type', {
-      enum: ['RESOURCE', 'USER', 'AUTH', 'PROJECT', 'ENVIRONMENT', 'TEMPLATE', 'DICT', 'SLOT_PERIOD'],
+      enum: [
+        'RESOURCE',
+        'USER',
+        'AUTH',
+        'PROJECT',
+        'ENVIRONMENT',
+        'TEMPLATE',
+        'DICT',
+        'SLOT_PERIOD',
+      ],
     }).notNull(),
     targetId: text('target_id'),
     targetName: text('target_name'),
-    changes: jsonb('changes').$type<
-      { field: string; label?: string; from: unknown; to: unknown }[]
-    >(),
+    changes:
+      jsonb('changes').$type<{ field: string; label?: string; from: unknown; to: unknown }[]>(),
     requestId: text('request_id'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
-  (t) => [index('idx_audit_target').on(t.targetType, t.targetId), index('idx_audit_created').on(t.createdAt)],
+  (t) => [
+    index('idx_audit_target').on(t.targetType, t.targetId),
+    index('idx_audit_created').on(t.createdAt),
+  ],
 );

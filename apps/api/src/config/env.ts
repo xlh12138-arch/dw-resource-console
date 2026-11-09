@@ -23,7 +23,8 @@ function findEnvFile(): string | undefined {
 const envFile = findEnvFile();
 if (envFile) process.loadEnvFile?.(envFile);
 
-const bool = (v: unknown, d: boolean) => (v === undefined ? d : ['1', 'true', 'yes'].includes(String(v)));
+const bool = (v: unknown, d: boolean) =>
+  v === undefined ? d : ['1', 'true', 'yes'].includes(String(v));
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -65,7 +66,6 @@ const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   // 快速失败：配置缺失或非法时立刻退出，而不是带着错误配置启动
   const issues = parsed.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');
-  // eslint-disable-next-line no-console
   console.error(`[config] 环境变量校验失败：\n${issues}`);
   process.exit(1);
 }
@@ -104,7 +104,9 @@ export const config = {
   },
   cors: {
     // 生产环境禁止通配符，必须显式列出来源
-    origins: raw.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean),
+    origins: raw.CORS_ORIGIN.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
   },
   db: {
     driver: raw.DB_DRIVER,

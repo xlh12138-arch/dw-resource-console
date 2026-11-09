@@ -65,7 +65,10 @@ export const resourceTypeFields = sqliteTable(
     isIp: integer('is_ip', { mode: 'boolean' }).notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
   },
-  (t) => [uniqueIndex('uq_type_field').on(t.typeCode, t.key), index('idx_type_field_type').on(t.typeCode)],
+  (t) => [
+    uniqueIndex('uq_type_field').on(t.typeCode, t.key),
+    index('idx_type_field_type').on(t.typeCode),
+  ],
 );
 
 /** 环境字典：不再只有生产/准生产/开发测试，可在页面自定义 */
@@ -94,7 +97,9 @@ export const projects = sqliteTable(
     name: text('name').notNull(),
     description: text('description'),
     owner: text('owner'),
-    status: text('status', { enum: ['ACTIVE', 'ARCHIVED'] }).notNull().default('ACTIVE'),
+    status: text('status', { enum: ['ACTIVE', 'ARCHIVED'] })
+      .notNull()
+      .default('ACTIVE'),
     createdById: integer('created_by_id'),
     createdByName: text('created_by_name'),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
@@ -189,8 +194,12 @@ export const users = sqliteTable(
     username: text('username').notNull(),
     displayName: text('display_name').notNull(),
     passwordHash: text('password_hash').notNull(),
-    role: text('role', { enum: ['ADMIN', 'USER', 'READONLY'] }).notNull().default('READONLY'),
-    status: text('status', { enum: ['ACTIVE', 'DISABLED'] }).notNull().default('ACTIVE'),
+    role: text('role', { enum: ['ADMIN', 'USER', 'READONLY'] })
+      .notNull()
+      .default('READONLY'),
+    status: text('status', { enum: ['ACTIVE', 'DISABLED'] })
+      .notNull()
+      .default('ACTIVE'),
     lastLoginAt: integer('last_login_at', { mode: 'timestamp_ms' }),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
       .notNull()
@@ -245,7 +254,10 @@ export const resources = sqliteTable(
       .default('IN_USE'),
     datacenter: text('datacenter'),
     owner: text('owner'),
-    tags: text('tags', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+    tags: text('tags', { mode: 'json' })
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'`),
     remark: text('remark'),
     attrs: text('attrs', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
     /** 主归属项目 / 项目环境：用于按项目检索与批量标注 */
@@ -265,7 +277,9 @@ export const resources = sqliteTable(
      * 父子层级：子资源挂在父资源下，attrs 在继承父资源属性后可补充额外字段。
      * 子资源的 demandAmount 会占用父资源容量，父资源容量调整时同步校验。
      */
-    parentId: integer('parent_id').references((): AnySQLiteColumn => resources.id, { onDelete: 'set null' }),
+    parentId: integer('parent_id').references((): AnySQLiteColumn => resources.id, {
+      onDelete: 'set null',
+    }),
     /** 向父资源申请的容量（仅子资源有值） */
     demandAmount: real('demand_amount'),
     createdById: integer('created_by_id'),
@@ -340,7 +354,16 @@ export const auditLogs = sqliteTable(
       enum: ['CREATE', 'UPDATE', 'DELETE', 'IMPORT', 'LOGIN', 'LOGOUT'],
     }).notNull(),
     targetType: text('target_type', {
-      enum: ['RESOURCE', 'USER', 'AUTH', 'PROJECT', 'ENVIRONMENT', 'TEMPLATE', 'DICT', 'SLOT_PERIOD'],
+      enum: [
+        'RESOURCE',
+        'USER',
+        'AUTH',
+        'PROJECT',
+        'ENVIRONMENT',
+        'TEMPLATE',
+        'DICT',
+        'SLOT_PERIOD',
+      ],
     }).notNull(),
     targetId: text('target_id'),
     targetName: text('target_name'),
@@ -352,7 +375,10 @@ export const auditLogs = sqliteTable(
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
   },
-  (t) => [index('idx_audit_target').on(t.targetType, t.targetId), index('idx_audit_created').on(t.createdAt)],
+  (t) => [
+    index('idx_audit_target').on(t.targetType, t.targetId),
+    index('idx_audit_created').on(t.createdAt),
+  ],
 );
 
 export type UserRow = typeof users.$inferSelect;

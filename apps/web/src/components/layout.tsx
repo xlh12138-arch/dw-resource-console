@@ -21,8 +21,20 @@ const NAV = [
   { to: '/resources', label: '资源台账', shortLabel: '台账', icon: Database },
   { to: '/projects', label: '需求项目', shortLabel: '项目', icon: FolderKanban },
   { to: '/templates', label: '环境模板', shortLabel: '模板', icon: Boxes },
-  { to: '/dict', label: '字典配置', shortLabel: '字典', icon: Settings2, permission: 'resource:read' },
-  { to: '/audit', label: '变更审计', shortLabel: '审计', icon: FileClock, permission: 'audit:read' },
+  {
+    to: '/dict',
+    label: '字典配置',
+    shortLabel: '字典',
+    icon: Settings2,
+    permission: 'resource:read',
+  },
+  {
+    to: '/audit',
+    label: '变更审计',
+    shortLabel: '审计',
+    icon: FileClock,
+    permission: 'audit:read',
+  },
   { to: '/users', label: '用户管理', shortLabel: '用户', icon: Users, permission: 'user:manage' },
 ];
 
@@ -33,7 +45,9 @@ function Brand({ compact = false }: { compact?: boolean }) {
         <Database size={18} strokeWidth={2.2} />
       </div>
       <div className={cn('min-w-0', compact && 'block')}>
-        <p className="truncate text-[14px] font-medium leading-tight text-white">数据仓库资源控制台</p>
+        <p className="truncate text-[14px] font-medium leading-tight text-white">
+          数据仓库资源控制台
+        </p>
       </div>
     </div>
   );
@@ -60,7 +74,8 @@ export function Layout() {
   useEffect(() => {
     if (!mobileOpen) return;
 
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     mobileCloseRef.current?.focus();
@@ -143,7 +158,10 @@ export function Layout() {
             <Brand />
           </NavLink>
 
-          <nav className="hidden h-full flex-1 items-center justify-center gap-1 xl:flex" aria-label="主导航">
+          <nav
+            className="hidden h-full flex-1 items-center justify-center gap-1 xl:flex"
+            aria-label="主导航"
+          >
             {renderNavigation()}
           </nav>
 
@@ -185,7 +203,11 @@ export function Layout() {
         </div>
       </header>
 
-      <main id="main-content" tabIndex={-1} className="min-w-0 px-4 py-6 focus:outline-none sm:px-6 sm:py-8 lg:px-8">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="min-w-0 px-4 py-6 focus:outline-none sm:px-6 sm:py-8 lg:px-8"
+      >
         <div className="mx-auto max-w-[1560px]">
           <Outlet />
         </div>

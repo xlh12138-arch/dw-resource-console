@@ -1,4 +1,10 @@
-import { createUserSchema, pagedSchema, resetPasswordResultSchema, updateUserSchema, userSchema } from '@dw/shared';
+import {
+  createUserSchema,
+  pagedSchema,
+  resetPasswordResultSchema,
+  updateUserSchema,
+  userSchema,
+} from '@dw/shared';
 import { z } from 'zod';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { actorOf } from '../../lib/actor.js';
@@ -15,7 +21,10 @@ export const userRoutes: FastifyPluginAsyncZod = async (app) => {
     { ...adminGuard, schema: { response: { 200: pagedSchema(userSchema) } } },
     async () => {
       const items = await userService.list();
-      return { items, meta: { page: 1, pageSize: items.length, total: items.length, totalPages: 1 } };
+      return {
+        items,
+        meta: { page: 1, pageSize: items.length, total: items.length, totalPages: 1 },
+      };
     },
   );
 
@@ -32,7 +41,10 @@ export const userRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.patch(
     '/users/:id',
-    { ...adminGuard, schema: { params: idParams, body: updateUserSchema, response: { 200: userSchema } } },
+    {
+      ...adminGuard,
+      schema: { params: idParams, body: updateUserSchema, response: { 200: userSchema } },
+    },
     async (request) =>
       withTransaction(() =>
         userService.update(request.params.id, request.body, actorOf(request), request.id),
@@ -56,6 +68,8 @@ export const userRoutes: FastifyPluginAsyncZod = async (app) => {
     '/users/:id/reset-password',
     { ...adminGuard, schema: { params: idParams, response: { 200: resetPasswordResultSchema } } },
     async (request) =>
-      withTransaction(() => userService.resetPassword(request.params.id, actorOf(request), request.id)),
+      withTransaction(() =>
+        userService.resetPassword(request.params.id, actorOf(request), request.id),
+      ),
   );
 };
