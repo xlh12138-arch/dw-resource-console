@@ -10,7 +10,7 @@
  *  6. 环境字典为 DEV / PT / UAT，且不再标记内置
  */
 
-const BASE = process.env.SMOKE_BASE ?? 'http://127.0.0.1:8787/api/v1';
+import { ADMIN_USERNAME, BASE, adminPassword } from './lib/smoke-env.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -45,8 +45,8 @@ async function req(path, { method = 'GET', token, body } = {}) {
 }
 
 const ADMIN = {
-  username: process.env.SMOKE_ADMIN_USER ?? 'admin',
-  password: process.env.SMOKE_PASSWORD ?? 'Admin@12345',
+  username: ADMIN_USERNAME,
+  password: adminPassword('smoke-slot-capacity'),
 };
 
 const A = (await req('/auth/login', { method: 'POST', body: ADMIN })).json.accessToken;
@@ -57,7 +57,10 @@ const A = (await req('/auth/login', { method: 'POST', body: ADMIN })).json.acces
 console.log('\n[1] 环境字典为 DEV / PT / UAT');
 const envs = (await req('/environments?includeDisabled=true', { token: A })).json;
 const codes = envs.map((e) => e.code);
-ok(['DEV', 'PT', 'UAT'].every((c) => codes.includes(c)), `环境字典齐全（${codes.join('/')}）`);
+ok(
+  ['DEV', 'PT', 'UAT'].every((c) => codes.includes(c)),
+  `环境字典齐全（${codes.join('/')}）`,
+);
 const dev = envs.find((e) => e.code === 'DEV');
 const pt = envs.find((e) => e.code === 'PT');
 const uat = envs.find((e) => e.code === 'UAT');
@@ -66,7 +69,10 @@ ok(pt?.builtin === false && Boolean(pt?.label), `PT 为非内置且有显示名�
 ok(uat?.builtin === false && Boolean(uat?.label), `UAT 为非内置且有显示名（${uat?.label}）`);
 const prod = envs.find((e) => e.code === 'PROD');
 ok(prod?.builtin === false && prod?.label === '生产', `PROD 为非内置生产环境（${prod?.label}）`);
-ok(envs.every((e) => /^#[0-9a-f]{6}$/.test(e.color ?? '')), '环境字典均带 #rrggbb 标识色');
+ok(
+  envs.every((e) => /^#[0-9a-f]{6}$/.test(e.color ?? '')),
+  '环境字典均带 #rrggbb 标识色',
+);
 
 /* ------------------------------------------------------------------ *
  * [2] 准备：两个项目、各自环境
@@ -156,11 +162,11 @@ const delSlot = await req(`/project-environments/${envA.id}/slots/${slot.id}`, {
 });
 ok(delSlot.status === 200, '删除槽位返回 200');
 const afterDel = (await req(`/project-environments/${envA.id}`, { token: A })).json;
-ok(afterDel.slots.length === slotCountBefore - 1, `槽位数量从 ${slotCountBefore} 减到 ${afterDel.slots.length}`);
 ok(
-  !afterDel.slots.some((s) => s.id === slot.id),
-  '被删除的槽位不再出现在环境详情中',
+  afterDel.slots.length === slotCountBefore - 1,
+  `槽位数量从 ${slotCountBefore} 减到 ${afterDel.slots.length}`,
 );
+ok(!afterDel.slots.some((s) => s.id === slot.id), '被删除的槽位不再出现在环境详情中');
 
 /* ------------------------------------------------------------------ *
  * [5] 容量：必填 / 不可超额 / 占用后可调
@@ -224,7 +230,10 @@ ok(
     tooLow.json.error.details.references.length > 0,
   '返回了占用明细（谁占用了多少）',
 );
-ok(tooLow.json?.error?.details?.shortage === 200, `缺口计算正确（${tooLow.json?.error?.details?.shortage}）`);
+ok(
+  tooLow.json?.error?.details?.shortage === 200,
+  `缺口计算正确（${tooLow.json?.error?.details?.shortage}）`,
+);
 
 const bigger = await req(`/resources/${nas.id}`, {
   method: 'PATCH',
@@ -232,7 +241,10 @@ const bigger = await req(`/resources/${nas.id}`, {
   body: { capacityTotal: 2000 },
 });
 ok(bigger.status === 200, `调大到 2000 成功（${bigger.status}）`);
-ok(bigger.json.capacityAvailable === 1700, `调大后剩余 1700（实际 ${bigger.json.capacityAvailable}）`);
+ok(
+  bigger.json.capacityAvailable === 1700,
+  `调大后剩余 1700（实际 ${bigger.json.capacityAvailable}）`,
+);
 
 const clearWhileUsed = await req(`/resources/${nas.id}`, {
   method: 'PATCH',
@@ -254,7 +266,9 @@ const envBDetail = (
 ).json;
 const slotB = envBDetail.slots.find((s) => s.slotRole === '跨项目槽位');
 
-const candB = (await req(`/project-environments/${envB.id}/slots/${slotB.id}/candidates`, { token: A })).json;
+const candB = (
+  await req(`/project-environments/${envB.id}/slots/${slotB.id}/candidates`, { token: A })
+).json;
 const usedItem = candB.items.find((c) => c.resource.id === nas.id);
 ok(Boolean(usedItem), '候选列表中包含该资源');
 ok(usedItem?.usedByOtherProject === true, '标记为「已被其他项目引用」');
@@ -294,7 +308,9 @@ const envBWithCross = (
   })
 ).json;
 const crossSlot = envBWithCross.slots.find((s) => s.slotRole === '跨环境槽位');
-const candCross = (await req(`/project-environments/${envB.id}/slots/${crossSlot.id}/candidates`, { token: A })).json;
+const candCross = (
+  await req(`/project-environments/${envB.id}/slots/${crossSlot.id}/candidates`, { token: A })
+).json;
 const crossItem = candCross.items.find((c) => c.crossEnvironment);
 ok(Boolean(crossItem), '候选列表中存在跨环境资源');
 ok(
@@ -327,7 +343,10 @@ if (crossId) {
  * ------------------------------------------------------------------ */
 console.log('\n[9] 资源台账的引用明细');
 const detail = (await req(`/resources/${nas.id}`, { token: A })).json;
-ok(Array.isArray(detail.references) && detail.references.length >= 2, `引用明细 ≥2 条（${detail.references.length}）`);
+ok(
+  Array.isArray(detail.references) && detail.references.length >= 2,
+  `引用明细 ≥2 条（${detail.references.length}）`,
+);
 ok(
   detail.references.some((r) => r.projectName === pA.name && r.envName === '产品测试环境'),
   '明细含项目 A 的产品测试环境',
@@ -356,7 +375,10 @@ const un = await req(`/project-environments/${envB.id}/slots/${slotB.id}/assign`
 });
 ok(un.status === 200, '解绑成功');
 const afterUn = (await req(`/resources/${nas.id}`, { token: A })).json;
-ok(afterUn.capacity?.allocated === 300, `解绑后占用回落至 300（实际 ${afterUn.capacity?.allocated}）`);
+ok(
+  afterUn.capacity?.allocated === 300,
+  `解绑后占用回落至 300（实际 ${afterUn.capacity?.allocated}）`,
+);
 const clearedSlot = (await req(`/project-environments/${envB.id}`, { token: A })).json.slots.find(
   (s) => s.id === slotB.id,
 );
@@ -366,7 +388,10 @@ ok(clearedSlot?.demandAmount === null, '解绑后槽位申请量被清空');
  * [11] 清理
  * ------------------------------------------------------------------ */
 console.log('\n[11] 清理冒烟数据');
-await req(`/project-environments/${envA.id}/slots/${capSlot.id}/assign`, { method: 'DELETE', token: A });
+await req(`/project-environments/${envA.id}/slots/${capSlot.id}/assign`, {
+  method: 'DELETE',
+  token: A,
+});
 await req(`/resources/${nas.id}`, { method: 'DELETE', token: A });
 // 项目下有环境时禁止删除，须先删环境，保证脚本可重复执行不残留数据
 await req(`/project-environments/${envA.id}`, { method: 'DELETE', token: A });

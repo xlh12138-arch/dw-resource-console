@@ -16,7 +16,7 @@
  *  7. 时间轴占用曲线
  */
 
-const BASE = process.env.SMOKE_BASE ?? 'http://127.0.0.1:8787/api/v1';
+import { ADMIN_USERNAME, BASE, adminPassword } from './lib/smoke-env.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -51,8 +51,8 @@ async function req(path, { method = 'GET', token, body } = {}) {
 }
 
 const ADMIN = {
-  username: 'admin',
-  password: process.env.SMOKE_PASSWORD ?? 'Admin@12345',
+  username: ADMIN_USERNAME,
+  password: adminPassword('smoke-capacity-period'),
 };
 
 const login = await req('/auth/login', { method: 'POST', body: ADMIN });
@@ -101,7 +101,9 @@ const nas = (
 ok(Boolean(nas?.id), `容量资源创建成功（${nas.code} / 1000 GB）`);
 
 async function makeProject(name) {
-  const project = (await req('/projects', { method: 'POST', token: A, body: { name, owner: '冒烟' } })).json;
+  const project = (
+    await req('/projects', { method: 'POST', token: A, body: { name, owner: '冒烟' } })
+  ).json;
   const env = (
     await req(`/projects/${project.id}/environments`, {
       method: 'POST',
@@ -122,10 +124,7 @@ async function makeProject(name) {
 const ctxA = await makeProject(`冒烟时段A-${stamp}`);
 const ctxB = await makeProject(`冒烟时段B-${stamp}`);
 const ctxC = await makeProject(`冒烟时段C-${stamp}`);
-ok(
-  Boolean(ctxA.slot?.id && ctxB.slot?.id && ctxC.slot?.id),
-  '三个项目环境槽位就绪',
-);
+ok(Boolean(ctxA.slot?.id && ctxB.slot?.id && ctxC.slot?.id), '三个项目环境槽位就绪');
 
 /* ------------------------------------------------------------------ *
  * [1] 错峰占用：两个不重叠的时间段都能占满容量
@@ -134,7 +133,13 @@ console.log('\n[1] 不重叠时间段各自可用最大容量');
 const bindA = await req(`/project-environments/${ctxA.env.id}/slots/${ctxA.slot.id}/assign`, {
   method: 'POST',
   token: A,
-  body: { resourceId: nas.id, amount: 1000, startAt: day(-300), endAt: day(-150), acknowledge: true },
+  body: {
+    resourceId: nas.id,
+    amount: 1000,
+    startAt: day(-300),
+    endAt: day(-150),
+    acknowledge: true,
+  },
 });
 ok(bindA.status === 200, `A 项目占用 1000GB（${day(-300)} → ${day(-150)}）成功`, bindA.text);
 ok(bindA.json?.slot?.demandAmount === 1000, 'A 槽位记录申请容量 1000');
@@ -142,13 +147,16 @@ ok(bindA.json?.slot?.demandAmount === 1000, 'A 槽位记录申请容量 1000');
 const bindB = await req(`/project-environments/${ctxB.env.id}/slots/${ctxB.slot.id}/assign`, {
   method: 'POST',
   token: A,
-  body: { resourceId: nas.id, amount: 1000, startAt: day(-140), endAt: day(-10), acknowledge: true },
+  body: {
+    resourceId: nas.id,
+    amount: 1000,
+    startAt: day(-140),
+    endAt: day(-10),
+    acknowledge: true,
+  },
 });
 ok(bindB.status === 200, `B 项目错峰占用 1000GB（${day(-140)} → ${day(-10)}）成功`, bindB.text);
-ok(
-  bindB.json?.slot?.demandAmount === 1000,
-  'B 项目拿到满容量（错峰不累加，未被 A 的占用挤占）',
-);
+ok(bindB.json?.slot?.demandAmount === 1000, 'B 项目拿到满容量（错峰不累加，未被 A 的占用挤占）');
 
 /* ------------------------------------------------------------------ *
  * [2] 详情给出「合计」与「峰值」两个口径
@@ -158,14 +166,8 @@ const detail = (await req(`/resources/${nas.id}`, { token: A })).json;
 const cap = detail?.capacity;
 ok(cap?.total === 1000, `总容量 1000（实际 ${cap?.total}）`);
 ok(cap?.allocated === 2000, `不分时段合计占用 2000（实际 ${cap?.allocated}）`);
-ok(
-  cap?.peak?.amount === 1000,
-  `按时间段的峰值占用为 1000（实际 ${cap?.peak?.amount}）`,
-);
-ok(
-  cap?.peakAvailable === 0,
-  `峰值口径剩余 0（实际 ${cap?.peakAvailable}）`,
-);
+ok(cap?.peak?.amount === 1000, `按时间段的峰值占用为 1000（实际 ${cap?.peak?.amount}）`);
+ok(cap?.peakAvailable === 0, `峰值口径剩余 0（实际 ${cap?.peakAvailable}）`);
 ok(
   sameDayish(cap?.peak?.startAt, day(-300)) && sameDayish(cap?.peak?.endAt, day(-150)),
   `峰值时段落在 A 的占用区间（实际 ${cap?.peak?.startAt?.slice(0, 10)} → ${cap?.peak?.endAt?.slice(0, 10)}）`,
@@ -186,13 +188,16 @@ console.log('\n[3] 时间段重叠时占用求和，超额被拒绝');
 const clash = await req(`/project-environments/${ctxC.env.id}/slots/${ctxC.slot.id}/assign`, {
   method: 'POST',
   token: A,
-  body: { resourceId: nas.id, amount: 200, startAt: day(-200), endAt: day(-180), acknowledge: true },
+  body: {
+    resourceId: nas.id,
+    amount: 200,
+    startAt: day(-200),
+    endAt: day(-180),
+    acknowledge: true,
+  },
 });
 ok(clash.status === 409, `与 A 重叠的 200GB 被拒绝（409，实际 ${clash.status}）`);
-ok(
-  clash.json?.error?.details?.code === 'CAPACITY_EXCEEDED',
-  '错误类型为 CAPACITY_EXCEEDED',
-);
+ok(clash.json?.error?.details?.code === 'CAPACITY_EXCEEDED', '错误类型为 CAPACITY_EXCEEDED');
 ok(
   clash.json?.error?.details?.available === 0,
   `提示该时段剩余 0（实际 ${clash.json?.error?.details?.available}）`,
@@ -201,10 +206,7 @@ ok(
   clash.json?.error?.details?.peak?.amount === 1000,
   `错误详情带峰值口径 ${clash.json?.error?.details?.peak?.amount}`,
 );
-ok(
-  (clash.json?.error?.message ?? '').includes('超出'),
-  '错误信息可读',
-);
+ok((clash.json?.error?.message ?? '').includes('超出'), '错误信息可读');
 
 /* ------------------------------------------------------------------ *
  * [4] 空档期可继续占用
@@ -213,7 +215,13 @@ console.log('\n[4] 空档期（A 已结束、B 未开始）可继续占用');
 const gap = await req(`/project-environments/${ctxC.env.id}/slots/${ctxC.slot.id}/assign`, {
   method: 'POST',
   token: A,
-  body: { resourceId: nas.id, amount: 300, startAt: day(-149), endAt: day(-141), acknowledge: true },
+  body: {
+    resourceId: nas.id,
+    amount: 300,
+    startAt: day(-149),
+    endAt: day(-141),
+    acknowledge: true,
+  },
 });
 ok(gap.status === 200, `空档期占用 300GB 成功（${day(-149)} → ${day(-141)}）`, gap.text);
 const afterGap = (await req(`/resources/${nas.id}`, { token: A })).json;
@@ -305,7 +313,9 @@ ok(
   `引用明细带项目名（样例：${(projEnvGroup?.samples ?? [])[0]?.name ?? '无'}）`,
 );
 // 样例只取前 8 条，这里校验「每条都能落到具体项目」，而不是依赖排序
-const knownProjects = new Set((await req('/projects?pageSize=200', { token: A })).json.items.map((p) => p.name));
+const knownProjects = new Set(
+  (await req('/projects?pageSize=200', { token: A })).json.items.map((p) => p.name),
+);
 ok(
   (projEnvGroup?.samples ?? []).every((s) => {
     const head = s.name.split(' · ')[0];
@@ -330,7 +340,10 @@ for (const ctx of [ctxA, ctxB, ctxC, ctxD, ctxE]) {
     method: 'DELETE',
     token: A,
   });
-  const envRemoved = await req(`/project-environments/${ctx.env.id}`, { method: 'DELETE', token: A });
+  const envRemoved = await req(`/project-environments/${ctx.env.id}`, {
+    method: 'DELETE',
+    token: A,
+  });
   const removed = await req(`/projects/${ctx.project.id}`, { method: 'DELETE', token: A });
   ok(
     removed.status === 200,

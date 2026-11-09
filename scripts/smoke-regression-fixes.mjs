@@ -2,8 +2,9 @@
  * 回归测试：默认值、容量编辑、动态属性排序。
  * 需要一个已初始化并启动的临时 API；脚本创建的数据会在结束时清理。
  */
-const BASE = process.env.SMOKE_BASE ?? 'http://127.0.0.1:8787/api/v1';
-const password = process.env.SMOKE_PASSWORD ?? 'Admin@12345';
+import { ADMIN_USERNAME, BASE, adminPassword } from './lib/smoke-env.mjs';
+
+const password = adminPassword('smoke-regression-fixes');
 const stamp = Date.now().toString(36).toUpperCase();
 let passed = 0;
 let failed = 0;
@@ -28,7 +29,7 @@ async function req(path, { method = 'GET', token, body } = {}) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await response.text();
-  let json = null;
+  let json;
   try {
     json = JSON.parse(text);
   } catch {
@@ -39,7 +40,7 @@ async function req(path, { method = 'GET', token, body } = {}) {
 
 const login = await req('/auth/login', {
   method: 'POST',
-  body: { username: process.env.SMOKE_ADMIN_USER ?? 'admin', password },
+  body: { username: ADMIN_USERNAME, password },
 });
 if (!login.json?.accessToken) {
   console.error('登录失败', login.text);
@@ -106,10 +107,7 @@ try {
   });
   ok(type.status === 201, '创建带默认值的资源类型', type.text);
   const meta = await req('/meta', { token });
-  ok(
-    meta.json?.attrFields?.[typeCode]?.[0]?.defaultValue === 'A',
-    '/meta 返回字段默认值',
-  );
+  ok(meta.json?.attrFields?.[typeCode]?.[0]?.defaultValue === 'A', '/meta 返回字段默认值');
 
   const first = await req('/resources', {
     method: 'POST',
@@ -136,9 +134,12 @@ try {
     },
   });
   ok(second.status === 201, '创建动态属性排序测试资源', second.text);
-  const sorted = await req(`/resources?type=${typeCode}&sortBy=attr:score&sortOrder=asc&pageSize=20`, {
-    token,
-  });
+  const sorted = await req(
+    `/resources?type=${typeCode}&sortBy=attr:score&sortOrder=asc&pageSize=20`,
+    {
+      token,
+    },
+  );
   ok(
     sorted.status === 200 &&
       sorted.json?.items?.[0]?.attrs?.score === 'A' &&
@@ -254,7 +255,13 @@ try {
   }
 
   console.log('\n[4] 清理');
-  for (const id of [childA.json?.id, childB.json?.id, parent.json?.id, first.json?.id, second.json?.id]) {
+  for (const id of [
+    childA.json?.id,
+    childB.json?.id,
+    parent.json?.id,
+    first.json?.id,
+    second.json?.id,
+  ]) {
     if (id) await req(`/resources/${id}`, { method: 'DELETE', token });
   }
   await req(`/resource-types/${typeCode}`, { method: 'DELETE', token });

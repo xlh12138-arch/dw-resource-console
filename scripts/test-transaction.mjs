@@ -98,7 +98,9 @@ try {
   );
 
   await withTransaction(async () => {
-    await db.delete(auditLogs).where(and(eq(auditLogs.targetType, 'DICT'), eq(auditLogs.targetId, code)));
+    await db
+      .delete(auditLogs)
+      .where(and(eq(auditLogs.targetType, 'DICT'), eq(auditLogs.targetId, code)));
     await db.delete(resourceTypes).where(eq(resourceTypes.code, code));
   });
   check('测试数据已清理', true);

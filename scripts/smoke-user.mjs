@@ -13,7 +13,7 @@
  *  9. 审计留痕且不记录明文密码
  */
 
-const BASE = process.env.SMOKE_BASE ?? 'http://127.0.0.1:8787/api/v1';
+import { ADMIN_USERNAME, BASE, adminPassword } from './lib/smoke-env.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -56,8 +56,8 @@ async function req(path, { method = 'GET', token, body, cookie } = {}) {
 }
 
 const ADMIN = {
-  username: process.env.SMOKE_ADMIN_USER ?? 'admin',
-  password: process.env.SMOKE_PASSWORD ?? 'Admin@12345',
+  username: ADMIN_USERNAME,
+  password: adminPassword('smoke-user'),
 };
 
 const adminLogin = await req('/auth/login', { method: 'POST', body: ADMIN });
@@ -90,7 +90,12 @@ ok(
 const legacyCreate = await req('/users', {
   method: 'POST',
   token: A,
-  body: { username: `smoke_legacy_${stamp}`, password: 'Legacy#12345', displayName: '旧角色', role: 'VIEWER' },
+  body: {
+    username: `smoke_legacy_${stamp}`,
+    password: 'Legacy#12345',
+    displayName: '旧角色',
+    role: 'VIEWER',
+  },
 });
 ok(legacyCreate.status === 422, `未定义角色 VIEWER 不可再创建（422，实际 ${legacyCreate.status}）`);
 
@@ -119,7 +124,10 @@ console.log('\n[3] 管理员重置密码');
 const reset = await req(`/users/${userId}/reset-password`, { method: 'POST', token: A });
 const newPwd = reset.json?.password;
 ok(reset.status === 200, `重置成功（${reset.status}）`, reset.text);
-ok(typeof newPwd === 'string' && newPwd.length === 12, `返回 12 位新密码（实际 ${newPwd?.length}）`);
+ok(
+  typeof newPwd === 'string' && newPwd.length === 12,
+  `返回 12 位新密码（实际 ${newPwd?.length}）`,
+);
 ok(/^[A-Za-z0-9]{12}$/.test(newPwd ?? ''), '新密码为不含易混淆字符的字母数字');
 ok(newPwd !== oldPwd, '新密码与旧密码不同');
 ok(reset.json?.user?.username === username, '响应回带账号信息');
@@ -167,8 +175,14 @@ const roCreated = await req('/users', {
   body: { username: roName, password: roPwd, displayName: '冒烟只读用户', role: 'READONLY' },
 });
 ok(roCreated.status === 201, `管理员可创建只读用户（${roCreated.status}）`, roCreated.text);
-const roLogin = await req('/auth/login', { method: 'POST', body: { username: roName, password: roPwd } });
-ok(roLogin.status === 200 && roLogin.json?.user?.role === 'READONLY', `只读用户可登录且角色为 READONLY（${roLogin.json?.user?.role}）`);
+const roLogin = await req('/auth/login', {
+  method: 'POST',
+  body: { username: roName, password: roPwd },
+});
+ok(
+  roLogin.status === 200 && roLogin.json?.user?.role === 'READONLY',
+  `只读用户可登录且角色为 READONLY（${roLogin.json?.user?.role}）`,
+);
 const R = roLogin.json.accessToken;
 ok('只读用户可读资源', (await req('/resources?pageSize=1', { token: R })).status === 200);
 ok('只读用户可读项目', (await req('/projects?pageSize=1', { token: R })).status === 200);
@@ -180,20 +194,31 @@ const roWrite = await req('/resources', {
     type: 'NAS',
     name: `冒烟只读越权-${stamp}`,
     environment: 'DEV',
-    attrs: { exportPath: '/smoke-ro', mountPoint: '/mnt/smoke-ro', protocol: 'NFS', capacityGb: 10 },
+    attrs: {
+      exportPath: '/smoke-ro',
+      mountPoint: '/mnt/smoke-ro',
+      protocol: 'NFS',
+      capacityGb: 10,
+    },
   },
 });
 ok(roWrite.status === 403, `只读用户新建资源被拒（403，实际 ${roWrite.status}）`);
 ok(
   '只读用户新建项目被拒',
-  (await req('/projects', { method: 'POST', token: R, body: { name: `只读越权-${stamp}` } })).status === 403,
+  (await req('/projects', { method: 'POST', token: R, body: { name: `只读越权-${stamp}` } }))
+    .status === 403,
 );
 ok(
   '只读用户改资源被拒',
   (await req('/resources/1', { method: 'PATCH', token: R, body: { name: 'x' } })).status === 403,
 );
 ok('只读用户访问用户管理被拒', (await req('/users', { token: R })).status === 403);
-if (roCreated.json?.id) await req(`/users/${roCreated.json.id}`, { method: 'PATCH', token: A, body: { status: 'DISABLED' } });
+if (roCreated.json?.id)
+  await req(`/users/${roCreated.json.id}`, {
+    method: 'PATCH',
+    token: A,
+    body: { status: 'DISABLED' },
+  });
 
 /* ------------------------------------------------------------------ *
  * [6] 审计留痕
@@ -204,22 +229,26 @@ const records = audit.json?.items ?? [];
 const pwdRecord = records.find((r) => (r.changes ?? []).some((c) => c.field === 'password'));
 ok(audit.status === 200, `审计日志可读（${records.length} 条）`);
 ok(Boolean(pwdRecord), '存在密码重置的审计记录');
-ok(pwdRecord?.actorName === '系统管理员' || pwdRecord?.actorName === ADMIN.username, `记录操作人（${pwdRecord?.actorName}）`);
+ok(
+  pwdRecord?.actorName === '系统管理员' || pwdRecord?.actorName === ADMIN.username,
+  `记录操作人（${pwdRecord?.actorName}）`,
+);
 ok(
   !JSON.stringify(records).includes(newPwd ?? '\u0000') &&
     !JSON.stringify(records).includes(oldPwd),
   '审计明细不含新旧明文密码',
 );
-ok(
-  JSON.stringify(pwdRecord?.changes ?? []).includes('已重置'),
-  '审计里以「已重置」标记代替明文',
-);
+ok(JSON.stringify(pwdRecord?.changes ?? []).includes('已重置'), '审计里以「已重置」标记代替明文');
 
 /* ------------------------------------------------------------------ *
  * 清理：停用测试账号（无删除接口，停用即可避免污染后续用例）
  * ------------------------------------------------------------------ */
 console.log('\n[7] 清理');
-const disabled = await req(`/users/${userId}`, { method: 'PATCH', token: A, body: { status: 'DISABLED' } });
+const disabled = await req(`/users/${userId}`, {
+  method: 'PATCH',
+  token: A,
+  body: { status: 'DISABLED' },
+});
 ok(disabled.status === 200, '测试账号已停用');
 
 console.log(`\n结果：通过 ${passed} 项，失败 ${failed} 项`);

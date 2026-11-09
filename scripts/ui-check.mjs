@@ -6,9 +6,11 @@
  *  4. Cookie 登录：刷新页面保持登录态
  */
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+import { WEB_BASE, adminPassword } from './lib/smoke-env.mjs';
 
 const CHROME =
   process.env.CHROME_PATH ??
@@ -23,16 +25,9 @@ if (!CHROME) throw new Error('未找到 Chrome/Chromium，请设置 CHROME_PATH'
 // 每次运行换一个调试端口与独立 profile，避免与残留实例互相干扰
 const PORT = 9333 + (Date.now() % 60);
 const PROFILE = join(tmpdir(), `cdp-ui-${Date.now()}`);
-const APP = process.env.SMOKE_WEB_BASE ?? 'http://localhost:5173/';
+const APP = WEB_BASE;
 
-const envUrl = new URL('../.env', import.meta.url);
-const env = existsSync(envUrl) ? readFileSync(envUrl, 'utf8') : '';
-const password =
-  process.env.SMOKE_PASSWORD ?? (env.match(/^BOOTSTRAP_ADMIN_PASSWORD=(.*)$/m) ?? [])[1]?.trim();
-const username =
-  process.env.SMOKE_ADMIN_USER ??
-  (env.match(/^BOOTSTRAP_ADMIN_USERNAME=(.*)$/m) ?? [])[1]?.trim() ??
-  'admin';
+const password = adminPassword('ui-check');
 
 let pass = 0;
 let fail = 0;
@@ -69,7 +64,7 @@ async function waitFor(fn, timeout = 15000, label = '') {
   while (Date.now() - start < timeout) {
     const v = await fn();
     if (v) return v;
-    await sleep 	(200);
+    await sleep(200);
   }
   throw new Error(`等待超时：${label}`);
 }
@@ -79,7 +74,9 @@ async function connect() {
   // 新建标签页并直接打开应用，避免复用残留的空白页
   let page;
   try {
-    const created = await fetch(`http://127.0.0.1:${PORT}/json/new?${encodeURIComponent(APP)}`, { method: 'PUT' });
+    const created = await fetch(`http://127.0.0.1:${PORT}/json/new?${encodeURIComponent(APP)}`, {
+      method: 'PUT',
+    });
     page = await created.json();
   } catch {
     /* 老版本 Chrome 不支持 PUT，走 /json/list 兜底 */
@@ -95,7 +92,8 @@ async function connect() {
     if (msg.id && pending.has(msg.id)) {
       const { resolve, reject } = pending.get(msg.id);
       pending.delete(msg.id);
-      msg.error ? reject(new Error(JSON.stringify(msg.error))) : resolve(msg.result);
+      if (msg.error) reject(new Error(JSON.stringify(msg.error)));
+      else resolve(msg.result);
     }
   });
   await new Promise((resolve, reject) => {
@@ -127,7 +125,8 @@ async function ev(expression) {
     returnByValue: true,
     awaitPromise: true,
   });
-  if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? 'evaluate 异常');
+  if (r.exceptionDetails)
+    throw new Error(r.exceptionDetails.exception?.description ?? 'evaluate 异常');
   return r.result.value;
 }
 
@@ -325,7 +324,10 @@ try {
   const afterSecondEsc = await ev(`
     return JSON.stringify(document.querySelectorAll('[role=dialog]').length);
   `);
-  ok(Number(afterSecondEsc) === 0, `第二次 ESC 关闭「环境槽位」窗口（剩余 ${afterSecondEsc} 个弹窗）`);
+  ok(
+    Number(afterSecondEsc) === 0,
+    `第二次 ESC 关闭「环境槽位」窗口（剩余 ${afterSecondEsc} 个弹窗）`,
+  );
 
   /* ---------- 3. 资源详情容量峰值 ---------- */
   console.log('\n[3] 资源详情容量块');
@@ -368,11 +370,7 @@ try {
     });
   `);
   const state = JSON.parse(afterReload);
-  ok(
-    !state.hasPassword,
-    '刷新后未回到登录页（凭 httpOnly Cookie 静默续期）',
-    state.text,
-  );
+  ok(!state.hasPassword, '刷新后未回到登录页（凭 httpOnly Cookie 静默续期）', state.text);
   console.log(`    刷新后页面：${state.text.replace(/\n/g, ' | ')}`);
   const cookieVisible = JSON.parse(before);
   ok(cookieVisible === false, '刷新令牌 Cookie 为 httpOnly（前端 JS 读不到）');
@@ -436,7 +434,9 @@ try {
     return btns.length;
   `);
   await sleep(1200);
-  const dirtyAfterSave = await ev(`return JSON.stringify((document.body.innerText || '').includes('有未保存的修改'))`);
+  const dirtyAfterSave = await ev(
+    `return JSON.stringify((document.body.innerText || '').includes('有未保存的修改'))`,
+  );
   ok(JSON.parse(dirtyAfterSave) === false, '保存完成后关闭不再提示「有未保存的修改」');
 
   /* ---------- 6. 台账容量列 = 详情峰值 ---------- */
@@ -483,7 +483,11 @@ try {
   `);
   const tipInfo = JSON.parse(tips);
   ok(tipInfo.count > 0, `时间轴有 ${tipInfo.count} 段占用`);
-  ok(/ · /.test(tipInfo.sample) && tipInfo.sample.includes('槽位「'), 'tooltip 含项目名 · 环境 · 槽位 · 时段', tipInfo.sample);
+  ok(
+    / · /.test(tipInfo.sample) && tipInfo.sample.includes('槽位「'),
+    'tooltip 含项目名 · 环境 · 槽位 · 时段',
+    tipInfo.sample,
+  );
   ok(tipInfo.firstInPage, 'tooltip 首段（项目名）能在详情里找到', tipInfo.sample);
   console.log(`    tooltip：${tipInfo.sample}`);
 
@@ -537,7 +541,9 @@ try {
   ok(!roleInfo.hasLegacyOperator, '页面不再出现已废弃的「运维人员」', roleInfo.opts.join(','));
   ok(
     roleInfo.opts.length === 0 ||
-      (roleInfo.opts.includes('管理员') && roleInfo.opts.includes('普通用户') && roleInfo.opts.includes('只读用户')),
+      (roleInfo.opts.includes('管理员') &&
+        roleInfo.opts.includes('普通用户') &&
+        roleInfo.opts.includes('只读用户')),
     `角色下拉为三项（${roleInfo.opts.join(' / ') || '无下拉'}）`,
   );
 
@@ -628,7 +634,9 @@ try {
   `);
   await sleep(700);
   ok(
-    await ev(`return ![...document.querySelectorAll('[role=dialog]')].some((d) => (d.innerText || '').includes('密码已重置'))`),
+    await ev(
+      `return ![...document.querySelectorAll('[role=dialog]')].some((d) => (d.innerText || '').includes('密码已重置'))`,
+    ),
     '关闭后结果窗口消失',
   );
 
@@ -653,7 +661,11 @@ try {
     return Boolean(btn);
   `);
   await sleep(1800);
-  await waitFor(async () => ev(`return !!document.querySelector('input[type=password]')`), 15000, '退回登录页');
+  await waitFor(
+    async () => ev(`return !!document.querySelector('input[type=password]')`),
+    15000,
+    '退回登录页',
+  );
   const roDemo = JSON.parse(
     await ev(`
       const demos = [...document.querySelectorAll('button[data-demo]')];
@@ -732,7 +744,11 @@ try {
     return Boolean(btn);
   `);
   await sleep(1800);
-  await waitFor(async () => ev(`return !!document.querySelector('input[type=password]')`), 15000, '退回登录页');
+  await waitFor(
+    async () => ev(`return !!document.querySelector('input[type=password]')`),
+    15000,
+    '退回登录页',
+  );
   await ev(`
     const user = [...document.querySelectorAll('button[data-demo]')].find((b) => b.dataset.demo === 'user');
     if (user) user.click();
@@ -761,7 +777,9 @@ try {
   ok(!uState.navHrefs.includes('/users'), '普通用户看不到「用户管理」菜单');
   ok(!uState.navHrefs.includes('/audit'), '普通用户看不到「变更审计」菜单');
   ok(
-    ['/', '/resources', '/projects', '/templates', '/dict'].every((href) => uState.navHrefs.includes(href)),
+    ['/', '/resources', '/projects', '/templates', '/dict'].every((href) =>
+      uState.navHrefs.includes(href),
+    ),
     `普通用户可见其余菜单（${uState.nav.join(' / ')}）`,
   );
   ok(await clickHref('/resources'), '进入资源台账');

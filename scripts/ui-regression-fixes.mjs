@@ -1,11 +1,13 @@
 /** 针对本轮 8 个缺陷的浏览器回归测试，仅用于临时数据库。 */
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const APP = process.env.SMOKE_WEB_BASE ?? 'http://localhost:5173/';
-const API = process.env.SMOKE_BASE ?? 'http://127.0.0.1:8787/api/v1';
+import { ADMIN_USERNAME, BASE, WEB_BASE, adminPassword } from './lib/smoke-env.mjs';
+
+const APP = WEB_BASE;
+const API = BASE;
 const chromePath =
   process.env.CHROME_PATH ??
   [
@@ -16,13 +18,8 @@ const chromePath =
   ].find((candidate) => existsSync(candidate));
 if (!chromePath) throw new Error('未找到 Chrome/Chromium');
 
-const envUrl = new URL('../.env', import.meta.url);
-const env = existsSync(envUrl) ? readFileSync(envUrl, 'utf8') : '';
-const username = process.env.SMOKE_ADMIN_USER ?? 'admin';
-const password =
-  process.env.SMOKE_PASSWORD ??
-  (env.match(/^BOOTSTRAP_ADMIN_PASSWORD=(.*)$/m) ?? [])[1]?.trim() ??
-  'Admin@12345';
+const username = ADMIN_USERNAME;
+const password = adminPassword('ui-regression-fixes');
 let pass = 0;
 let fail = 0;
 const ok = (condition, label, extra) => {
@@ -55,7 +52,7 @@ const login = await api('/auth/login', {
 if (!login.json?.accessToken) throw new Error(`API 登录失败：${login.text}`);
 const auth = { authorization: `Bearer ${login.json.accessToken}` };
 const code = `UI_REG_${Date.now().toString(36).toUpperCase()}`;
-let resourceId = null;
+let resourceId;
 await api('/resource-types', {
   method: 'POST',
   headers: { ...auth, 'content-type': 'application/json' },
@@ -131,7 +128,8 @@ async function connect() {
     if (message.id && pending.has(message.id)) {
       const item = pending.get(message.id);
       pending.delete(message.id);
-      message.error ? item.reject(new Error(JSON.stringify(message.error))) : item.resolve(message.result);
+      if (message.error) item.reject(new Error(JSON.stringify(message.error)));
+      else item.resolve(message.result);
     }
   });
   await new Promise((resolve, reject) => {
@@ -290,18 +288,22 @@ try {
 
   const nasRows = await api('/resources?type=NAS&pageSize=50', { headers: auth });
   const child = nasRows.json?.items?.find((item) => item.parentId && item.demandAmount > 0);
-  const parent = child
-    ? await api(`/resources/${child.parentId}`, { headers: auth })
-    : null;
+  const parent = child ? await api(`/resources/${child.parentId}`, { headers: auth }) : null;
   if (child && parent) {
     await navigate(`/resources?id=${child.id}`);
-    await waitFor(`return document.body.innerText.includes(${JSON.stringify(child.code)})`, '子资源');
+    await waitFor(
+      `return document.body.innerText.includes(${JSON.stringify(child.code)})`,
+      '子资源',
+    );
     await evaluate(`
       const button = [...document.querySelectorAll('tbody button')].find((b) => b.querySelector('.lucide-pencil'));
       button?.click();
       return true;
     `);
-    await waitFor(`return document.querySelector('[role="dialog"]')?.innerText.includes('申请容量')`, '子资源编辑弹窗');
+    await waitFor(
+      `return document.querySelector('[role="dialog"]')?.innerText.includes('申请容量')`,
+      '子资源编辑弹窗',
+    );
     await sleep(250);
     const text = await evaluate(`return document.querySelector('[role="dialog"]').innerText`);
     const match = text.match(/父资源剩余可用\s*([0-9.]+)/);
@@ -353,11 +355,17 @@ try {
     button?.click();
     return true;
   `);
-  await waitFor(`return document.querySelector('[role="dialog"]')?.innerText.includes('资源组合')`, '模板编辑弹窗');
-  await waitFor(`
+  await waitFor(
+    `return document.querySelector('[role="dialog"]')?.innerText.includes('资源组合')`,
+    '模板编辑弹窗',
+  );
+  await waitFor(
+    `
     const button = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('添加资源类型'));
     return button && !button.disabled;
-  `, '模板详情加载');
+  `,
+    '模板详情加载',
+  );
   const before = await evaluate(`
     return document.querySelectorAll('[role="dialog"] .divide-y > div select').length;
   `);
@@ -394,7 +402,10 @@ try {
     button?.click();
     return true;
   `);
-  await waitFor(`return document.querySelector('[role="dialog"]')?.innerText.includes('槽位列表')`, '槽位列表');
+  await waitFor(
+    `return document.querySelector('[role="dialog"]')?.innerText.includes('槽位列表')`,
+    '槽位列表',
+  );
   ok(
     await evaluate(`return [...document.querySelectorAll('button[title="编辑槽位"]')].length > 0`),
     '环境槽位提供编辑入口',

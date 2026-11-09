@@ -6,7 +6,9 @@ import { existsSync, readFileSync } from 'node:fs';
 
 const envUrl = new URL('../.env', import.meta.url);
 const envText = existsSync(envUrl) ? readFileSync(envUrl, 'utf8') : '';
-const envLimit = Number(process.env.RATE_LIMIT_LOGIN_MAX ?? envText.match(/^RATE_LIMIT_LOGIN_MAX=(.*)$/m)?.[1] ?? 10);
+const envLimit = Number(
+  process.env.RATE_LIMIT_LOGIN_MAX ?? envText.match(/^RATE_LIMIT_LOGIN_MAX=(.*)$/m)?.[1] ?? 10,
+);
 const base = process.env.SMOKE_BASE ?? 'http://127.0.0.1:8787/api/v1';
 const statuses = [];
 

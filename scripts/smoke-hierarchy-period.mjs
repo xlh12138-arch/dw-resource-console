@@ -2,12 +2,12 @@
  * 冒烟：资源父子层级（容量同步）+ 占用期限（超期 / 续期 / 释放 / 时间轴）+ 标签与层级筛选
  *
  * 前置：API 已在 8787 运行，且执行过 npm run db:reset && npm run db:seed
- * 运行：SMOKE_PASSWORD=<管理员口令> node scripts/smoke-hierarchy-period.mjs
- *      或在已导出口令的终端执行 npm run smoke:hierarchy
+ * 运行：node scripts/smoke-hierarchy-period.mjs（口令取自 .env 或 SMOKE_PASSWORD）
  */
-const BASE = process.env.SMOKE_BASE ?? 'http://127.0.0.1:8787/api/v1';
-const USER = process.env.SMOKE_USER ?? 'admin';
-const PASSWORD = process.env.SMOKE_PASSWORD;
+import { ADMIN_USERNAME, BASE, adminPassword } from './lib/smoke-env.mjs';
+
+const USER = ADMIN_USERNAME;
+const PASSWORD = adminPassword('smoke-hierarchy-period');
 
 let passed = 0;
 let failed = 0;
@@ -35,7 +35,7 @@ async function req(path, { method = 'GET', token, body } = {}) {
   try {
     json = await res.json();
   } catch {
-    json = null;
+    // 非 JSON 响应
   }
   return { status: res.status, json };
 }
@@ -44,11 +44,6 @@ async function req(path, { method = 'GET', token, body } = {}) {
 const iso = (days) => new Date(Date.now() + days * 86400000).toISOString();
 const day = (days) => iso(days).slice(0, 10);
 
-if (!PASSWORD) {
-  console.log('跳过：未提供 SMOKE_PASSWORD（管理员口令）环境变量，本组用例需要管理员权限。');
-  process.exit(0);
-}
-
 const suffix = Date.now().toString().slice(-6);
 
 async function main() {
@@ -56,7 +51,10 @@ async function main() {
    * [1] 准备：登录 + 项目 + 环境
    * ---------------------------------------------------------------- */
   console.log('\n[1] 准备');
-  const login = await req('/auth/login', { method: 'POST', body: { username: USER, password: PASSWORD } });
+  const login = await req('/auth/login', {
+    method: 'POST',
+    body: { username: USER, password: PASSWORD },
+  });
   if (login.status !== 200) {
     console.error(`  登录失败（${login.status}）：${login.json?.error?.message ?? ''}`);
     process.exit(1);
@@ -68,7 +66,11 @@ async function main() {
     await req('/projects', {
       method: 'POST',
       token,
-      body: { name: `层级期限冒烟-${suffix}`, owner: '冒烟', description: 'smoke: hierarchy & period' },
+      body: {
+        name: `层级期限冒烟-${suffix}`,
+        owner: '冒烟',
+        description: 'smoke: hierarchy & period',
+      },
     })
   ).json;
   ok(Boolean(project?.id), `创建项目（${project?.code}）`);
@@ -112,8 +114,14 @@ async function main() {
       },
     })
   ).json;
-  ok(parent?.capacityTotal === 1000 && parent?.capacityAvailable === 1000, '父资源容量 1000 / 剩余 1000');
-  ok(parent?.childCount === 0 && parent?.childAllocated === 0, '父资源初始无子资源、子资源占用为 0');
+  ok(
+    parent?.capacityTotal === 1000 && parent?.capacityAvailable === 1000,
+    '父资源容量 1000 / 剩余 1000',
+  );
+  ok(
+    parent?.childCount === 0 && parent?.childAllocated === 0,
+    '父资源初始无子资源、子资源占用为 0',
+  );
 
   // 子资源：只补充少数字段，其余属性应与父资源一致
   const child = (
@@ -135,23 +143,41 @@ async function main() {
   ok(child?.capacityTotal === 200, `子资源总容量等于申请额度（${child?.capacityTotal}）`);
   ok(child?.projectId === project.id, '子资源继承父资源的项目归属');
   ok(child?.attrs?.exportPath === nasAttrs.exportPath, '子资源继承父资源的专属属性');
-  ok(child?.attrs?.mountPoint === nasAttrs.mountPoint, '子资源无法覆盖必填属性（挂载点继承父资源）');
+  ok(
+    child?.attrs?.mountPoint === nasAttrs.mountPoint,
+    '子资源无法覆盖必填属性（挂载点继承父资源）',
+  );
   ok(child?.attrs?.clusterName === 'SMOKE-CHILD', '子资源可以补充非必填属性');
 
   const parentAfterChild = (await req(`/resources/${parent.id}`, { token })).json;
   ok(parentAfterChild?.capacity?.childAllocated === 200, '父资源「其中子资源」为 200');
-  ok(parentAfterChild?.capacity?.available === 800, `父资源剩余 800（实际 ${parentAfterChild?.capacity?.available}）`);
+  ok(
+    parentAfterChild?.capacity?.available === 800,
+    `父资源剩余 800（实际 ${parentAfterChild?.capacity?.available}）`,
+  );
   ok(parentAfterChild?.children?.length === 1, '父资源详情返回 1 个子资源');
 
   const childDetail = (await req(`/resources/${child.id}`, { token })).json;
-  ok(childDetail?.ancestors?.length === 1 && childDetail.ancestors[0].id === parent.id, '子资源详情返回祖先链');
-  ok((await req(`/resources/${parent.id}/children`, { token })).json?.length === 1, '子资源列表接口返回 1 条');
+  ok(
+    childDetail?.ancestors?.length === 1 && childDetail.ancestors[0].id === parent.id,
+    '子资源详情返回祖先链',
+  );
+  ok(
+    (await req(`/resources/${parent.id}/children`, { token })).json?.length === 1,
+    '子资源列表接口返回 1 条',
+  );
 
   // 超申请：父剩余 800，申请 900 应被拒
   const overChild = await req('/resources', {
     method: 'POST',
     token,
-    body: { type: 'NAS', name: `冒烟超额子-${suffix}`, environment: 'DEV', parentId: parent.id, demandAmount: 900 },
+    body: {
+      type: 'NAS',
+      name: `冒烟超额子-${suffix}`,
+      environment: 'DEV',
+      parentId: parent.id,
+      demandAmount: 900,
+    },
   });
   ok(overChild.status === 409, `子资源超额申请被拒绝（409，实际 ${overChild.status}）`);
   ok(overChild.json?.error?.details?.siblingDemand === 200, '超额提示带出了已有子资源申请量');
@@ -160,15 +186,29 @@ async function main() {
   const wrongType = await req('/resources', {
     method: 'POST',
     token,
-    body: { type: 'GDS_SERVER', name: `冒烟类型不符-${suffix}`, environment: 'DEV', parentId: parent.id, demandAmount: 10 },
+    body: {
+      type: 'GDS_SERVER',
+      name: `冒烟类型不符-${suffix}`,
+      environment: 'DEV',
+      parentId: parent.id,
+      demandAmount: 10,
+    },
   });
-  ok(wrongType.status === 400 || wrongType.status === 422, `子资源类型必须与父一致（实际 ${wrongType.status}）`);
+  ok(
+    wrongType.status === 400 || wrongType.status === 422,
+    `子资源类型必须与父一致（实际 ${wrongType.status}）`,
+  );
 
   // 父资源调小到低于子资源申请量
-  const shrink = await req(`/resources/${parent.id}`, { method: 'PATCH', token, body: { capacityTotal: 150 } });
+  const shrink = await req(`/resources/${parent.id}`, {
+    method: 'PATCH',
+    token,
+    body: { capacityTotal: 150 },
+  });
   ok(shrink.status === 409, `父资源调小到 150 被拒绝（409，实际 ${shrink.status}）`);
   ok(
-    Array.isArray(shrink.json?.error?.details?.children) && shrink.json.error.details.children.length === 1,
+    Array.isArray(shrink.json?.error?.details?.children) &&
+      shrink.json.error.details.children.length === 1,
     '拒绝时返回了子资源明细',
   );
 
@@ -193,20 +233,37 @@ async function main() {
   const assign = await req(`/project-environments/${env.id}/slots/${slot.id}/assign`, {
     method: 'POST',
     token,
-    body: { resourceId: parent.id, amount: 300, startAt: iso(-60), endAt: iso(-10), acknowledge: true },
+    body: {
+      resourceId: parent.id,
+      amount: 300,
+      startAt: iso(-60),
+      endAt: iso(-10),
+      acknowledge: true,
+    },
   });
   ok(assign.status === 200, `父资源被槽位申请 300（${assign.status}）`);
   const p2 = (await req(`/resources/${parent.id}`, { token })).json;
   ok(p2?.capacity?.slotAllocated === 300, '父资源「槽位占用」为 300');
   ok(p2?.capacity?.childAllocated === 200, '父资源「子资源占用」仍为 200');
-  ok(p2?.capacity?.allocated === 500 && p2?.capacity?.available === 500, '父资源合计占用 500、剩余 500');
+  ok(
+    p2?.capacity?.allocated === 500 && p2?.capacity?.available === 500,
+    '父资源合计占用 500、剩余 500',
+  );
 
   // 此时子资源申请 600（500 + 600 > 1000）应被拒；申请 400 成功
-  const childOver = await req(`/resources/${child.id}`, { method: 'PATCH', token, body: { demandAmount: 800 } });
+  const childOver = await req(`/resources/${child.id}`, {
+    method: 'PATCH',
+    token,
+    body: { demandAmount: 800 },
+  });
   ok(childOver.status === 409, `子资源调大到 800 被拒绝（409，实际 ${childOver.status}）`);
   ok(childOver.json?.error?.details?.slotAllocated === 300, '拒绝时带出父资源的槽位占用量');
 
-  const childGrow = await req(`/resources/${child.id}`, { method: 'PATCH', token, body: { demandAmount: 400 } });
+  const childGrow = await req(`/resources/${child.id}`, {
+    method: 'PATCH',
+    token,
+    body: { demandAmount: 400 },
+  });
   ok(childGrow.status === 200, `子资源调大到 400 成功（${childGrow.status}）`);
   ok(childGrow.json?.capacityTotal === 400, '子资源总容量随申请额度同步更新');
 
@@ -217,10 +274,13 @@ async function main() {
    * [4] 占用期限：超期提示 / 续期 / 转长期 / 测试时间重叠
    * ---------------------------------------------------------------- */
   console.log('\n[4] 占用期限与超期处理');
-  const slotAfterAssign = (
-    await req(`/project-environments/${env.id}`, { token })
-  ).json.slots.find((s) => s.id === slot.id);
-  ok(slotAfterAssign?.occupancyState === 'EXPIRED', `结束时间已过 → 状态为已超期（${slotAfterAssign?.occupancyState}）`);
+  const slotAfterAssign = (await req(`/project-environments/${env.id}`, { token })).json.slots.find(
+    (s) => s.id === slot.id,
+  );
+  ok(
+    slotAfterAssign?.occupancyState === 'EXPIRED',
+    `结束时间已过 → 状态为已超期（${slotAfterAssign?.occupancyState}）`,
+  );
   ok(slotAfterAssign?.overdueDays >= 10, `返回超期天数（${slotAfterAssign?.overdueDays} 天）`);
   ok(slotAfterAssign?.resourceId === parent.id, '超期后资源仍未被自动释放');
 
@@ -259,7 +319,10 @@ async function main() {
     body: { days: 30 },
   });
   ok(renew.status === 200, `续期成功（${renew.status}）`);
-  ok(renew.json?.slot?.occupancyState === 'ACTIVE', `续期后状态恢复为占用中（${renew.json?.slot?.occupancyState}）`);
+  ok(
+    renew.json?.slot?.occupancyState === 'ACTIVE',
+    `续期后状态恢复为占用中（${renew.json?.slot?.occupancyState}）`,
+  );
   ok(renew.json?.slot?.overdueDays === 0, '续期后超期天数为 0');
   ok(renew.json?.slot?.renewCount === 1, `续期次数累计为 1（${renew.json?.slot?.renewCount}）`);
 
@@ -269,14 +332,23 @@ async function main() {
     token,
     body: { endAt: null },
   });
-  ok(toForever.status === 200 && toForever.json?.slot?.endAt === null, '可将占用期限调整为长期（endAt 为空）');
+  ok(
+    toForever.status === 200 && toForever.json?.slot?.endAt === null,
+    '可将占用期限调整为长期（endAt 为空）',
+  );
 
   const envTimeline = (await req(`/project-environments/${env.id}/timeline`, { token })).json;
-  ok(envTimeline?.entries?.length >= 1, `环境时间轴返回占用区间（${envTimeline?.entries?.length}）`);
+  ok(
+    envTimeline?.entries?.length >= 1,
+    `环境时间轴返回占用区间（${envTimeline?.entries?.length}）`,
+  );
   ok(Boolean(envTimeline?.range?.today), '环境时间轴返回「今天」参考时间');
 
   const resTimeline = (await req(`/resources/${parent.id}/timeline`, { token })).json;
-  ok(resTimeline?.entries?.length >= 1, `资源时间轴返回占用区间（${resTimeline?.entries?.length}）`);
+  ok(
+    resTimeline?.entries?.length >= 1,
+    `资源时间轴返回占用区间（${resTimeline?.entries?.length}）`,
+  );
   ok(resTimeline?.resource?.id === parent.id, '资源时间轴标注了资源本身');
   ok(typeof resTimeline?.expiredCount === 'number', '资源时间轴返回超期数量');
 
@@ -284,14 +356,23 @@ async function main() {
    * [5] 一键释放
    * ---------------------------------------------------------------- */
   console.log('\n[5] 一键释放');
-  const release = await req(`/project-environments/${env.id}/slots/${slot.id}/release`, { method: 'POST', token });
+  const release = await req(`/project-environments/${env.id}/slots/${slot.id}/release`, {
+    method: 'POST',
+    token,
+  });
   ok(release.status === 200, `释放成功（${release.status}）`);
   ok(release.json?.slot?.resourceId === null, '释放后槽位不再绑定资源');
-  ok(release.json?.slot?.endAt === null && release.json?.slot?.occupancyState === null, '释放后占用期限被清空');
+  ok(
+    release.json?.slot?.endAt === null && release.json?.slot?.occupancyState === null,
+    '释放后占用期限被清空',
+  );
 
   const p4 = (await req(`/resources/${parent.id}`, { token })).json;
   ok(p4?.capacity?.slotAllocated === 0, '释放后父资源的槽位占用归零');
-  ok(p4?.capacity?.allocated === 400, `父资源仅剩子资源占用的 400（实际 ${p4?.capacity?.allocated}）`);
+  ok(
+    p4?.capacity?.allocated === 400,
+    `父资源仅剩子资源占用的 400（实际 ${p4?.capacity?.allocated}）`,
+  );
 
   /* ---------------------------------------------------------------- *
    * [6] 标签与层级筛选
@@ -315,7 +396,10 @@ async function main() {
 
   const rootOnly = (await req('/resources?rootOnly=true&pageSize=200', { token })).json;
   ok(!(rootOnly.items ?? []).some((r) => r.id === child.id), 'rootOnly=true 不包含子资源');
-  ok((rootOnly.items ?? []).some((r) => r.id === parent.id), 'rootOnly=true 包含父资源');
+  ok(
+    (rootOnly.items ?? []).some((r) => r.id === parent.id),
+    'rootOnly=true 包含父资源',
+  );
 
   const byParent = (await req(`/resources?parentId=${parent.id}`, { token })).json;
   ok(
@@ -332,7 +416,10 @@ async function main() {
   ok(!(byId.items ?? []).some((r) => r.id === child.id), '按 id 定位时不会带出子资源');
 
   const overview = (await req('/stats/overview', { token })).json;
-  ok((overview?.hierarchy?.rootCount ?? 0) >= 1, `概览返回顶层/子资源统计（顶层 ${overview?.hierarchy?.rootCount}）`);
+  ok(
+    (overview?.hierarchy?.rootCount ?? 0) >= 1,
+    `概览返回顶层/子资源统计（顶层 ${overview?.hierarchy?.rootCount}）`,
+  );
   ok(Array.isArray(overview?.byTag), '概览返回标签分布');
   ok(typeof overview?.slotPeriod?.expiredCount === 'number', '概览返回占用期限统计（含超期数）');
 
@@ -355,14 +442,23 @@ async function main() {
   const futureAssign = await req(`/project-environments/${env.id}/slots/${slot.id}/assign`, {
     method: 'POST',
     token,
-    body: { resourceId: parent.id, amount: 300, startAt: day(10), endAt: day(40), acknowledge: true },
+    body: {
+      resourceId: parent.id,
+      amount: 300,
+      startAt: day(10),
+      endAt: day(40),
+      acknowledge: true,
+    },
   });
   ok(futureAssign.status === 200, `未来开始时间可以申请资源（${futureAssign.status}）`);
   ok(futureAssign.json?.slot?.occupancyState === 'ACTIVE', '未来开始时间仍为「占用中」');
   ok(futureAssign.json?.slot?.notStarted === true, '未来开始时间带 notStarted 标记');
   ok(futureAssign.json?.slot?.overdueDays === 0, '未来开始不产生超期天数');
   const pFuture = (await req(`/resources/${parent.id}`, { token })).json;
-  ok(pFuture?.capacity?.slotAllocated === 300, `未来占用的容量已立即扣除（${pFuture?.capacity?.slotAllocated}）`);
+  ok(
+    pFuture?.capacity?.slotAllocated === 300,
+    `未来占用的容量已立即扣除（${pFuture?.capacity?.slotAllocated}）`,
+  );
   const overviewFuture = (await req('/stats/overview', { token })).json;
   ok(overviewFuture?.slotPeriod?.occupiedCount >= 1, '概览占用数包含未来开始的占用');
 
@@ -376,8 +472,14 @@ async function main() {
   ok(swap.json?.slot?.resourceId === child.id, '槽位已切换到新资源');
   ok(swap.json?.slot?.startAt !== null, '未传时间时沿用原占用区间');
   const afterSwap = (await req(`/resources/${parent.id}`, { token })).json;
-  ok(afterSwap?.capacity?.slotAllocated === 0, `旧资源的槽位占用已释放（${afterSwap?.capacity?.slotAllocated}）`);
-  ok(afterSwap?.capacity?.allocated === 400, `旧资源仅剩子资源申请 400（${afterSwap?.capacity?.allocated}）`);
+  ok(
+    afterSwap?.capacity?.slotAllocated === 0,
+    `旧资源的槽位占用已释放（${afterSwap?.capacity?.slotAllocated}）`,
+  );
+  ok(
+    afterSwap?.capacity?.allocated === 400,
+    `旧资源仅剩子资源申请 400（${afterSwap?.capacity?.allocated}）`,
+  );
 
   // 容量下限：已占用 400，调到 399 必须拒绝，调到 400 允许（剩余 0）
   const overshrink = await req(`/resources/${parent.id}`, {
@@ -393,7 +495,10 @@ async function main() {
     token,
     body: { capacityTotal: 400 },
   });
-  ok(exact.status === 200 && exact.json?.capacityAvailable === 0, '调到刚好等于已占用允许（剩余 0）');
+  ok(
+    exact.status === 200 && exact.json?.capacityAvailable === 0,
+    '调到刚好等于已占用允许（剩余 0）',
+  );
   await req(`/resources/${parent.id}`, { method: 'PATCH', token, body: { capacityTotal: 1000 } });
 
   // 环境标识色：可写任意 HEX，非 #rrggbb 被拒绝
@@ -401,9 +506,20 @@ async function main() {
   const prodDict = envDicts.find((e) => e.code === 'PROD');
   ok(prodDict?.builtin === false && prodDict?.label === '生产', 'PROD 为非内置生产环境');
   ok(/^#[0-9a-f]{6}$/.test(prodDict?.color ?? ''), `生产环境带默认标识色（${prodDict?.color}）`);
-  const recolor = await req('/environments/PROD', { method: 'PATCH', token, body: { color: '#0ea5e9' } });
-  ok(recolor.status === 200 && recolor.json?.detail?.color === '#0ea5e9', '标识色可改为任意 HEX（对应 RGB 输入）');
-  const badRecolor = await req('/environments/PROD', { method: 'PATCH', token, body: { color: 'rgb(1,2,3)' } });
+  const recolor = await req('/environments/PROD', {
+    method: 'PATCH',
+    token,
+    body: { color: '#0ea5e9' },
+  });
+  ok(
+    recolor.status === 200 && recolor.json?.detail?.color === '#0ea5e9',
+    '标识色可改为任意 HEX（对应 RGB 输入）',
+  );
+  const badRecolor = await req('/environments/PROD', {
+    method: 'PATCH',
+    token,
+    body: { color: 'rgb(1,2,3)' },
+  });
   ok([400, 422].includes(badRecolor.status), '非 #rrggbb 标识色被拒绝');
   await req('/environments/PROD', { method: 'PATCH', token, body: { color: '#dc2626' } });
 
@@ -418,16 +534,28 @@ async function main() {
   const overdueAssign = await req(`/project-environments/${env.id}/slots/${slot.id}/assign`, {
     method: 'POST',
     token,
-    body: { resourceId: parent.id, amount: 100, startAt: day(-30), endAt: day(-5), acknowledge: true },
+    body: {
+      resourceId: parent.id,
+      amount: 100,
+      startAt: day(-30),
+      endAt: day(-5),
+      acknowledge: true,
+    },
   });
   ok(overdueAssign.status === 200, `可构造一个已超期的占用（${overdueAssign.status}）`);
-  ok((overdueAssign.json?.slot?.overdueDays ?? 0) >= 5, `占用已超期多天（${overdueAssign.json?.slot?.overdueDays}）`);
+  ok(
+    (overdueAssign.json?.slot?.overdueDays ?? 0) >= 5,
+    `占用已超期多天（${overdueAssign.json?.slot?.overdueDays}）`,
+  );
 
   const overviewOverdue = (await req('/stats/overview', { token })).json;
   const overdueItem = (overviewOverdue?.overdueSlots ?? []).find((s) => s.slotId === slot.id);
   ok(Boolean(overdueItem), '概览「超期占用资源」包含该槽位');
   ok(overdueItem?.projectId === project.id, '超期明细标注了所属项目');
-  ok(overdueItem?.resourceId === parent.id && overdueItem?.resourceCode === parent.code, '超期明细标注了具体资源');
+  ok(
+    overdueItem?.resourceId === parent.id && overdueItem?.resourceCode === parent.code,
+    '超期明细标注了具体资源',
+  );
   ok(
     (overviewOverdue?.overdueByProject ?? []).some(
       (g) => g.projectId === project.id && g.items.some((i) => i.slotId === slot.id),
@@ -437,7 +565,10 @@ async function main() {
 
   const projOverdue = (await req(`/projects/${project.id}`, { token })).json;
   const overdueRef = (projOverdue?.slotRefs ?? []).find((r) => r.slotId === slot.id);
-  ok(overdueRef?.resourceCode === parent.code, '项目详情的槽位引用带资源编码（可直接列出超期资源）');
+  ok(
+    overdueRef?.resourceCode === parent.code,
+    '项目详情的槽位引用带资源编码（可直接列出超期资源）',
+  );
   ok((overdueRef?.overdueDays ?? 0) >= 5, '项目详情给出该资源的超期天数');
   ok((projOverdue?.overdueCount ?? 0) >= 1, `项目详情给出超期数量（${projOverdue?.overdueCount}）`);
 
