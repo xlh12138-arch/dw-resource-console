@@ -221,7 +221,7 @@ async function capacityCheckFor(
         } 的峰值 ${peak.amount}${unitSuffix} 核算）`
       : '';
 
-  if (amount === null || amount <= 0) {
+  if (amount === null) {
     return {
       code: 'CAPACITY_REQUIRED',
       message: `资源 ${resource.code} 已设置容量 ${resource.capacityTotal}${unitSuffix}，已占用 ${capacity.allocated}${unitSuffix}，剩余 ${available}${unitSuffix}${periodNote}，请填写本槽位申请的容量`,
@@ -894,7 +894,7 @@ export const projectEnvService = {
    * - 类型必须一致（硬校验）
    * - 环境不一致时允许绑定，但返回跨环境引用提示，需前端确认后再提交
    * - 已被其他项目引用时返回占用明细提示，同样需确认
-   * - 资源设了容量时必须填写申请量，且不能超过剩余可用（硬校验）
+   * - 资源设了容量时必须填写申请量，可为 0，且不能超过剩余可用（硬校验）
    * - 占用区间与其他槽位重叠时提示并发共用，需确认（endAt 为空表示长期占用）
    */
   async assignSlot(
@@ -988,7 +988,7 @@ export const projectEnvService = {
       });
     }
 
-    // —— 容量：资源设了容量就必须填申请量，且不能超过「本次占用期间」的剩余可用
+    // —— 容量：资源设了容量就必须填申请量（可为 0），且不能超过「本次占用期间」的剩余可用
     // 占用按时间段核算：与本槽位区间不重叠的历史占用可以复用同一份容量
     const capacityCheck = await capacityCheckFor(resource, slotId, amount, { startAt, endAt });
 
@@ -1056,7 +1056,7 @@ export const projectEnvService = {
       changes: [
         {
           field: `slot.${slotId}`,
-          label: `槽位「${slot.slotRole}」${previousResource ? `资源由 ${previousResource.code} ${previousResource.name} 更换为 ` : '绑定资源'}${amount ? `（申请 ${amount}${resource.capacityUnit ? ` ${resource.capacityUnit}` : ''}）` : ''}${crossEnvironment ? '（跨环境引用）' : ''}，占用 ${startAt.toLocaleDateString('zh-CN')} 起${endAt ? `至 ${endAt.toLocaleDateString('zh-CN')}` : '（长期）'}`,
+          label: `槽位「${slot.slotRole}」${previousResource ? `资源由 ${previousResource.code} ${previousResource.name} 更换为 ` : '绑定资源'}${amount !== null ? `（申请 ${amount}${resource.capacityUnit ? ` ${resource.capacityUnit}` : ''}）` : ''}${crossEnvironment ? '（跨环境引用）' : ''}，占用 ${startAt.toLocaleDateString('zh-CN')} 起${endAt ? `至 ${endAt.toLocaleDateString('zh-CN')}` : '（长期）'}`,
           from: previousResource ? `${previousResource.code} ${previousResource.name}` : null,
           to: `${resource.code} ${resource.name}`,
         },

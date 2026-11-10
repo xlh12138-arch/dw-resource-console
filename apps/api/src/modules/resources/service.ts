@@ -351,7 +351,7 @@ export async function assertParentCapacityAvailable(
 /**
  * 校验某个槽位对资源的容量申请：
  * - 资源未设容量 → 无需填写，也不做限制
- * - 资源设了容量 → 必须填写申请量，且「本次占用期间的已有峰值占用 + 本次申请」不得超过总容量
+ * - 资源设了容量 → 必须填写申请量（可为 0），且「本次占用期间的已有峰值占用 + 本次申请」不得超过总容量
  *
  * 占用按**时间段**计算：与本次区间不重叠的历史占用可以复用同一份容量，
  * 只有时间上重叠的占用才相加（见 lib/capacity.ts）。未给时间段视为长期占用，与所有占用重叠。
@@ -379,7 +379,7 @@ export async function assertCapacityAvailable(
   const available = round2(row.capacityTotal - allocatedExcludingSelf);
   const periodHint = formatPeriod(period?.startAt ?? null, period?.endAt ?? null);
 
-  if (amount === null || amount === undefined || amount <= 0) {
+  if (amount === null || amount === undefined) {
     throw validationError(
       `资源 ${row.code} 已设置容量，请填写该槽位申请的容量（剩余可用 ${available}${unitSuffix}）`,
       {

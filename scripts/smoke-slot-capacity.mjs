@@ -6,7 +6,7 @@
  *  2. 引用资源时「已被其他项目占用」的提示与明细
  *  3. 跨环境引用（准生产引用开发资源）需确认后放行
  *  4. 资源台账可查看被哪些项目 / 环境引用
- *  5. 容量：槽位申请必填且不可超额、调小容量时校验现有占用、台账显示容量明细
+ *  5. 容量：槽位申请必填且可为 0、不可超额、调小容量时校验现有占用、台账显示容量明细
  *  6. 环境字典为 DEV / PT / UAT，且不再标记内置（生产环境 PRD 由管理员自建）
  */
 
@@ -203,6 +203,14 @@ ok(
   (over.json?.error?.details?.warnings ?? []).some((w) => w.code === 'CAPACITY_EXCEEDED'),
   '提示类型为 CAPACITY_EXCEEDED',
 );
+
+const zero = await req(`/project-environments/${envA.id}/slots/${capSlot.id}/assign`, {
+  method: 'POST',
+  token: A,
+  body: { resourceId: nas.id, amount: 0, acknowledge: true },
+});
+ok(zero.status === 200, `申请容量 0 可以成功绑定（${zero.status}）`);
+ok(zero.json?.slot?.demandAmount === 0, '槽位记录了申请容量 0');
 
 const good = await req(`/project-environments/${envA.id}/slots/${capSlot.id}/assign`, {
   method: 'POST',

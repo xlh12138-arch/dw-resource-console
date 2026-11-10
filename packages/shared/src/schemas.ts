@@ -635,14 +635,14 @@ const periodShape = {
 
 /**
  * 槽位绑定资源：
- * - amount：该槽位申请的容量（资源设了总容量时必填，且不能超过剩余容量）
+ * - amount：该槽位申请的容量（资源设了总容量时必填，可为 0，且不能超过剩余容量）
  * - startAt / endAt：占用起止；endAt 为 null 表示长期占用
  * - acknowledge：已知悉「跨环境引用 / 已被其他项目占用 / 时间区间重叠」等提示，确认继续
  */
 export const envSlotAssignSchema = z
   .object({
     resourceId: z.coerce.number().int().positive(),
-    amount: z.coerce.number().positive().max(1e9).nullable().optional(),
+    amount: z.coerce.number().min(0).max(1e9).nullable().optional(),
     acknowledge: z.coerce.boolean().default(false),
     ...periodShape,
   })

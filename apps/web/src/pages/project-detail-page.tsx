@@ -1421,7 +1421,7 @@ function CreateEnvModal({
  * 槽位分配资源：
  * - 放开环境限制，支持跨环境引用（如准生产环境引用开发环境资源），但会显著提示
  * - 资源已被其他项目占用时展示占用明细
- * - 资源设置了容量时必须填写申请量，且不能超过剩余可用
+ * - 资源设置了容量时必须填写申请量，可为 0，且不能超过剩余可用
  */
 function AssignSlotModal({
   state,
@@ -1521,7 +1521,7 @@ function AssignSlotModal({
     Boolean(resourceId) &&
     !periodInvalid &&
     !assign.isPending &&
-    (!demandRequired || (amount !== '' && Number(amount) > 0));
+    (!demandRequired || (amount !== '' && Number.isFinite(Number(amount)) && Number(amount) >= 0));
 
   return (
     <Modal
@@ -1531,7 +1531,7 @@ function AssignSlotModal({
       desc={
         slot.resourceId
           ? '更换后原资源的占用容量立即释放，占用起止默认沿用原区间，可在此调整'
-          : '支持跨环境引用（会明确提示）；资源设置了容量时需填写申请量'
+          : '支持跨环境引用（会明确提示）；资源设置了容量时需填写申请量，可填 0'
       }
       onClose={onClose}
       onSave={() => canSubmit && assign.mutate()}
@@ -1653,7 +1653,7 @@ function AssignSlotModal({
               required
               hint={
                 picked?.capacity
-                  ? `总容量 ${picked.capacity.total}，已占用 ${picked.capacity.allocated}，剩余 ${picked.capacity.available}`
+                  ? `总容量 ${picked.capacity.total}，已占用 ${picked.capacity.allocated}，剩余 ${picked.capacity.available}；可填 0`
                   : undefined
               }
             >
@@ -1662,7 +1662,7 @@ function AssignSlotModal({
                 min={0}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="如：1024"
+                placeholder="如：1024；可填 0"
               />
             </Field>
           </div>
