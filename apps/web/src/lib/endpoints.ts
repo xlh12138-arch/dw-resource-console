@@ -123,6 +123,8 @@ export interface ProjectQuery {
   status?: string;
   page?: number;
   pageSize?: number;
+  sortBy?: 'code' | 'name' | 'owner' | 'envCount' | 'resourceCount' | 'status' | 'updatedAt';
+  sortOrder?: 'asc' | 'desc';
 }
 
 export const projectsApi = {
@@ -236,8 +238,13 @@ export interface TemplateItemInput {
 }
 
 export const templatesApi = {
-  list: (query: { q?: string; page?: number; pageSize?: number }) =>
-    api.get<Paged<EnvTemplateDto>>(`/env-templates${toQuery(query)}`),
+  list: (query: {
+    q?: string;
+    page?: number;
+    pageSize?: number;
+    sortBy?: 'code' | 'name' | 'slotCount' | 'usageCount' | 'updatedAt';
+    sortOrder?: 'asc' | 'desc';
+  }) => api.get<Paged<EnvTemplateDto>>(`/env-templates${toQuery(query)}`),
   options: () => api.get<EnvTemplateDto[]>('/env-templates/options'),
   get: (id: number) => api.get<EnvTemplateDetail>(`/env-templates/${id}`),
   create: (body: {
@@ -275,6 +282,8 @@ export const auditApi = {
     targetType?: string;
     page?: number;
     pageSize?: number;
+    sortBy?: 'createdAt' | 'actorName' | 'action' | 'targetType' | 'targetName';
+    sortOrder?: 'asc' | 'desc';
   }) => api.get<Paged<AuditLogDto>>(`/audit-logs${toQuery(query)}`),
 };
 

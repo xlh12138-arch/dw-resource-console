@@ -11,7 +11,19 @@ import {
 } from '@dw/shared';
 import { useDict } from '../lib/dict';
 import { resourcesApi } from '../lib/endpoints';
-import { Badge, ClickableBadge, EmptyState, Modal, Spinner, Td, Th, Table } from './ui';
+import {
+  Badge,
+  ClickableBadge,
+  EmptyState,
+  Modal,
+  SortableTh,
+  Spinner,
+  Td,
+  Th,
+  Table,
+  sortRows,
+  useTableSort,
+} from './ui';
 import { TimelineChart, toneOfState } from './timeline';
 import { EnvBadge } from './env-badge';
 
@@ -37,6 +49,15 @@ export function ResourceDetailModal({
   const navigate = useNavigate();
   // 支持从子资源回到父资源 / 下钻子资源：以 id 驱动，详情接口返回完整 DTO
   const [currentId, setCurrentId] = useState<number | null>(resource?.id ?? null);
+  const childSort = useTableSort<
+    'code' | 'environment' | 'demandAmount' | 'allocated' | 'children' | 'status'
+  >('code', 'asc');
+  const referenceSort = useTableSort<
+    'project' | 'environment' | 'slotRole' | 'amount' | 'endAt' | 'status'
+  >('project', 'asc');
+  const auditSort = useTableSort<'createdAt' | 'actorName' | 'action'>('createdAt', 'desc', [
+    'createdAt',
+  ]);
 
   useEffect(() => {
     setCurrentId(resource?.id ?? null);
@@ -74,6 +95,27 @@ export function ResourceDetailModal({
   const ancestors = d?.ancestors ?? [];
   const tl = timeline.data;
   const expiredRefs = references.filter((ref) => ref.overdueDays > 0);
+  const sortedChildren = sortRows(children, childSort, (child, key) => {
+    if (key === 'environment') return child.environmentLabel;
+    if (key === 'demandAmount') return child.demandAmount;
+    if (key === 'allocated') return child.capacityAllocated;
+    if (key === 'children') return child.childCount;
+    if (key === 'status') return RESOURCE_STATUS_LABELS[child.status];
+    return child[key];
+  });
+  const sortedReferences = sortRows(references, referenceSort, (ref, key) => {
+    if (key === 'project') return ref.projectName ?? '';
+    if (key === 'environment') return `${ref.envName} ${ref.environmentLabel}`;
+    if (key === 'slotRole') return ref.slotRole;
+    if (key === 'amount') return ref.amount;
+    if (key === 'endAt') return ref.endAt ? new Date(ref.endAt) : null;
+    if (key === 'status') return SLOT_OCCUPANCY_STATE_LABELS[ref.occupancyState];
+    return '';
+  });
+  const sortedAudit = sortRows(audit.data ?? [], auditSort, (log, key) => {
+    if (key === 'createdAt') return new Date(log.createdAt);
+    return log[key];
+  });
 
   const jumpToResources = (params: Record<string, string>) => {
     const search = new URLSearchParams(params).toString();
@@ -325,16 +367,52 @@ export function ResourceDetailModal({
             <Table
               head={
                 <tr>
-                  <Th>子资源</Th>
-                  <Th>环境</Th>
-                  <Th>申请容量</Th>
-                  <Th>自身已占用</Th>
-                  <Th>下级</Th>
-                  <Th>状态</Th>
+                  <SortableTh
+                    label="子资源"
+                    sortKey="code"
+                    sortBy={childSort.sortBy}
+                    sortOrder={childSort.sortOrder}
+                    onSort={childSort.onSort}
+                  />
+                  <SortableTh
+                    label="环境"
+                    sortKey="environment"
+                    sortBy={childSort.sortBy}
+                    sortOrder={childSort.sortOrder}
+                    onSort={childSort.onSort}
+                  />
+                  <SortableTh
+                    label="申请容量"
+                    sortKey="demandAmount"
+                    sortBy={childSort.sortBy}
+                    sortOrder={childSort.sortOrder}
+                    onSort={childSort.onSort}
+                  />
+                  <SortableTh
+                    label="自身已占用"
+                    sortKey="allocated"
+                    sortBy={childSort.sortBy}
+                    sortOrder={childSort.sortOrder}
+                    onSort={childSort.onSort}
+                  />
+                  <SortableTh
+                    label="下级"
+                    sortKey="children"
+                    sortBy={childSort.sortBy}
+                    sortOrder={childSort.sortOrder}
+                    onSort={childSort.onSort}
+                  />
+                  <SortableTh
+                    label="状态"
+                    sortKey="status"
+                    sortBy={childSort.sortBy}
+                    sortOrder={childSort.sortOrder}
+                    onSort={childSort.onSort}
+                  />
                 </tr>
               }
             >
-              {children.map((c) => (
+              {sortedChildren.map((c) => (
                 <tr
                   key={c.id}
                   className="cursor-pointer hover:bg-slate-50"
@@ -445,16 +523,52 @@ export function ResourceDetailModal({
             <Table
               head={
                 <tr>
-                  <Th>项目</Th>
-                  <Th>项目环境</Th>
-                  <Th>槽位</Th>
-                  <Th>占用容量</Th>
-                  <Th>占用起止</Th>
-                  <Th>状态</Th>
+                  <SortableTh
+                    label="项目"
+                    sortKey="project"
+                    sortBy={referenceSort.sortBy}
+                    sortOrder={referenceSort.sortOrder}
+                    onSort={referenceSort.onSort}
+                  />
+                  <SortableTh
+                    label="项目环境"
+                    sortKey="environment"
+                    sortBy={referenceSort.sortBy}
+                    sortOrder={referenceSort.sortOrder}
+                    onSort={referenceSort.onSort}
+                  />
+                  <SortableTh
+                    label="槽位"
+                    sortKey="slotRole"
+                    sortBy={referenceSort.sortBy}
+                    sortOrder={referenceSort.sortOrder}
+                    onSort={referenceSort.onSort}
+                  />
+                  <SortableTh
+                    label="占用容量"
+                    sortKey="amount"
+                    sortBy={referenceSort.sortBy}
+                    sortOrder={referenceSort.sortOrder}
+                    onSort={referenceSort.onSort}
+                  />
+                  <SortableTh
+                    label="占用起止"
+                    sortKey="endAt"
+                    sortBy={referenceSort.sortBy}
+                    sortOrder={referenceSort.sortOrder}
+                    onSort={referenceSort.onSort}
+                  />
+                  <SortableTh
+                    label="状态"
+                    sortKey="status"
+                    sortBy={referenceSort.sortBy}
+                    sortOrder={referenceSort.sortOrder}
+                    onSort={referenceSort.onSort}
+                  />
                 </tr>
               }
             >
-              {references.map((ref) => (
+              {sortedReferences.map((ref) => (
                 <tr key={ref.slotId}>
                   <Td>
                     {ref.projectId !== null ? (
@@ -539,15 +653,33 @@ export function ResourceDetailModal({
             <Table
               head={
                 <tr>
-                  <Th>时间</Th>
-                  <Th>操作人</Th>
-                  <Th>动作</Th>
+                  <SortableTh
+                    label="时间"
+                    sortKey="createdAt"
+                    sortBy={auditSort.sortBy}
+                    sortOrder={auditSort.sortOrder}
+                    onSort={auditSort.onSort}
+                  />
+                  <SortableTh
+                    label="操作人"
+                    sortKey="actorName"
+                    sortBy={auditSort.sortBy}
+                    sortOrder={auditSort.sortOrder}
+                    onSort={auditSort.onSort}
+                  />
+                  <SortableTh
+                    label="动作"
+                    sortKey="action"
+                    sortBy={auditSort.sortBy}
+                    sortOrder={auditSort.sortOrder}
+                    onSort={auditSort.onSort}
+                  />
                   <Th>变更内容</Th>
                 </tr>
               }
             >
-              {(audit.data ?? []).map((log, idx) => (
-                <tr key={idx}>
+              {sortedAudit.map((log, idx) => (
+                <tr key={`${log.createdAt}-${idx}`}>
                   <Td className="whitespace-nowrap text-xs text-slate-500">
                     {new Date(log.createdAt).toLocaleString('zh-CN')}
                   </Td>

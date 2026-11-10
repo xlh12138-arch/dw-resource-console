@@ -1,4 +1,5 @@
 import { clsx } from 'clsx';
+import { ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import {
   createContext,
@@ -19,6 +20,75 @@ import type {
 
 export function cn(...inputs: (string | false | null | undefined)[]): string {
   return twMerge(clsx(inputs));
+}
+
+export type SortOrder = 'asc' | 'desc';
+
+export interface SortState<K extends string = string> {
+  sortBy: K;
+  sortOrder: SortOrder;
+}
+
+export function nextSortState<K extends string>(
+  current: SortState<K>,
+  nextKey: K,
+  defaultOrder: SortOrder = 'asc',
+): SortState<K> {
+  if (current.sortBy !== nextKey) return { sortBy: nextKey, sortOrder: defaultOrder };
+  return {
+    sortBy: nextKey,
+    sortOrder: current.sortOrder === 'asc' ? 'desc' : 'asc',
+  };
+}
+
+export function useTableSort<K extends string>(
+  initialKey: K,
+  initialOrder: SortOrder = 'asc',
+  descendingKeys: readonly K[] = [],
+): SortState<K> & { onSort: (key: K) => void } {
+  const [state, setState] = useState<SortState<K>>({
+    sortBy: initialKey,
+    sortOrder: initialOrder,
+  });
+  const onSort = useCallback(
+    (key: K) =>
+      setState((current) =>
+        nextSortState(current, key, descendingKeys.includes(key) ? 'desc' : 'asc'),
+      ),
+    [descendingKeys],
+  );
+  return { ...state, onSort };
+}
+
+function compareSortValues(a: unknown, b: unknown): number {
+  if (a === null || a === undefined || a === '') {
+    return b === null || b === undefined || b === '' ? 0 : 1;
+  }
+  if (b === null || b === undefined || b === '') return -1;
+  if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b), 'zh-CN', {
+    numeric: true,
+    sensitivity: 'base',
+  });
+}
+
+export function sortRows<T, K extends string>(
+  rows: readonly T[],
+  state: SortState<K>,
+  valueOf: (row: T, key: K) => unknown,
+): T[] {
+  const direction = state.sortOrder === 'asc' ? 1 : -1;
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const compared = compareSortValues(
+        valueOf(a.row, state.sortBy),
+        valueOf(b.row, state.sortBy),
+      );
+      return compared === 0 ? a.index - b.index : compared * direction;
+    })
+    .map((item) => item.row);
 }
 
 /* ------------------------------- Button ------------------------------- */
@@ -807,6 +877,40 @@ export function Th({
     >
       {children}
     </th>
+  );
+}
+
+export function SortableTh<K extends string>({
+  label,
+  sortKey,
+  sortBy,
+  sortOrder,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: K;
+  sortBy: K;
+  sortOrder: SortOrder;
+  onSort: (key: K) => void;
+  className?: string;
+}) {
+  const active = sortBy === sortKey;
+  const Icon = !active ? ChevronsUpDown : sortOrder === 'asc' ? ChevronUp : ChevronDown;
+  return (
+    <Th
+      ariaSort={active ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+      className={className}
+    >
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 whitespace-nowrap hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+        onClick={() => onSort(sortKey)}
+      >
+        {label}
+        <Icon size={12} className={active ? 'text-brand-600' : 'text-slate-400'} />
+      </button>
+    </Th>
   );
 }
 

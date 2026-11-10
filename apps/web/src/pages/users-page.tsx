@@ -25,11 +25,16 @@ import {
   Modal,
   PageHeader,
   Select,
+  SortableTh,
   Spinner,
   Td,
   Th,
   Table,
+  sortRows,
+  useTableSort,
 } from '../components/ui';
+
+type UserSortKey = 'username' | 'displayName' | 'role' | 'status' | 'lastLoginAt' | 'createdAt';
 
 export function UsersPage() {
   const { push } = useToast();
@@ -100,6 +105,12 @@ export function UsersPage() {
   });
 
   const users = query.data?.items ?? [];
+  const userSort = useTableSort<UserSortKey>('username', 'asc');
+  const sortedUsers = sortRows(users, userSort, (user, key) => {
+    if (key === 'lastLoginAt') return user.lastLoginAt ? new Date(user.lastLoginAt) : null;
+    if (key === 'createdAt') return new Date(user.createdAt);
+    return user[key];
+  });
 
   const copyPassword = async () => {
     if (!resetResult) return;
@@ -140,17 +151,53 @@ export function UsersPage() {
           <Table
             head={
               <tr>
-                <Th>用户名</Th>
-                <Th>姓名</Th>
-                <Th>角色</Th>
-                <Th>状态</Th>
-                <Th>最近登录</Th>
-                <Th>创建时间</Th>
+                <SortableTh
+                  label="用户名"
+                  sortKey="username"
+                  sortBy={userSort.sortBy}
+                  sortOrder={userSort.sortOrder}
+                  onSort={userSort.onSort}
+                />
+                <SortableTh
+                  label="姓名"
+                  sortKey="displayName"
+                  sortBy={userSort.sortBy}
+                  sortOrder={userSort.sortOrder}
+                  onSort={userSort.onSort}
+                />
+                <SortableTh
+                  label="角色"
+                  sortKey="role"
+                  sortBy={userSort.sortBy}
+                  sortOrder={userSort.sortOrder}
+                  onSort={userSort.onSort}
+                />
+                <SortableTh
+                  label="状态"
+                  sortKey="status"
+                  sortBy={userSort.sortBy}
+                  sortOrder={userSort.sortOrder}
+                  onSort={userSort.onSort}
+                />
+                <SortableTh
+                  label="最近登录"
+                  sortKey="lastLoginAt"
+                  sortBy={userSort.sortBy}
+                  sortOrder={userSort.sortOrder}
+                  onSort={userSort.onSort}
+                />
+                <SortableTh
+                  label="创建时间"
+                  sortKey="createdAt"
+                  sortBy={userSort.sortBy}
+                  sortOrder={userSort.sortOrder}
+                  onSort={userSort.onSort}
+                />
                 <Th className="text-right">操作</Th>
               </tr>
             }
           >
-            {users.map((u) => (
+            {sortedUsers.map((u) => (
               <tr key={u.id} className="hover:bg-slate-50">
                 <Td className="font-medium">{u.username}</Td>
                 <Td>{u.displayName}</Td>

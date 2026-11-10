@@ -17,32 +17,15 @@ import type { z } from 'zod';
 export type ProjectQuery = z.infer<typeof projectQuerySchema>;
 export type EnvTemplateQuery = z.infer<typeof envTemplateQuerySchema>;
 
-export interface Paged<T> {
-  items: T[];
-  meta: { page: number; pageSize: number; total: number; totalPages: number };
-}
-
-function page<T>(rows: T[], total: number, q: { page: number; pageSize: number }): Paged<T> {
-  return {
-    items: rows,
-    meta: {
-      page: q.page,
-      pageSize: q.pageSize,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / q.pageSize)),
-    },
-  };
-}
-
 /* ------------------------------------------------------------------ *
  * 项目
  * ------------------------------------------------------------------ */
 
 export const projectRepository = {
-  async list(q: ProjectQuery): Promise<Paged<ProjectRow>> {
+  async listFiltered(q: ProjectQuery): Promise<ProjectRow[]> {
     const where = q.status ? eq(projects.status, q.status) : undefined;
     const all = await db.select().from(projects).where(where).orderBy(desc(projects.updatedAt));
-    const filtered = q.q
+    return q.q
       ? all.filter(
           (p) =>
             p.name.includes(q.q!) ||
@@ -51,8 +34,6 @@ export const projectRepository = {
             (p.description ?? '').includes(q.q!),
         )
       : all;
-    const start = (q.page - 1) * q.pageSize;
-    return page(filtered.slice(start, start + q.pageSize), filtered.length, q);
   },
 
   listAll(): Promise<ProjectRow[]> {
@@ -241,9 +222,9 @@ export const slotRepository = {
  * ------------------------------------------------------------------ */
 
 export const templateRepository = {
-  async list(q: EnvTemplateQuery): Promise<Paged<typeof envTemplates.$inferSelect>> {
+  async listFiltered(q: EnvTemplateQuery): Promise<(typeof envTemplates.$inferSelect)[]> {
     const all = await db.select().from(envTemplates).orderBy(desc(envTemplates.updatedAt));
-    const filtered = q.q
+    return q.q
       ? all.filter(
           (t) =>
             t.name.includes(q.q!) ||
@@ -251,8 +232,6 @@ export const templateRepository = {
             (t.description ?? '').includes(q.q!),
         )
       : all;
-    const start = (q.page - 1) * q.pageSize;
-    return page(filtered.slice(start, start + q.pageSize), filtered.length, q);
   },
 
   listAll(): Promise<(typeof envTemplates.$inferSelect)[]> {

@@ -31,11 +31,14 @@ import {
   ModalCancelButton,
   PageHeader,
   Select,
+  SortableTh,
   Spinner,
   Switch,
   Table,
   Td,
   Th,
+  sortRows,
+  useTableSort,
 } from '../components/ui';
 import { ColorPicker } from '../components/color-picker';
 import { EnvBadge } from '../components/env-badge';
@@ -355,6 +358,10 @@ export function ResourceTypePanel() {
     queryKey: ['dict', 'resource-types'],
     queryFn: () => dictApi.types(true),
   });
+  const typeSort = useTableSort<
+    'sortOrder' | 'label' | 'code' | 'prefix' | 'fieldCount' | 'referenceCount' | 'enabled'
+  >('sortOrder', 'asc');
+  const sortedTypes = sortRows(list.data ?? [], typeSort, (type, key) => type[key]);
 
   const [editing, setEditing] = useState<ResourceTypeDetail | null>(null);
   const [open, setOpen] = useState(false);
@@ -564,7 +571,7 @@ export function ResourceTypePanel() {
 
   const moveType = useMutation({
     mutationFn: async ({ code, offset }: { code: string; offset: -1 | 1 }) => {
-      const rows = list.data ?? [];
+      const rows = sortedTypes;
       const from = rows.findIndex((item) => item.code === code);
       const to = from + offset;
       if (from < 0 || to < 0 || to >= rows.length) return;
@@ -629,17 +636,53 @@ export function ResourceTypePanel() {
           <Table
             head={
               <tr>
-                <Th>类型名称</Th>
-                <Th>编码</Th>
-                <Th>编码前缀</Th>
-                <Th>字段</Th>
-                <Th>引用</Th>
-                <Th>状态</Th>
+                <SortableTh
+                  label="类型名称"
+                  sortKey="label"
+                  sortBy={typeSort.sortBy}
+                  sortOrder={typeSort.sortOrder}
+                  onSort={typeSort.onSort}
+                />
+                <SortableTh
+                  label="编码"
+                  sortKey="code"
+                  sortBy={typeSort.sortBy}
+                  sortOrder={typeSort.sortOrder}
+                  onSort={typeSort.onSort}
+                />
+                <SortableTh
+                  label="编码前缀"
+                  sortKey="prefix"
+                  sortBy={typeSort.sortBy}
+                  sortOrder={typeSort.sortOrder}
+                  onSort={typeSort.onSort}
+                />
+                <SortableTh
+                  label="字段"
+                  sortKey="fieldCount"
+                  sortBy={typeSort.sortBy}
+                  sortOrder={typeSort.sortOrder}
+                  onSort={typeSort.onSort}
+                />
+                <SortableTh
+                  label="引用"
+                  sortKey="referenceCount"
+                  sortBy={typeSort.sortBy}
+                  sortOrder={typeSort.sortOrder}
+                  onSort={typeSort.onSort}
+                />
+                <SortableTh
+                  label="状态"
+                  sortKey="enabled"
+                  sortBy={typeSort.sortBy}
+                  sortOrder={typeSort.sortOrder}
+                  onSort={typeSort.onSort}
+                />
                 <Th className="text-right">操作</Th>
               </tr>
             }
           >
-            {list.data.map((t, index) => (
+            {sortedTypes.map((t, index) => (
               <tr key={t.code} className="hover:bg-slate-50">
                 <Td className="font-medium">{t.label}</Td>
                 <Td className="font-mono text-xs text-slate-500">{t.code}</Td>
@@ -680,7 +723,7 @@ export function ResourceTypePanel() {
                           size="sm"
                           title="下移"
                           aria-label={`下移资源类型 ${t.label}`}
-                          disabled={index === list.data!.length - 1 || moveType.isPending}
+                          disabled={index === sortedTypes.length - 1 || moveType.isPending}
                           onClick={() => moveType.mutate({ code: t.code, offset: 1 })}
                         >
                           <ArrowDown size={13} />
@@ -955,6 +998,14 @@ export function EnvironmentPanel() {
     queryKey: ['dict', 'environments'],
     queryFn: () => dictApi.environments(true),
   });
+  const environmentSort = useTableSort<
+    'sortOrder' | 'label' | 'code' | 'referenceCount' | 'enabled'
+  >('sortOrder', 'asc');
+  const sortedEnvironments = sortRows(
+    list.data ?? [],
+    environmentSort,
+    (environment, key) => environment[key],
+  );
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<EnvironmentDto | null>(null);
@@ -1100,7 +1151,7 @@ export function EnvironmentPanel() {
 
   const moveEnvironment = useMutation({
     mutationFn: async ({ code, offset }: { code: string; offset: -1 | 1 }) => {
-      const rows = list.data ?? [];
+      const rows = sortedEnvironments;
       const from = rows.findIndex((item) => item.code === code);
       const to = from + offset;
       if (from < 0 || to < 0 || to >= rows.length) return;
@@ -1165,15 +1216,39 @@ export function EnvironmentPanel() {
           <Table
             head={
               <tr>
-                <Th>环境名称</Th>
-                <Th>编码</Th>
-                <Th>引用</Th>
-                <Th>状态</Th>
+                <SortableTh
+                  label="环境名称"
+                  sortKey="label"
+                  sortBy={environmentSort.sortBy}
+                  sortOrder={environmentSort.sortOrder}
+                  onSort={environmentSort.onSort}
+                />
+                <SortableTh
+                  label="编码"
+                  sortKey="code"
+                  sortBy={environmentSort.sortBy}
+                  sortOrder={environmentSort.sortOrder}
+                  onSort={environmentSort.onSort}
+                />
+                <SortableTh
+                  label="引用"
+                  sortKey="referenceCount"
+                  sortBy={environmentSort.sortBy}
+                  sortOrder={environmentSort.sortOrder}
+                  onSort={environmentSort.onSort}
+                />
+                <SortableTh
+                  label="状态"
+                  sortKey="enabled"
+                  sortBy={environmentSort.sortBy}
+                  sortOrder={environmentSort.sortOrder}
+                  onSort={environmentSort.onSort}
+                />
                 <Th className="text-right">操作</Th>
               </tr>
             }
           >
-            {list.data.map((e, index) => (
+            {sortedEnvironments.map((e, index) => (
               <tr key={e.code} className="hover:bg-slate-50">
                 <Td className="font-medium">{e.label}</Td>
                 {/* 标识色直接作为编码的底色，不再单独占一列 */}
@@ -1215,7 +1290,9 @@ export function EnvironmentPanel() {
                           size="sm"
                           title="下移"
                           aria-label={`下移环境 ${e.label}`}
-                          disabled={index === list.data!.length - 1 || moveEnvironment.isPending}
+                          disabled={
+                            index === sortedEnvironments.length - 1 || moveEnvironment.isPending
+                          }
                           onClick={() => moveEnvironment.mutate({ code: e.code, offset: 1 })}
                         >
                           <ArrowDown size={13} />

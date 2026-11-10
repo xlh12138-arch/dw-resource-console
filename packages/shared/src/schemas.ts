@@ -490,6 +490,10 @@ export const auditQuerySchema = z.object({
   action: z.enum(['CREATE', 'UPDATE', 'DELETE', 'IMPORT', 'LOGIN', 'LOGOUT']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(20),
+  sortBy: z
+    .enum(['createdAt', 'actorName', 'action', 'targetType', 'targetName'])
+    .default('createdAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
 /* ------------------------------------------------------------------ *
@@ -524,6 +528,10 @@ export const projectQuerySchema = z.object({
   status: z.enum(PROJECT_STATUSES).optional(),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(20),
+  sortBy: z
+    .enum(['code', 'name', 'owner', 'envCount', 'resourceCount', 'status', 'updatedAt'])
+    .default('updatedAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
 export const projectSchema = z.object({
@@ -557,8 +565,8 @@ export const projectEnvUpdateSchema = z
   .object({
     name: shortText.optional(),
     environment: environmentCodeSchema.optional(),
-    description: longText.optional(),
-    owner: shortText.optional(),
+    description: longText.nullable().optional(),
+    owner: shortText.nullable().optional(),
     status: z.enum(ENV_RUN_STATUSES).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: '至少需要更新一个字段' });
@@ -925,6 +933,8 @@ export const envTemplateQuerySchema = z.object({
   q: z.string().trim().max(64).optional(),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(20),
+  sortBy: z.enum(['code', 'name', 'slotCount', 'usageCount', 'updatedAt']).default('updatedAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
 export const envTemplateItemSchema = templateItemSchema.extend({

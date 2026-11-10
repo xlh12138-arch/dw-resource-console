@@ -47,11 +47,14 @@ import {
   ModalCancelButton,
   PageHeader,
   Select,
+  SortableTh,
   Spinner,
   Table,
   Td,
   Textarea,
   Th,
+  sortRows,
+  useTableSort,
 } from '../components/ui';
 import { EnvBadge } from '../components/env-badge';
 import { TimelineChart, toneOfState } from '../components/timeline';
@@ -108,6 +111,15 @@ export function ProjectDetailPage() {
   } | null>(null);
   const [editEnv, setEditEnv] = useState<ProjectEnvDto | null>(null);
   const [envView, setEnvView] = useState<'slots' | 'timeline'>('slots');
+  const overdueSort = useTableSort<
+    'resource' | 'environment' | 'slotRole' | 'endAt' | 'overdueDays'
+  >('overdueDays', 'desc', ['overdueDays']);
+  const resourceSort = useTableSort<
+    'code' | 'name' | 'type' | 'keyAttr' | 'environment' | 'status' | 'source'
+  >('code', 'asc');
+  const slotSort = useTableSort<
+    'slotRole' | 'resourceType' | 'resource' | 'amount' | 'endAt' | 'status'
+  >('slotRole', 'asc');
 
   const invalidateAll = () => {
     void queryClient.invalidateQueries({ queryKey: ['project', projectId] });
@@ -219,6 +231,37 @@ export function ProjectDetailPage() {
   const overdueRefs = (data.slotRefs ?? [])
     .filter((r) => r.overdueDays > 0)
     .sort((a, b) => b.overdueDays - a.overdueDays);
+  const sortedOverdueRefs = sortRows(overdueRefs, overdueSort, (ref, key) => {
+    if (key === 'resource') return `${ref.resourceCode ?? ''} ${ref.resourceName ?? ''}`;
+    if (key === 'environment') return ref.environmentLabel ?? ref.environment;
+    if (key === 'endAt') return ref.endAt ? new Date(ref.endAt) : null;
+    return ref[key];
+  });
+  const sortedProjectResources = sortRows(
+    resources.data?.items ?? [],
+    resourceSort,
+    (resource, key) => {
+      if (key === 'type') return dict.typeLabel(resource.type);
+      if (key === 'keyAttr') {
+        return (dict.typeColumns(resource.type) ?? [])
+          .slice(0, 3)
+          .map((field) => String(resource.attrs[field] ?? ''))
+          .join(' ');
+      }
+      if (key === 'environment') return dict.envLabel(resource.environment);
+      if (key === 'status') return RESOURCE_STATUS_LABELS[resource.status];
+      if (key === 'source') return resource.projectId === projectId ? 1 : 0;
+      return resource[key];
+    },
+  );
+  const sortedSlots = sortRows(env?.slots ?? [], slotSort, (slot, key) => {
+    if (key === 'resourceType') return dict.typeLabel(slot.resourceType);
+    if (key === 'resource') return `${slot.resourceCode ?? ''} ${slot.resourceName ?? ''}`;
+    if (key === 'amount') return slot.demandAmount;
+    if (key === 'endAt') return slot.endAt ? new Date(slot.endAt) : null;
+    if (key === 'status') return SLOT_OCCUPANCY_STATE_LABELS[slot.occupancyState ?? 'ACTIVE'];
+    return slot[key];
+  });
 
   return (
     <div className="space-y-4">
@@ -274,16 +317,46 @@ export function ProjectDetailPage() {
           <Table
             head={
               <tr>
-                <Th>资源</Th>
-                <Th>所属环境</Th>
-                <Th>槽位</Th>
-                <Th>占用结束</Th>
-                <Th>超期</Th>
+                <SortableTh
+                  label="资源"
+                  sortKey="resource"
+                  sortBy={overdueSort.sortBy}
+                  sortOrder={overdueSort.sortOrder}
+                  onSort={overdueSort.onSort}
+                />
+                <SortableTh
+                  label="所属环境"
+                  sortKey="environment"
+                  sortBy={overdueSort.sortBy}
+                  sortOrder={overdueSort.sortOrder}
+                  onSort={overdueSort.onSort}
+                />
+                <SortableTh
+                  label="槽位"
+                  sortKey="slotRole"
+                  sortBy={overdueSort.sortBy}
+                  sortOrder={overdueSort.sortOrder}
+                  onSort={overdueSort.onSort}
+                />
+                <SortableTh
+                  label="占用结束"
+                  sortKey="endAt"
+                  sortBy={overdueSort.sortBy}
+                  sortOrder={overdueSort.sortOrder}
+                  onSort={overdueSort.onSort}
+                />
+                <SortableTh
+                  label="超期"
+                  sortKey="overdueDays"
+                  sortBy={overdueSort.sortBy}
+                  sortOrder={overdueSort.sortOrder}
+                  onSort={overdueSort.onSort}
+                />
                 <Th className="text-right">操作</Th>
               </tr>
             }
           >
-            {overdueRefs.map((r) => (
+            {sortedOverdueRefs.map((r) => (
               <tr key={`${r.slotId}-${r.resourceId}`} className="bg-rose-50/30">
                 <Td>
                   <button
@@ -453,18 +526,60 @@ export function ProjectDetailPage() {
           <Table
             head={
               <tr>
-                <Th>编码</Th>
-                <Th>名称</Th>
-                <Th>类型</Th>
-                <Th>关键属性</Th>
-                <Th>环境</Th>
-                <Th>状态</Th>
-                <Th>来源</Th>
+                <SortableTh
+                  label="编码"
+                  sortKey="code"
+                  sortBy={resourceSort.sortBy}
+                  sortOrder={resourceSort.sortOrder}
+                  onSort={resourceSort.onSort}
+                />
+                <SortableTh
+                  label="名称"
+                  sortKey="name"
+                  sortBy={resourceSort.sortBy}
+                  sortOrder={resourceSort.sortOrder}
+                  onSort={resourceSort.onSort}
+                />
+                <SortableTh
+                  label="类型"
+                  sortKey="type"
+                  sortBy={resourceSort.sortBy}
+                  sortOrder={resourceSort.sortOrder}
+                  onSort={resourceSort.onSort}
+                />
+                <SortableTh
+                  label="关键属性"
+                  sortKey="keyAttr"
+                  sortBy={resourceSort.sortBy}
+                  sortOrder={resourceSort.sortOrder}
+                  onSort={resourceSort.onSort}
+                />
+                <SortableTh
+                  label="环境"
+                  sortKey="environment"
+                  sortBy={resourceSort.sortBy}
+                  sortOrder={resourceSort.sortOrder}
+                  onSort={resourceSort.onSort}
+                />
+                <SortableTh
+                  label="状态"
+                  sortKey="status"
+                  sortBy={resourceSort.sortBy}
+                  sortOrder={resourceSort.sortOrder}
+                  onSort={resourceSort.onSort}
+                />
+                <SortableTh
+                  label="来源"
+                  sortKey="source"
+                  sortBy={resourceSort.sortBy}
+                  sortOrder={resourceSort.sortOrder}
+                  onSort={resourceSort.onSort}
+                />
                 <Th className="text-right">操作</Th>
               </tr>
             }
           >
-            {(resources.data?.items ?? []).map((r) => {
+            {sortedProjectResources.map((r) => {
               const slotCount = slotRefs.get(r.id) ?? 0;
               const owned = r.projectId === projectId;
               return (
@@ -599,17 +714,53 @@ export function ProjectDetailPage() {
                 <Table
                   head={
                     <tr>
-                      <Th>槽位</Th>
-                      <Th>需求类型</Th>
-                      <Th>已分配资源</Th>
-                      <Th>申请容量</Th>
-                      <Th>占用起止</Th>
-                      <Th>占用状态</Th>
+                      <SortableTh
+                        label="槽位"
+                        sortKey="slotRole"
+                        sortBy={slotSort.sortBy}
+                        sortOrder={slotSort.sortOrder}
+                        onSort={slotSort.onSort}
+                      />
+                      <SortableTh
+                        label="需求类型"
+                        sortKey="resourceType"
+                        sortBy={slotSort.sortBy}
+                        sortOrder={slotSort.sortOrder}
+                        onSort={slotSort.onSort}
+                      />
+                      <SortableTh
+                        label="已分配资源"
+                        sortKey="resource"
+                        sortBy={slotSort.sortBy}
+                        sortOrder={slotSort.sortOrder}
+                        onSort={slotSort.onSort}
+                      />
+                      <SortableTh
+                        label="申请容量"
+                        sortKey="amount"
+                        sortBy={slotSort.sortBy}
+                        sortOrder={slotSort.sortOrder}
+                        onSort={slotSort.onSort}
+                      />
+                      <SortableTh
+                        label="占用起止"
+                        sortKey="endAt"
+                        sortBy={slotSort.sortBy}
+                        sortOrder={slotSort.sortOrder}
+                        onSort={slotSort.onSort}
+                      />
+                      <SortableTh
+                        label="占用状态"
+                        sortKey="status"
+                        sortBy={slotSort.sortBy}
+                        sortOrder={slotSort.sortOrder}
+                        onSort={slotSort.onSort}
+                      />
                       <Th className="text-right">操作</Th>
                     </tr>
                   }
                 >
-                  {env.slots.map((slot) => (
+                  {sortedSlots.map((slot) => (
                     <tr
                       key={slot.id}
                       className={slot.overdueDays > 0 ? 'bg-rose-50/40' : undefined}

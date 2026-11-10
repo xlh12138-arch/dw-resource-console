@@ -54,6 +54,17 @@ check(
 );
 const tpl = templates.json.items.find((t) => t.name === '标准数仓项目-生产');
 check('标准模板含 7 个槽位', tpl?.slotCount === 7, `slotCount=${tpl?.slotCount}`);
+const sortedTemplates = await req('/env-templates?sortBy=slotCount&sortOrder=desc&pageSize=200', {
+  token: A,
+});
+check(
+  '环境模板支持按槽位数排序',
+  sortedTemplates.status === 200 &&
+    sortedTemplates.json.items.every(
+      (item, index, rows) => index === 0 || rows[index - 1].slotCount >= item.slotCount,
+    ),
+  JSON.stringify(sortedTemplates.json?.items?.map((item) => item.slotCount)),
+);
 
 const newTpl = await req('/env-templates', {
   method: 'POST',
@@ -105,6 +116,17 @@ check(
   `envCount=${prj?.envCount}`,
 );
 check('项目统计含资源数', prj?.resourceCount > 0, `resourceCount=${prj?.resourceCount}`);
+const sortedProjects = await req('/projects?sortBy=resourceCount&sortOrder=desc&pageSize=200', {
+  token: A,
+});
+check(
+  '项目支持按资源数排序',
+  sortedProjects.status === 200 &&
+    sortedProjects.json.items.every(
+      (item, index, rows) => index === 0 || rows[index - 1].resourceCount >= item.resourceCount,
+    ),
+  JSON.stringify(sortedProjects.json?.items?.map((item) => item.resourceCount)),
+);
 
 const newPrj = await req('/projects', {
   method: 'POST',
@@ -150,6 +172,20 @@ check('同名环境冲突返回 409', dupEnv.status === 409, `status=${dupEnv.st
 
 const envDetail = await req(`/project-environments/${envId}`, { token: A });
 check('环境详情含 3 个槽位', envDetail.status === 200 && envDetail.json.slots.length === 3);
+
+const clearEnvOptional = await req(`/project-environments/${envId}`, {
+  method: 'PATCH',
+  token: A,
+  body: { description: null, owner: null },
+});
+check(
+  '环境说明和负责人可清空',
+  clearEnvOptional.status === 200 &&
+    clearEnvOptional.json.description === null &&
+    clearEnvOptional.json.owner === null,
+  JSON.stringify(clearEnvOptional.json),
+);
+
 const slot = envDetail.json.slots[0];
 
 console.log('\n[4] 槽位分配资源');
@@ -314,6 +350,17 @@ check(
   '环境变更写入审计',
   audit.status === 200 && audit.json.items.length > 0,
   `count=${audit.json.items.length}`,
+);
+const sortedAudit = await req('/audit-logs?sortBy=createdAt&sortOrder=asc&pageSize=200', {
+  token: A,
+});
+check(
+  '审计日志支持按时间排序',
+  sortedAudit.status === 200 &&
+    sortedAudit.json.items.every(
+      (item, index, rows) =>
+        index === 0 || new Date(rows[index - 1].createdAt) <= new Date(item.createdAt),
+    ),
 );
 
 console.log('\n[9] 删除保护与清理');

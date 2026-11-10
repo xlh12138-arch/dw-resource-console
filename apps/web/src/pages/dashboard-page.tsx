@@ -21,11 +21,13 @@ import {
   EmptyState,
   ErrorBanner,
   PageHeader,
+  SortableTh,
   Spinner,
   Table,
   Td,
-  Th,
   cn,
+  sortRows,
+  useTableSort,
 } from '../components/ui';
 import { EnvBadge } from '../components/env-badge';
 import { friendlyMessage } from '../lib/api';
@@ -165,6 +167,9 @@ function DistributionList({
 export function DashboardPage() {
   const dict = useDict();
   const navigate = useNavigate();
+  const recentSort = useTableSort<
+    'code' | 'name' | 'type' | 'environment' | 'status' | 'owner' | 'updatedAt'
+  >('updatedAt', 'desc', ['updatedAt']);
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['stats', 'overview'],
     queryFn: statsApi.overview,
@@ -185,6 +190,12 @@ export function DashboardPage() {
     [...data.byEnvironment].sort((a, b) => b.count - a.count)[0] ?? data.byEnvironment[0];
   const prodCount = primaryEnv?.count ?? 0;
   const inUse = data.byStatus.find((s) => s.status === 'IN_USE')?.count ?? 0;
+  const sortedRecent = sortRows(data.recentUpdated, recentSort, (resource, key) => {
+    if (key === 'updatedAt') return new Date(resource.updatedAt);
+    if (key === 'type') return dict.typeLabel(resource.type);
+    if (key === 'environment') return dict.envLabel(resource.environment);
+    return resource[key];
+  });
 
   return (
     <div className="space-y-5">
@@ -422,17 +433,59 @@ export function DashboardPage() {
           <Table
             head={
               <tr>
-                <Th>编码</Th>
-                <Th>名称</Th>
-                <Th>类型</Th>
-                <Th>环境</Th>
-                <Th>状态</Th>
-                <Th>负责人</Th>
-                <Th>更新时间</Th>
+                <SortableTh
+                  label="编码"
+                  sortKey="code"
+                  sortBy={recentSort.sortBy}
+                  sortOrder={recentSort.sortOrder}
+                  onSort={recentSort.onSort}
+                />
+                <SortableTh
+                  label="名称"
+                  sortKey="name"
+                  sortBy={recentSort.sortBy}
+                  sortOrder={recentSort.sortOrder}
+                  onSort={recentSort.onSort}
+                />
+                <SortableTh
+                  label="类型"
+                  sortKey="type"
+                  sortBy={recentSort.sortBy}
+                  sortOrder={recentSort.sortOrder}
+                  onSort={recentSort.onSort}
+                />
+                <SortableTh
+                  label="环境"
+                  sortKey="environment"
+                  sortBy={recentSort.sortBy}
+                  sortOrder={recentSort.sortOrder}
+                  onSort={recentSort.onSort}
+                />
+                <SortableTh
+                  label="状态"
+                  sortKey="status"
+                  sortBy={recentSort.sortBy}
+                  sortOrder={recentSort.sortOrder}
+                  onSort={recentSort.onSort}
+                />
+                <SortableTh
+                  label="负责人"
+                  sortKey="owner"
+                  sortBy={recentSort.sortBy}
+                  sortOrder={recentSort.sortOrder}
+                  onSort={recentSort.onSort}
+                />
+                <SortableTh
+                  label="更新时间"
+                  sortKey="updatedAt"
+                  sortBy={recentSort.sortBy}
+                  sortOrder={recentSort.sortOrder}
+                  onSort={recentSort.onSort}
+                />
               </tr>
             }
           >
-            {data.recentUpdated.map((r) => (
+            {sortedRecent.map((r) => (
               <tr key={r.id} className="transition-colors hover:bg-slate-50">
                 <Td className="font-mono text-xs text-slate-500">{r.code}</Td>
                 <Td className="font-medium">

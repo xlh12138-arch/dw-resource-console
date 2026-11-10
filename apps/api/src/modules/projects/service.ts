@@ -49,6 +49,47 @@ export interface Actor {
   username: string;
 }
 
+function compareSortValues(a: unknown, b: unknown): number {
+  if (a === null || a === undefined || a === '') {
+    return b === null || b === undefined || b === '' ? 0 : 1;
+  }
+  if (b === null || b === undefined || b === '') return -1;
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b), 'zh-CN', {
+    numeric: true,
+    sensitivity: 'base',
+  });
+}
+
+function sortRows<T, K extends string>(
+  rows: readonly T[],
+  sortBy: K,
+  sortOrder: 'asc' | 'desc',
+  valueOf: (row: T, key: K) => unknown,
+): T[] {
+  const direction = sortOrder === 'asc' ? 1 : -1;
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const compared = compareSortValues(valueOf(a.row, sortBy), valueOf(b.row, sortBy));
+      return compared === 0 ? a.index - b.index : compared * direction;
+    })
+    .map((item) => item.row);
+}
+
+function paginate<T>(rows: readonly T[], page: number, pageSize: number) {
+  const start = (page - 1) * pageSize;
+  return {
+    items: rows.slice(start, start + pageSize),
+    meta: {
+      page,
+      pageSize,
+      total: rows.length,
+      totalPages: Math.max(1, Math.ceil(rows.length / pageSize)),
+    },
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * DTO 映射
  * ------------------------------------------------------------------ */
@@ -269,14 +310,15 @@ async function templateItemsSummary(
 
 export const projectService = {
   async list(query: ProjectQuery) {
-    const { items, meta } = await projectRepository.list(query);
+    const items = await projectRepository.listFiltered(query);
     const out: ProjectDto[] = [];
     for (const row of items) {
       const envs = await projectEnvRepository.listByProject(row.id);
       const resourceIds = await projectResourceIds(row.id);
       out.push(toProjectDto(row, envs.length, resourceIds.length));
     }
-    return { items: out, meta };
+    const sorted = sortRows(out, query.sortBy, query.sortOrder, (project, key) => project[key]);
+    return paginate(sorted, query.page, query.pageSize);
   },
 
   async listOptions() {
@@ -589,8 +631,8 @@ export const projectEnvService = {
     patch: {
       name?: string;
       environment?: string;
-      description?: string;
-      owner?: string;
+      description?: string | null;
+      owner?: string | null;
       status?: 'PLANNING' | 'BUILDING' | 'RUNNING' | 'OFFLINE';
     },
     actor: Actor,
@@ -1412,13 +1454,14 @@ export const projectEnvService = {
 
 export const templateService = {
   async list(query: EnvTemplateQuery) {
-    const { items, meta } = await templateRepository.list(query);
+    const items = await templateRepository.listFiltered(query);
     const out: EnvTemplateDto[] = [];
     for (const row of items) {
       const items_ = await templateRepository.listItems(row.id);
       out.push(toTemplateDto(row, items_, await templateRepository.usageCount(row.id)));
     }
-    return { items: out, meta };
+    const sorted = sortRows(out, query.sortBy, query.sortOrder, (template, key) => template[key]);
+    return paginate(sorted, query.page, query.pageSize);
   },
 
   async listOptions() {

@@ -2,9 +2,6 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  ChevronsUpDown,
   Download,
   FileSpreadsheet,
   FolderTree,
@@ -54,6 +51,7 @@ import {
   PageHeader,
   Pagination,
   Select,
+  SortableTh,
   Spinner,
   Td,
   Th,
@@ -86,35 +84,6 @@ function statusTone(status: ResourceStatus): 'gray' | 'green' | 'amber' | 'red' 
   if (status === 'MAINTAINING') return 'amber';
   if (status === 'RETIRED') return 'red';
   return 'gray';
-}
-
-function SortableTh({
-  label,
-  sortKey,
-  currentSort,
-  currentOrder,
-  onSort,
-}: {
-  label: string;
-  sortKey: string;
-  currentSort: string;
-  currentOrder: 'asc' | 'desc';
-  onSort: (key: string) => void;
-}) {
-  const active = currentSort === sortKey;
-  const Icon = !active ? ChevronsUpDown : currentOrder === 'asc' ? ChevronUp : ChevronDown;
-  return (
-    <Th ariaSort={active ? (currentOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
-      <button
-        type="button"
-        className="inline-flex items-center gap-1 hover:text-brand-700"
-        onClick={() => onSort(sortKey)}
-      >
-        {label}
-        <Icon size={12} className={active ? 'text-brand-600' : 'text-slate-400'} />
-      </button>
-    </Th>
-  );
 }
 
 /** 单个筛选条件标签：点 × 只移除这一项，不影响其他筛选 */
@@ -668,30 +637,30 @@ export function ResourcesPage() {
                 <SortableTh
                   label="编码"
                   sortKey="code"
-                  currentSort={sortBy}
-                  currentOrder={sortOrder}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
                   onSort={sortColumn}
                 />
                 <SortableTh
                   label="名称"
                   sortKey="name"
-                  currentSort={sortBy}
-                  currentOrder={sortOrder}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
                   onSort={sortColumn}
                 />
                 <SortableTh
                   label="类型"
                   sortKey="type"
-                  currentSort={sortBy}
-                  currentOrder={sortOrder}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
                   onSort={sortColumn}
                 />
                 {primaryAttrKey ? (
                   <SortableTh
                     label="关键属性"
                     sortKey={`attr:${primaryAttrKey}`}
-                    currentSort={sortBy}
-                    currentOrder={sortOrder}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
                     onSort={sortColumn}
                   />
                 ) : (
@@ -702,30 +671,30 @@ export function ResourcesPage() {
                 <SortableTh
                   label="环境"
                   sortKey="environment"
-                  currentSort={sortBy}
-                  currentOrder={sortOrder}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
                   onSort={sortColumn}
                 />
                 <Th>容量</Th>
                 <SortableTh
                   label="状态"
                   sortKey="status"
-                  currentSort={sortBy}
-                  currentOrder={sortOrder}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
                   onSort={sortColumn}
                 />
                 <SortableTh
                   label="负责人"
                   sortKey="owner"
-                  currentSort={sortBy}
-                  currentOrder={sortOrder}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
                   onSort={sortColumn}
                 />
                 <SortableTh
                   label="更新时间"
                   sortKey="updatedAt"
-                  currentSort={sortBy}
-                  currentOrder={sortOrder}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
                   onSort={sortColumn}
                 />
                 <Th className="sticky right-0 z-20 w-24 bg-slate-50 text-right shadow-[-12px_0_16px_-16px_rgba(15,23,42,0.55)]">

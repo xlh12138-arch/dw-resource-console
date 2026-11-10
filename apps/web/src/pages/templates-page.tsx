@@ -21,6 +21,7 @@ import {
   PageHeader,
   Pagination,
   Select,
+  SortableTh,
   Spinner,
   Switch,
   Table,
@@ -29,6 +30,13 @@ import {
 } from '../components/ui';
 
 const PAGE_SIZE = 20;
+type TemplateSortBy = 'code' | 'name' | 'slotCount' | 'usageCount' | 'updatedAt';
+interface TemplateQuery {
+  page: number;
+  pageSize: number;
+  sortBy: TemplateSortBy;
+  sortOrder: 'asc' | 'desc';
+}
 
 export function TemplatesPage() {
   const dict = useDict();
@@ -39,7 +47,12 @@ export function TemplatesPage() {
   const canWrite = canDo('resource:write');
   const canDelete = canDo('resource:delete');
 
-  const [query, setQuery] = useState({ page: 1, pageSize: PAGE_SIZE });
+  const [query, setQuery] = useState<TemplateQuery>({
+    page: 1,
+    pageSize: PAGE_SIZE,
+    sortBy: 'updatedAt',
+    sortOrder: 'desc',
+  });
   const [form, setForm] = useState<{ open: boolean; initial: EnvTemplateDto | null }>({
     open: false,
     initial: null,
@@ -73,6 +86,15 @@ export function TemplatesPage() {
   });
 
   const rows = list.data?.items ?? [];
+  const onSort = (key: TemplateSortBy) => {
+    const defaultOrder = key === 'updatedAt' ? 'desc' : 'asc';
+    setQuery((prev) => ({
+      ...prev,
+      page: 1,
+      sortBy: key,
+      sortOrder: prev.sortBy === key ? (prev.sortOrder === 'asc' ? 'desc' : 'asc') : defaultOrder,
+    }));
+  };
 
   return (
     <div className="space-y-4">
@@ -114,12 +136,42 @@ export function TemplatesPage() {
           <Table
             head={
               <tr>
-                <Th>编码</Th>
-                <Th>模板名称</Th>
+                <SortableTh
+                  label="编码"
+                  sortKey="code"
+                  sortBy={query.sortBy}
+                  sortOrder={query.sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="模板名称"
+                  sortKey="name"
+                  sortBy={query.sortBy}
+                  sortOrder={query.sortOrder}
+                  onSort={onSort}
+                />
                 <Th>资源组合</Th>
-                <Th>槽位数</Th>
-                <Th>被引用</Th>
-                <Th>更新时间</Th>
+                <SortableTh
+                  label="槽位数"
+                  sortKey="slotCount"
+                  sortBy={query.sortBy}
+                  sortOrder={query.sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="被引用"
+                  sortKey="usageCount"
+                  sortBy={query.sortBy}
+                  sortOrder={query.sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="更新时间"
+                  sortKey="updatedAt"
+                  sortBy={query.sortBy}
+                  sortOrder={query.sortOrder}
+                  onSort={onSort}
+                />
                 <Th className="text-right">操作</Th>
               </tr>
             }

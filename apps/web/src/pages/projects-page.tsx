@@ -25,6 +25,7 @@ import {
   PageHeader,
   Pagination,
   Select,
+  SortableTh,
   Spinner,
   Table,
   Td,
@@ -42,7 +43,12 @@ export function ProjectsPage() {
   const canDelete = canDo('resource:delete');
 
   const [keyword, setKeyword] = useState('');
-  const [query, setQuery] = useState<ProjectQuery>({ page: 1, pageSize: PAGE_SIZE });
+  const [query, setQuery] = useState<ProjectQuery>({
+    page: 1,
+    pageSize: PAGE_SIZE,
+    sortBy: 'updatedAt',
+    sortOrder: 'desc',
+  });
   const [form, setForm] = useState<{ open: boolean; initial: ProjectDto | null }>({
     open: false,
     initial: null,
@@ -74,6 +80,17 @@ export function ProjectsPage() {
   });
 
   const rows = list.data?.items ?? [];
+  const sortBy = query.sortBy ?? 'updatedAt';
+  const sortOrder = query.sortOrder ?? 'desc';
+  const onSort = (key: NonNullable<ProjectQuery['sortBy']>) => {
+    const defaultOrder = key === 'updatedAt' ? 'desc' : 'asc';
+    setQuery((prev) => ({
+      ...prev,
+      page: 1,
+      sortBy: key,
+      sortOrder: prev.sortBy === key ? (prev.sortOrder === 'asc' ? 'desc' : 'asc') : defaultOrder,
+    }));
+  };
 
   return (
     <div className="space-y-4">
@@ -150,13 +167,55 @@ export function ProjectsPage() {
           <Table
             head={
               <tr>
-                <Th>编码</Th>
-                <Th>项目名称</Th>
-                <Th>负责人</Th>
-                <Th>环境数</Th>
-                <Th>资源数</Th>
-                <Th>状态</Th>
-                <Th>更新时间</Th>
+                <SortableTh
+                  label="编码"
+                  sortKey="code"
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="项目名称"
+                  sortKey="name"
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="负责人"
+                  sortKey="owner"
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="环境数"
+                  sortKey="envCount"
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="资源数"
+                  sortKey="resourceCount"
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="状态"
+                  sortKey="status"
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="更新时间"
+                  sortKey="updatedAt"
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={onSort}
+                />
                 <Th className="text-right">操作</Th>
               </tr>
             }

@@ -39,13 +39,21 @@ export const auditRepository = {
     if (q.actor) clauses.push(like(auditLogs.actorName, `%${q.actor}%`));
     if (q.action) clauses.push(eq(auditLogs.action, q.action));
     const where = clauses.length ? and(...clauses) : undefined;
+    const sortColumns = {
+      createdAt: auditLogs.createdAt,
+      actorName: auditLogs.actorName,
+      action: auditLogs.action,
+      targetType: auditLogs.targetType,
+      targetName: auditLogs.targetName,
+    } as const;
+    const sortColumn = sortColumns[q.sortBy];
 
     const [{ value: total }] = await db.select({ value: count() }).from(auditLogs).where(where);
     const items = await db
       .select()
       .from(auditLogs)
       .where(where)
-      .orderBy(desc(auditLogs.createdAt))
+      .orderBy(q.sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn))
       .limit(q.pageSize)
       .offset((q.page - 1) * q.pageSize);
     return { items, total, totalPages: Math.max(1, Math.ceil(total / q.pageSize)) };

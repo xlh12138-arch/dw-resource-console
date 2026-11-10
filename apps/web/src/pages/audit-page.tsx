@@ -21,6 +21,7 @@ import {
   PageHeader,
   Pagination,
   Select,
+  SortableTh,
   Spinner,
   Td,
   Th,
@@ -56,7 +57,17 @@ export function AuditPage() {
     targetType: string;
     page: number;
     pageSize: number;
-  }>({ action: '', actor: '', targetType: '', page: 1, pageSize: 20 });
+    sortBy: 'createdAt' | 'actorName' | 'action' | 'targetType' | 'targetName';
+    sortOrder: 'asc' | 'desc';
+  }>({
+    action: '',
+    actor: '',
+    targetType: '',
+    page: 1,
+    pageSize: 20,
+    sortBy: 'createdAt',
+    sortOrder: 'desc',
+  });
 
   const query = useQuery({
     queryKey: ['audit-logs', filters],
@@ -67,11 +78,22 @@ export function AuditPage() {
         targetType: filters.targetType || undefined,
         page: filters.page,
         pageSize: filters.pageSize,
+        sortBy: filters.sortBy,
+        sortOrder: filters.sortOrder,
       }),
   });
 
   const patch = (next: Partial<typeof filters>) =>
     setFilters((prev) => ({ ...prev, ...next, page: 1 }));
+  const onSort = (key: typeof filters.sortBy) => {
+    const defaultOrder = key === 'createdAt' ? 'desc' : 'asc';
+    setFilters((prev) => ({
+      ...prev,
+      page: 1,
+      sortBy: key,
+      sortOrder: prev.sortBy === key ? (prev.sortOrder === 'asc' ? 'desc' : 'asc') : defaultOrder,
+    }));
+  };
   const rows = query.data?.items ?? [];
 
   return (
@@ -118,7 +140,15 @@ export function AuditPage() {
           <Button
             variant="ghost"
             onClick={() =>
-              setFilters({ action: '', actor: '', targetType: '', page: 1, pageSize: 20 })
+              setFilters({
+                action: '',
+                actor: '',
+                targetType: '',
+                page: 1,
+                pageSize: 20,
+                sortBy: 'createdAt',
+                sortOrder: 'desc',
+              })
             }
           >
             重置
@@ -141,10 +171,34 @@ export function AuditPage() {
           <Table
             head={
               <tr>
-                <Th>时间</Th>
-                <Th>操作人</Th>
-                <Th>动作</Th>
-                <Th>对象</Th>
+                <SortableTh
+                  label="时间"
+                  sortKey="createdAt"
+                  sortBy={filters.sortBy}
+                  sortOrder={filters.sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="操作人"
+                  sortKey="actorName"
+                  sortBy={filters.sortBy}
+                  sortOrder={filters.sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="动作"
+                  sortKey="action"
+                  sortBy={filters.sortBy}
+                  sortOrder={filters.sortOrder}
+                  onSort={onSort}
+                />
+                <SortableTh
+                  label="对象"
+                  sortKey="targetName"
+                  sortBy={filters.sortBy}
+                  sortOrder={filters.sortOrder}
+                  onSort={onSort}
+                />
                 <Th>变更内容</Th>
               </tr>
             }
