@@ -153,12 +153,12 @@ export const RESOURCE_STATUS_LABELS: Record<ResourceStatus, string> = {
   RETIRED: '已下线',
 };
 
-/** 需求项目状态：在建/在用 vs 已归档（归档项目不参与新建环境） */
+/** 需求项目状态：在建/在用 vs 已结项（结项项目不参与新建环境） */
 export const PROJECT_STATUSES = ['ACTIVE', 'ARCHIVED'] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   ACTIVE: '进行中',
-  ARCHIVED: '已归档',
+  ARCHIVED: '已结项',
 };
 
 /**

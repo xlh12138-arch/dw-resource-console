@@ -5,10 +5,13 @@ import type {
   EnvTemplateDetail,
   EnvTemplateDto,
   EnvTimeline,
+  ProjectCloseResult,
   ProjectDetail,
   ProjectDto,
   ProjectEnvDetail,
   ProjectEnvDto,
+  ProjectReleaseResourcesResult,
+  ProjectSnapshotDto,
   EnvironmentDto,
   ResourceChild,
   ResourceDetail,
@@ -131,6 +134,12 @@ export const projectsApi = {
   list: (query: ProjectQuery) => api.get<Paged<ProjectDto>>(`/projects${toQuery(query)}`),
   options: () => api.get<ProjectDto[]>('/projects/options'),
   get: (id: number) => api.get<ProjectDetail>(`/projects/${id}`),
+  close: (id: number) => api.post<ProjectCloseResult>(`/projects/${id}/close`),
+  snapshot: (id: number) => api.get<ProjectSnapshotDto | null>(`/projects/${id}/snapshot`),
+  releaseResources: (id: number) =>
+    api.post<ProjectReleaseResourcesResult>(`/projects/${id}/release-resources`),
+  deleteSnapshot: (id: number, confirmation: string) =>
+    api.del<{ id: number }>(`/project-snapshots/${id}`, { confirmation }),
   create: (body: {
     name: string;
     code?: string;

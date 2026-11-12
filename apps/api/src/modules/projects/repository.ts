@@ -5,11 +5,13 @@ import {
   envTemplateItems,
   envTemplates,
   projectEnvironments,
+  projectSnapshots,
   projects,
   resources,
   type EnvSlotRow,
   type ProjectEnvRow,
   type ProjectRow,
+  type ProjectSnapshotRow,
 } from '../../db/schema.js';
 import type { envTemplateQuerySchema, projectQuerySchema } from '@dw/shared';
 import type { z } from 'zod';
@@ -83,6 +85,29 @@ export const projectRepository = {
       .from(projectEnvironments)
       .where(eq(projectEnvironments.projectId, projectId));
     return rows.map((r) => r.id);
+  },
+};
+
+export const projectSnapshotRepository = {
+  findByProjectId(projectId: number): Promise<ProjectSnapshotRow | undefined> {
+    return firstRow<ProjectSnapshotRow>(
+      db.select().from(projectSnapshots).where(eq(projectSnapshots.projectId, projectId)),
+    );
+  },
+
+  findById(id: number): Promise<ProjectSnapshotRow | undefined> {
+    return firstRow<ProjectSnapshotRow>(
+      db.select().from(projectSnapshots).where(eq(projectSnapshots.id, id)),
+    );
+  },
+
+  async create(values: typeof projectSnapshots.$inferInsert): Promise<ProjectSnapshotRow> {
+    const rows = await db.insert(projectSnapshots).values(values).returning();
+    return rows[0]!;
+  },
+
+  async remove(id: number): Promise<void> {
+    await db.delete(projectSnapshots).where(eq(projectSnapshots.id, id));
   },
 };
 

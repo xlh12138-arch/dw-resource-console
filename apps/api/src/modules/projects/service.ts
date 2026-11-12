@@ -1,4 +1,5 @@
 import {
+  PROJECT_SNAPSHOT_DELETE_CONFIRMATION,
   RESOURCE_STATUS_LABELS,
   type EnvSlotDto,
   type EnvTemplateDetail,
@@ -8,6 +9,9 @@ import {
   type ProjectDto,
   type ProjectEnvDetail,
   type ProjectEnvDto,
+  type ProjectReleaseResourcesResult,
+  type ProjectSnapshotDto,
+  type ProjectSnapshotPayload,
   type SlotAssignWarning,
   type SlotCandidate,
   type SlotCandidates,
@@ -31,17 +35,19 @@ import {
   assertCapacityAvailable,
   capacityUsageOf,
   otherProjectUsageOf,
+  resourceService,
 } from '../resources/service.js';
 import {
   projectEnvRepository,
   projectRepository,
+  projectSnapshotRepository,
   resourceProjectRepository,
   slotRepository,
   templateRepository,
   type EnvTemplateQuery,
   type ProjectQuery,
 } from './repository.js';
-import type { ProjectEnvRow, ProjectRow } from '../../db/schema.js';
+import type { ProjectEnvRow, ProjectRow, ProjectSnapshotRow } from '../../db/schema.js';
 import type { ResourceRow } from '../../db/schema.js';
 
 export interface Actor {
@@ -102,12 +108,50 @@ function toProjectDto(row: ProjectRow, envCount: number, resourceCount: number):
     description: row.description ?? null,
     owner: row.owner ?? null,
     status: row.status,
+    closedAt: row.closedAt ? new Date(row.closedAt).toISOString() : null,
     envCount,
     resourceCount,
     createdBy: row.createdByName ?? null,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
   };
+}
+
+function toProjectSnapshotDto(row: ProjectSnapshotRow): ProjectSnapshotDto {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    projectCode: row.projectCode,
+    projectName: row.projectName,
+    closedAt: new Date(row.closedAt).toISOString(),
+    createdBy: row.createdByName ?? null,
+    createdAt: new Date(row.createdAt).toISOString(),
+    payload: row.payload as unknown as ProjectSnapshotPayload,
+  };
+}
+
+async function buildProjectSnapshotPayload(projectId: number): Promise<ProjectSnapshotPayload> {
+  const project = await projectService.get(projectId);
+  const envRows = await projectEnvRepository.listByProject(projectId);
+  const environments: ProjectEnvDetail[] = [];
+  for (const env of envRows) {
+    environments.push(await buildEnvDetail(env));
+  }
+
+  const resources: ProjectSnapshotPayload['resources'] = [];
+  for (let page = 1; ; page += 1) {
+    const result = await resourceService.list({
+      projectId,
+      page,
+      pageSize: 200,
+      sortBy: 'name',
+      sortOrder: 'asc',
+    });
+    resources.push(...result.items);
+    if (page >= result.meta.totalPages) break;
+  }
+
+  return { project, environments, resources };
 }
 
 /** 环境显示名：复用字典模块的实时解析，改字典后项目里的标签立即同步 */
@@ -441,13 +485,132 @@ export const projectService = {
     return toProjectDto(row, envs.length, (await projectResourceIds(id)).length);
   },
 
+  /** 项目结项：保存结项时点快照，并把项目状态收口为已结项。 */
+  async close(id: number, actor: Actor, requestId?: string) {
+    const before = await projectRepository.findById(id);
+    if (!before) throw notFound(`项目 ${id} 不存在`);
+    if (before.closedAt) throw conflict(`项目「${before.name}」已经结项`);
+    if (await projectSnapshotRepository.findByProjectId(id)) {
+      throw conflict(`项目「${before.name}」已存在结项快照`);
+    }
+
+    const closedAt = new Date();
+    const row = await projectRepository.update(id, {
+      status: 'ARCHIVED',
+      closedAt,
+    });
+    const payload = await buildProjectSnapshotPayload(id);
+    const snapshotRow = await projectSnapshotRepository.create({
+      projectId: row.id,
+      projectCode: row.code,
+      projectName: row.name,
+      payload,
+      closedAt,
+      createdById: actor.id,
+      createdByName: actor.username,
+      createdAt: closedAt,
+    });
+    await auditRepository.record({
+      actorId: actor.id,
+      actorName: actor.username,
+      action: 'UPDATE',
+      targetType: 'PROJECT',
+      targetId: String(id),
+      targetName: `${row.code} ${row.name}`,
+      changes: [
+        {
+          field: 'closedAt',
+          label: '项目结项并生成快照',
+          from: null,
+          to: closedAt.toISOString(),
+        },
+      ],
+      requestId,
+    });
+
+    return {
+      project: toProjectDto(row, payload.project.envCount, payload.project.resourceCount),
+      snapshot: toProjectSnapshotDto(snapshotRow),
+    };
+  },
+
+  /**
+   * 结项后一键释放资源：长期占用或尚未到期的槽位统一把结束时间收口到今天。
+   * 已超期的历史占用保持原结束时间，便于保留真实档案。
+   */
+  async releaseResources(
+    id: number,
+    actor: Actor,
+    requestId?: string,
+  ): Promise<ProjectReleaseResourcesResult> {
+    const project = await projectRepository.findById(id);
+    if (!project) throw notFound(`项目 ${id} 不存在`);
+    if (!project.closedAt) throw conflict('项目尚未结项，不能执行结项资源释放');
+
+    const releasedAt = new Date();
+    const releasedSlots: ProjectReleaseResourcesResult['slots'] = [];
+    const envs = await projectEnvRepository.listByProject(id);
+    for (const env of envs) {
+      const slots = await slotRepository.listByEnv(env.id);
+      for (const slot of slots) {
+        if (slot.resourceId === null) continue;
+        if (slot.endAt && new Date(slot.endAt).getTime() <= releasedAt.getTime()) continue;
+
+        const resource = await resourceRepository.findById(slot.resourceId);
+        const nextStartAt =
+          slot.startAt && new Date(slot.startAt).getTime() > releasedAt.getTime()
+            ? releasedAt
+            : slot.startAt;
+        await slotRepository.update(slot.id, {
+          startAt: nextStartAt,
+          endAt: releasedAt,
+          updatedAt: releasedAt,
+        });
+        releasedSlots.push({
+          slotId: slot.id,
+          envId: env.id,
+          envName: env.name,
+          slotRole: slot.slotRole,
+          resourceCode: resource?.code ?? null,
+          resourceName: resource?.name ?? null,
+          endAt: releasedAt.toISOString(),
+        });
+      }
+    }
+
+    await auditRepository.record({
+      actorId: actor.id,
+      actorName: actor.username,
+      action: 'UPDATE',
+      targetType: 'PROJECT',
+      targetId: String(id),
+      targetName: `${project.code} ${project.name}`,
+      changes: [
+        {
+          field: 'slotEndAt',
+          label: `结项资源释放：${releasedSlots.length} 个槽位结束时间调整为 ${releasedAt.toISOString().slice(0, 10)}`,
+          from: null,
+          to: releasedSlots.length,
+        },
+      ],
+      requestId,
+    });
+
+    return {
+      projectId: id,
+      released: releasedSlots.length,
+      releasedAt: releasedAt.toISOString(),
+      slots: releasedSlots,
+    };
+  },
+
   async remove(id: number, actor: Actor, requestId?: string) {
     const before = await projectRepository.findById(id);
     if (!before) throw notFound(`项目 ${id} 不存在`);
     const envs = await projectEnvRepository.listByProject(id);
     if (envs.length > 0) {
       throw conflict(
-        `项目「${before.name}」下仍有 ${envs.length} 套环境，请先删除环境后再归档或删除项目`,
+        `项目「${before.name}」下仍有 ${envs.length} 套环境，请先删除环境后再结项或删除项目`,
       );
     }
     // 先解除资源的项目归属，避免遗留外键指向已删除的项目
@@ -534,6 +697,49 @@ export const projectService = {
   },
 };
 
+export const projectSnapshotService = {
+  async getByProjectId(projectId: number): Promise<ProjectSnapshotDto | null> {
+    const project = await projectRepository.findById(projectId);
+    if (!project) throw notFound(`项目 ${projectId} 不存在`);
+    const snapshot = await projectSnapshotRepository.findByProjectId(projectId);
+    return snapshot ? toProjectSnapshotDto(snapshot) : null;
+  },
+
+  async remove(
+    id: number,
+    confirmation: string,
+    actor: Actor,
+    requestId?: string,
+  ): Promise<{ id: number }> {
+    if (confirmation !== PROJECT_SNAPSHOT_DELETE_CONFIRMATION) {
+      throw validationError(`请输入“${PROJECT_SNAPSHOT_DELETE_CONFIRMATION}”后再删除`, {
+        field: 'confirmation',
+      });
+    }
+    const snapshot = await projectSnapshotRepository.findById(id);
+    if (!snapshot) throw notFound(`结项快照 ${id} 不存在`);
+    await projectSnapshotRepository.remove(id);
+    await auditRepository.record({
+      actorId: actor.id,
+      actorName: actor.username,
+      action: 'DELETE',
+      targetType: 'PROJECT',
+      targetId: String(snapshot.projectId),
+      targetName: `${snapshot.projectCode} ${snapshot.projectName} 结项快照`,
+      changes: [
+        {
+          field: '*',
+          label: '删除结项快照',
+          from: snapshot.closedAt,
+          to: null,
+        },
+      ],
+      requestId,
+    });
+    return { id };
+  },
+};
+
 /* ------------------------------------------------------------------ *
  * 项目环境
  * ------------------------------------------------------------------ */
@@ -576,7 +782,7 @@ export const projectEnvService = {
     const project = await projectRepository.findById(input.projectId);
     if (!project) throw notFound(`项目 ${input.projectId} 不存在`);
     if (project.status === 'ARCHIVED')
-      throw badRequest(`项目「${project.name}」已归档，无法新建环境`);
+      throw badRequest(`项目「${project.name}」已结项，无法新建环境`);
     if (await projectEnvRepository.findByName(input.projectId, input.name)) {
       throw conflict(`项目「${project.name}」下已存在同名环境「${input.name}」`);
     }

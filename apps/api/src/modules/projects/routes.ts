@@ -15,6 +15,7 @@ import {
   envTemplateUpdateSchema,
   instantiateTemplateSchema,
   pagedSchema,
+  projectCloseResultSchema,
   projectCreateSchema,
   projectDetailSchema,
   projectEnvCreateSchema,
@@ -24,7 +25,10 @@ import {
   projectEnvSchema,
   projectEnvUpdateSchema,
   projectQuerySchema,
+  projectReleaseResourcesResultSchema,
   projectSchema,
+  projectSnapshotDeleteSchema,
+  projectSnapshotSchema,
   projectUpdateSchema,
   slotAssignWarningSchema,
   slotCandidatesSchema,
@@ -34,7 +38,12 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { actorOf } from '../../lib/actor.js';
 import { withTransaction } from '../../db/index.js';
 import { resourceService } from '../resources/service.js';
-import { projectEnvService, projectService, templateService } from './service.js';
+import {
+  projectEnvService,
+  projectService,
+  projectSnapshotService,
+  templateService,
+} from './service.js';
 
 const idParams = z.object({ id: z.coerce.number().int().positive() });
 const envIdParams = z.object({ id: z.coerce.number().int().positive() });
@@ -81,6 +90,58 @@ export const projectRoutes: FastifyPluginAsyncZod = async (app) => {
     '/projects/:id',
     { ...read, schema: { params: idParams, response: { 200: projectDetailSchema } } },
     async (request) => projectService.get(request.params.id),
+  );
+
+  app.post(
+    '/projects/:id/close',
+    {
+      ...write,
+      schema: { params: idParams, response: { 200: projectCloseResultSchema } },
+    },
+    async (request) =>
+      withTransaction(() => projectService.close(request.params.id, actorOf(request), request.id)),
+  );
+
+  app.get(
+    '/projects/:id/snapshot',
+    {
+      ...read,
+      schema: { params: idParams, response: { 200: projectSnapshotSchema.nullable() } },
+    },
+    async (request) => projectSnapshotService.getByProjectId(request.params.id),
+  );
+
+  app.post(
+    '/projects/:id/release-resources',
+    {
+      ...write,
+      schema: { params: idParams, response: { 200: projectReleaseResourcesResultSchema } },
+    },
+    async (request) =>
+      withTransaction(() =>
+        projectService.releaseResources(request.params.id, actorOf(request), request.id),
+      ),
+  );
+
+  app.delete(
+    '/project-snapshots/:id',
+    {
+      ...drop,
+      schema: {
+        params: idParams,
+        body: projectSnapshotDeleteSchema,
+        response: { 200: z.object({ id: z.number().int().positive() }) },
+      },
+    },
+    async (request) =>
+      withTransaction(() =>
+        projectSnapshotService.remove(
+          request.params.id,
+          request.body.confirmation,
+          actorOf(request),
+          request.id,
+        ),
+      ),
   );
 
   app.patch(

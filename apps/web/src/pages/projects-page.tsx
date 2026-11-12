@@ -236,8 +236,8 @@ export function ProjectsPage() {
                 <Td>{p.envCount}</Td>
                 <Td>{p.resourceCount}</Td>
                 <Td>
-                  <Badge tone={p.status === 'ACTIVE' ? 'green' : 'gray'}>
-                    {PROJECT_STATUS_LABELS[p.status]}
+                  <Badge tone={p.closedAt ? 'violet' : p.status === 'ACTIVE' ? 'green' : 'gray'}>
+                    {p.closedAt ? '已结项' : PROJECT_STATUS_LABELS[p.status]}
                   </Badge>
                 </Td>
                 <Td className="whitespace-nowrap text-xs text-slate-500">

@@ -19,6 +19,8 @@ export const resourceTypeFields =
 export const environmentDict =
   selected.environmentDict as unknown as typeof sqliteSchema.environmentDict;
 export const projects = selected.projects as unknown as typeof sqliteSchema.projects;
+export const projectSnapshots =
+  selected.projectSnapshots as unknown as typeof sqliteSchema.projectSnapshots;
 export const envTemplates = selected.envTemplates as unknown as typeof sqliteSchema.envTemplates;
 export const envTemplateItems =
   selected.envTemplateItems as unknown as typeof sqliteSchema.envTemplateItems;
@@ -35,6 +37,7 @@ export type ResourceRow = typeof sqliteSchema.resources.$inferSelect;
 export type AuditLogRow = typeof sqliteSchema.auditLogs.$inferSelect;
 export type NewResourceRow = typeof sqliteSchema.resources.$inferInsert;
 export type ProjectRow = typeof sqliteSchema.projects.$inferSelect;
+export type ProjectSnapshotRow = typeof sqliteSchema.projectSnapshots.$inferSelect;
 export type EnvTemplateRow = typeof sqliteSchema.envTemplates.$inferSelect;
 export type EnvTemplateItemRow = typeof sqliteSchema.envTemplateItems.$inferSelect;
 export type ProjectEnvRow = typeof sqliteSchema.projectEnvironments.$inferSelect;

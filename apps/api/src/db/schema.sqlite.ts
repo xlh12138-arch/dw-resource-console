@@ -100,6 +100,7 @@ export const projects = sqliteTable(
     status: text('status', { enum: ['ACTIVE', 'ARCHIVED'] })
       .notNull()
       .default('ACTIVE'),
+    closedAt: integer('closed_at', { mode: 'timestamp_ms' }),
     createdById: integer('created_by_id'),
     createdByName: text('created_by_name'),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
@@ -110,6 +111,28 @@ export const projects = sqliteTable(
       .default(sql`(unixepoch() * 1000)`),
   },
   (t) => [uniqueIndex('uq_projects_code').on(t.code), index('idx_projects_status').on(t.status)],
+);
+
+/** 项目结项快照：保存结项时点的项目、环境、槽位与资源信息 */
+export const projectSnapshots = sqliteTable(
+  'project_snapshots',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    projectId: integer('project_id').notNull(),
+    projectCode: text('project_code').notNull(),
+    projectName: text('project_name').notNull(),
+    payload: text('payload', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+    closedAt: integer('closed_at', { mode: 'timestamp_ms' }).notNull(),
+    createdById: integer('created_by_id'),
+    createdByName: text('created_by_name'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [
+    uniqueIndex('uq_project_snapshots_project').on(t.projectId),
+    index('idx_project_snapshots_closed').on(t.closedAt),
+  ],
 );
 
 /**

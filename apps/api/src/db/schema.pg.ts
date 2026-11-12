@@ -93,6 +93,7 @@ export const projects = appTable(
     status: text('status', { enum: ['ACTIVE', 'ARCHIVED'] })
       .notNull()
       .default('ACTIVE'),
+    closedAt: timestamp('closed_at', { withTimezone: true, mode: 'date' }),
     createdById: integer('created_by_id'),
     createdByName: text('created_by_name'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
@@ -102,6 +103,26 @@ export const projects = appTable(
     uniqueIndex('uq_projects_code').on(t.code),
     index('idx_projects_status').on(t.status),
     index('idx_projects_updated').on(t.updatedAt),
+  ],
+);
+
+/** 项目结项快照：保存结项时点的项目、环境、槽位与资源信息 */
+export const projectSnapshots = appTable(
+  'project_snapshots',
+  {
+    id: serial('id').primaryKey(),
+    projectId: integer('project_id').notNull(),
+    projectCode: text('project_code').notNull(),
+    projectName: text('project_name').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    closedAt: timestamp('closed_at', { withTimezone: true, mode: 'date' }).notNull(),
+    createdById: integer('created_by_id'),
+    createdByName: text('created_by_name'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('uq_project_snapshots_project').on(t.projectId),
+    index('idx_project_snapshots_closed').on(t.closedAt),
   ],
 );
 

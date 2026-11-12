@@ -7,6 +7,7 @@ import {
   resources,
   refreshTokens,
   projectEnvironments,
+  projectSnapshots,
   projects,
   envTemplates,
   resourceTypeFields,
@@ -20,6 +21,7 @@ await withTransaction(async () => {
   await db.update(resources).set({ projectId: null, projectEnvId: null });
   await db.delete(envSlots);
   await db.delete(projectEnvironments);
+  await db.delete(projectSnapshots);
   await db.delete(envTemplates);
   await db.delete(projects);
   await db.delete(auditLogs);

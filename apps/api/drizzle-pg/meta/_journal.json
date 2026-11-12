@@ -8,6 +8,13 @@
       "when": 1793686853798,
       "tag": "0000_kind_triathlon",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794367202887,
+      "tag": "0001_uneven_garia",
+      "breakpoints": true
     }
   ]
 }

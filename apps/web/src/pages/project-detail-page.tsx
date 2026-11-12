@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Archive,
   AlertTriangle,
   ArrowLeft,
   Boxes,
@@ -7,11 +8,13 @@ import {
   GanttChartSquare,
   Link2,
   ListTree,
+  FileText,
   Pencil,
   Plus,
   RefreshCw,
   Tag,
   Trash2,
+  Unlock,
   Unlink,
 } from 'lucide-react';
 import { useDict } from '../lib/dict';
@@ -20,13 +23,17 @@ import { Link, useNavigate, useParams } from 'react-router';
 import {
   ENV_RUN_STATUSES,
   ENV_RUN_STATUS_LABELS,
+  PROJECT_SNAPSHOT_DELETE_CONFIRMATION,
   RESOURCE_STATUS_LABELS,
   SLOT_OCCUPANCY_STATE_LABELS,
   SLOT_OCCUPANCY_STATE_TONES,
   type EnvRunStatus,
   type EnvSlotDto,
+  type ProjectDetail,
   type ProjectEnvDetail,
   type ProjectEnvDto,
+  type ProjectReleaseResourcesResult,
+  type ProjectSnapshotDto,
   type ResourceDto,
   type SlotAssignWarning,
 } from '@dw/shared';
@@ -34,6 +41,8 @@ import { envApi, projectsApi, resourcesApi, templatesApi } from '../lib/endpoint
 import { ApiError, friendlyMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useToast } from '../components/toast';
+import { ResourceDetailModal } from '../components/resource-detail';
+import { ResourceFormModal } from '../components/resource-form';
 import {
   Badge,
   Button,
@@ -111,6 +120,13 @@ export function ProjectDetailPage() {
   } | null>(null);
   const [editEnv, setEditEnv] = useState<ProjectEnvDto | null>(null);
   const [envView, setEnvView] = useState<'slots' | 'timeline'>('slots');
+  const [resourceDetailId, setResourceDetailId] = useState<number | null>(null);
+  const [resourceDetailSeed, setResourceDetailSeed] = useState<ResourceDto | null>(null);
+  const [editingResource, setEditingResource] = useState<ResourceDto | null>(null);
+  const [closeProjectOpen, setCloseProjectOpen] = useState(false);
+  const [releaseResourcesOpen, setReleaseResourcesOpen] = useState(false);
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const [deleteSnapshotOpen, setDeleteSnapshotOpen] = useState(false);
   const overdueSort = useTableSort<
     'resource' | 'environment' | 'slotRole' | 'endAt' | 'overdueDays'
   >('overdueDays', 'desc', ['overdueDays']);
@@ -127,12 +143,18 @@ export function ProjectDetailPage() {
     void queryClient.invalidateQueries({ queryKey: ['env'] });
     void queryClient.invalidateQueries({ queryKey: ['resources'] });
     void queryClient.invalidateQueries({ queryKey: ['stats'] });
+    void queryClient.invalidateQueries({ queryKey: ['project-snapshot', projectId] });
   };
 
   const project = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => projectsApi.get(projectId),
     enabled: Number.isFinite(projectId),
+  });
+  const snapshot = useQuery({
+    queryKey: ['project-snapshot', projectId],
+    queryFn: () => projectsApi.snapshot(projectId),
+    enabled: Number.isFinite(projectId) && Boolean(project.data?.closedAt),
   });
 
   const envDetail = useQuery({
@@ -146,6 +168,20 @@ export function ProjectDetailPage() {
     queryFn: () => resourcesApi.list({ projectId, pageSize: 50 }),
     enabled: Number.isFinite(projectId),
   });
+  const resourceDetail = useQuery({
+    queryKey: ['resource', resourceDetailId],
+    queryFn: () => resourcesApi.get(resourceDetailId!),
+    enabled: resourceDetailId !== null,
+  });
+
+  const openResourceDetail = (resourceId: number, seed?: ResourceDto) => {
+    setResourceDetailSeed(seed ?? null);
+    setResourceDetailId(resourceId);
+  };
+  const closeResourceDetail = () => {
+    setResourceDetailId(null);
+    setResourceDetailSeed(null);
+  };
 
   const deleteEnv = useMutation({
     mutationFn: (envId: number) => envApi.remove(envId),
@@ -221,6 +257,9 @@ export function ProjectDetailPage() {
 
   const data = project.data;
   const env = envDetail.data;
+  const openedResource =
+    resourceDetail.data ??
+    (resourceDetailSeed?.id === resourceDetailId ? resourceDetailSeed : null);
 
   /** 资源 id → 本项目下引用它的槽位数量 */
   const slotRefs = new Map<number, number>();
@@ -276,8 +315,8 @@ export function ProjectDetailPage() {
         title={
           <span className="flex flex-wrap items-center gap-2">
             {data.name}
-            <Badge tone={data.status === 'ACTIVE' ? 'green' : 'gray'}>
-              {data.status === 'ACTIVE' ? '进行中' : '已归档'}
+            <Badge tone={data.closedAt ? 'violet' : data.status === 'ACTIVE' ? 'green' : 'gray'}>
+              {data.closedAt ? '已结项' : data.status === 'ACTIVE' ? '进行中' : '已结项'}
             </Badge>
           </span>
         }
@@ -287,19 +326,53 @@ export function ProjectDetailPage() {
               <span className="font-mono">{data.code}</span>
               {data.owner ? ` · 负责人 ${data.owner}` : ''} · {data.envCount} 套环境 ·{' '}
               {data.resourceCount} 个资源
+              {data.closedAt ? ` · 结项于 ${new Date(data.closedAt).toLocaleString('zh-CN')}` : ''}
             </p>
             {data.description && <p className="mt-1 max-w-2xl">{data.description}</p>}
           </>
         }
         actions={
-          canWrite ? (
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus size={14} />
-              新建环境
-            </Button>
-          ) : undefined
+          <div className="flex flex-wrap items-center gap-2">
+            {canWrite && !data.closedAt && data.status === 'ACTIVE' && (
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus size={14} />
+                新建环境
+              </Button>
+            )}
+            {canWrite && !data.closedAt && (
+              <Button variant="outline" onClick={() => setCloseProjectOpen(true)}>
+                <Archive size={14} />
+                项目结项
+              </Button>
+            )}
+            {canWrite && data.closedAt && (
+              <Button variant="outline" onClick={() => setReleaseResourcesOpen(true)}>
+                <Unlock size={14} />
+                一键释放资源
+              </Button>
+            )}
+            {data.closedAt && snapshot.data && (
+              <Button onClick={() => setSnapshotOpen(true)}>
+                <FileText size={14} />
+                查看结项快照
+              </Button>
+            )}
+          </div>
         }
       />
+
+      {data.closedAt && (
+        <div className="flex flex-wrap items-start gap-2 rounded-lg border border-signal-200 bg-signal-50 px-4 py-3 text-sm text-brand-800">
+          <Archive size={15} className="mt-0.5 shrink-0" />
+          <p className="min-w-0 flex-1">
+            项目已结项。
+            {snapshot.data
+              ? '结项时点的项目、环境、槽位和资源信息已保存为快照。'
+              : '当前结项快照已被删除。'}
+            一键释放资源会保留槽位绑定，并把长期或未到期占用的结束时间调整为今天。
+          </p>
+        </div>
+      )}
 
       {/* 超期资源：过期不自动释放，此处列出本项目超期的资源明细并引导逐个续期或释放 */}
       {(data.overdueCount ?? 0) > 0 && (
@@ -362,8 +435,8 @@ export function ProjectDetailPage() {
                   <button
                     type="button"
                     className="text-left"
-                    title="在资源台账中查看该资源"
-                    onClick={() => navigate(`/resources?id=${r.resourceId}`)}
+                    title="查看资源详情、容量明细与被引用情况"
+                    onClick={() => openResourceDetail(r.resourceId)}
                   >
                     <span className="font-mono text-xs text-slate-500">
                       {r.resourceCode ?? `#${r.resourceId}`}
@@ -585,7 +658,16 @@ export function ProjectDetailPage() {
               return (
                 <tr key={r.id} className="hover:bg-slate-50">
                   <Td className="font-mono text-xs text-slate-500">{r.code}</Td>
-                  <Td className="font-medium text-slate-900">{r.name}</Td>
+                  <Td>
+                    <button
+                      type="button"
+                      className="text-left font-medium text-slate-900 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+                      title="查看资源详情、容量明细与被引用情况"
+                      onClick={() => openResourceDetail(r.id, r)}
+                    >
+                      {r.name}
+                    </button>
+                  </Td>
                   <Td>
                     <Badge tone="blue">{dict.typeLabel(r.type)}</Badge>
                   </Td>
@@ -778,10 +860,15 @@ export function ProjectDetailPage() {
                       </Td>
                       <Td>
                         {slot.resourceId ? (
-                          <span className="text-xs">
+                          <button
+                            type="button"
+                            className="text-left text-xs hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+                            title="查看资源详情、容量明细与被引用情况"
+                            onClick={() => openResourceDetail(slot.resourceId!)}
+                          >
                             <span className="font-mono text-slate-500">{slot.resourceCode}</span>{' '}
                             {slot.resourceName}
-                          </span>
+                          </button>
                         ) : (
                           <span className="text-xs text-slate-400">待分配</span>
                         )}
@@ -957,6 +1044,68 @@ export function ProjectDetailPage() {
           <EmptyState title="环境不存在" />
         )}
       </Modal>
+
+      <CloseProjectModal
+        open={closeProjectOpen}
+        project={data}
+        onClose={() => setCloseProjectOpen(false)}
+        onSaved={() => {
+          setCloseProjectOpen(false);
+          invalidateAll();
+        }}
+      />
+
+      <ReleaseResourcesModal
+        open={releaseResourcesOpen}
+        project={data}
+        onClose={() => setReleaseResourcesOpen(false)}
+        onSaved={() => {
+          setReleaseResourcesOpen(false);
+          invalidateAll();
+        }}
+      />
+
+      <ProjectSnapshotModal
+        open={snapshotOpen}
+        snapshot={snapshot.data ?? null}
+        canDelete={canDelete}
+        onClose={() => setSnapshotOpen(false)}
+        onDelete={() => {
+          setSnapshotOpen(false);
+          setDeleteSnapshotOpen(true);
+        }}
+      />
+
+      <DeleteProjectSnapshotModal
+        open={deleteSnapshotOpen}
+        snapshot={snapshot.data ?? null}
+        onClose={() => setDeleteSnapshotOpen(false)}
+        onDeleted={() => {
+          setDeleteSnapshotOpen(false);
+          setSnapshotOpen(false);
+          invalidateAll();
+        }}
+      />
+
+      <ResourceDetailModal
+        resource={openedResource}
+        onClose={closeResourceDetail}
+        onEdit={(resource) => {
+          closeResourceDetail();
+          setEditingResource(resource);
+        }}
+      />
+
+      <ResourceFormModal
+        open={editingResource !== null}
+        initial={editingResource}
+        defaultType={editingResource?.type ?? ''}
+        onClose={() => setEditingResource(null)}
+        onSaved={() => {
+          setEditingResource(null);
+          invalidateAll();
+        }}
+      />
 
       <EditEnvModal
         env={editEnv}
@@ -1278,6 +1427,335 @@ function ApplyTemplateBar({ envId, onDone }: { envId: number; onDone: () => void
         加槽位
       </Button>
     </div>
+  );
+}
+
+function CloseProjectModal({
+  open,
+  project,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  project: ProjectDetail;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { push } = useToast();
+  const closeProject = useMutation({
+    mutationFn: () => projectsApi.close(project.id),
+    onSuccess: () => {
+      push('success', '项目已结项，并已保存最终快照');
+      onSaved();
+    },
+    onError: (err) => push('error', friendlyMessage(err)),
+  });
+
+  return (
+    <Modal
+      open={open}
+      width="max-w-lg"
+      title={`项目结项 · ${project.name}`}
+      desc="结项时会保存项目、环境、槽位和资源在此时点的最终信息"
+      onClose={onClose}
+      footer={
+        <>
+          <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
+          <Button disabled={closeProject.isPending} onClick={() => closeProject.mutate()}>
+            {closeProject.isPending ? '结项中…' : '确认结项并保存快照'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3 text-sm text-slate-700">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          结项后项目状态会转为已结项，不再允许新建环境。结项快照保存后仍需手动删除。
+        </div>
+        <dl className="grid gap-2 text-xs sm:grid-cols-2">
+          <div>
+            <dt className="text-slate-500">项目编码</dt>
+            <dd className="mt-0.5 font-mono text-slate-800">{project.code}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-500">当前规模</dt>
+            <dd className="mt-0.5 text-slate-800">
+              {project.envCount} 套环境 · {project.resourceCount} 个资源
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </Modal>
+  );
+}
+
+function ReleaseResourcesModal({
+  open,
+  project,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  project: ProjectDetail;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { push } = useToast();
+  const releaseResources = useMutation({
+    mutationFn: () => projectsApi.releaseResources(project.id),
+    onSuccess: (result: ProjectReleaseResourcesResult) => {
+      push(
+        'success',
+        result.released > 0
+          ? `已将 ${result.released} 个槽位的结束时间调整为今天`
+          : '没有需要调整的长期或未到期占用',
+      );
+      onSaved();
+    },
+    onError: (err) => push('error', friendlyMessage(err)),
+  });
+
+  return (
+    <Modal
+      open={open}
+      width="max-w-lg"
+      title="一键释放结项资源"
+      desc="保留槽位与资源绑定关系，只结束仍处于长期或未到期的占用"
+      onClose={onClose}
+      footer={
+        <>
+          <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
+          <Button disabled={releaseResources.isPending} onClick={() => releaseResources.mutate()}>
+            {releaseResources.isPending ? '处理中…' : '确认释放资源'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3 text-sm text-slate-700">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+          所有长期占用和未到期占用都会把结束时间改为今天，执行后容量会从今天结束。
+          已经超期的历史占用保持原结束时间。
+        </div>
+        <p>
+          本次操作作用于项目 <span className="font-medium">{project.name}</span> 下所有环境槽位。
+        </p>
+      </div>
+    </Modal>
+  );
+}
+
+function ProjectSnapshotModal({
+  open,
+  snapshot,
+  canDelete,
+  onClose,
+  onDelete,
+}: {
+  open: boolean;
+  snapshot: ProjectSnapshotDto | null;
+  canDelete: boolean;
+  onClose: () => void;
+  onDelete: () => void;
+}) {
+  const dict = useDict();
+  if (!snapshot) return null;
+  const { project, environments, resources } = snapshot.payload;
+
+  return (
+    <Modal
+      open={open}
+      width="max-w-6xl"
+      title={`结项快照 · ${snapshot.projectName}`}
+      desc={`${snapshot.projectCode} · 结项于 ${new Date(snapshot.closedAt).toLocaleString('zh-CN')}`}
+      onClose={onClose}
+      footer={
+        <>
+          {canDelete && (
+            <Button variant="danger" onClick={onDelete}>
+              <Trash2 size={13} />
+              删除快照
+            </Button>
+          )}
+          <div className="flex-1" />
+          <ModalCancelButton onClick={onClose}>关闭</ModalCancelButton>
+        </>
+      }
+    >
+      <div className="max-h-[68vh] space-y-5 overflow-y-auto pr-1">
+        <div className="grid gap-3 sm:grid-cols-4">
+          {[
+            ['环境', environments.length],
+            ['槽位', environments.reduce((sum, env) => sum + env.slots.length, 0)],
+            ['资源', resources.length],
+            ['负责人', project.owner ?? '—'],
+          ].map(([label, value]) => (
+            <div
+              key={String(label)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+            >
+              <p className="text-[11px] text-slate-500">{label}</p>
+              <p className="mt-1 text-sm font-medium text-slate-900">{value}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+          <p className="text-xs font-semibold text-slate-700">项目信息</p>
+          <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+            <div>
+              <dt className="text-slate-500">项目名称</dt>
+              <dd className="mt-0.5 text-slate-800">{project.name}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">项目编码</dt>
+              <dd className="mt-0.5 font-mono text-slate-800">{project.code}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">项目负责人</dt>
+              <dd className="mt-0.5 text-slate-800">{project.owner ?? '—'}</dd>
+            </div>
+          </dl>
+          {project.description && (
+            <p className="mt-2 text-xs leading-relaxed text-slate-600">{project.description}</p>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-slate-700">环境与槽位</p>
+          {environments.map((env) => (
+            <div key={env.id} className="rounded-lg border border-slate-200 bg-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-slate-800">{env.name}</span>
+                  <EnvBadge code={env.environment} label={env.environmentLabel} size="xs" />
+                </div>
+                <span className="text-[11px] text-slate-500">
+                  {env.slotFilled}/{env.slotTotal} 个槽位已分配
+                </span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {env.slots.map((slot) => (
+                  <div
+                    key={slot.id}
+                    className="grid gap-2 px-4 py-2.5 text-xs sm:grid-cols-[1fr_1fr_auto]"
+                  >
+                    <div>
+                      <p className="font-medium text-slate-800">{slot.slotRole}</p>
+                      <p className="mt-0.5 text-slate-500">{dict.typeLabel(slot.resourceType)}</p>
+                    </div>
+                    <div className="text-slate-600">
+                      {slot.resourceId ? (
+                        <>
+                          <span className="font-mono text-slate-500">{slot.resourceCode}</span>{' '}
+                          {slot.resourceName}
+                        </>
+                      ) : (
+                        '未分配资源'
+                      )}
+                    </div>
+                    <div className="text-slate-500">
+                      {slot.demandAmount !== null ? `申请 ${slot.demandAmount}` : '未申请容量'}
+                      {' · '}
+                      {fmtDate(slot.startAt)} → {slot.endAt ? fmtDate(slot.endAt) : '长期'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-slate-700">资源清单</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {resources.map((resource) => (
+              <div
+                key={resource.id}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-slate-500">{resource.code}</span>
+                  <span className="text-slate-500">{dict.envLabel(resource.environment)}</span>
+                </div>
+                <p className="mt-1 font-medium text-slate-800">{resource.name}</p>
+                <p className="mt-0.5 text-slate-500">{RESOURCE_STATUS_LABELS[resource.status]}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DeleteProjectSnapshotModal({
+  open,
+  snapshot,
+  onClose,
+  onDeleted,
+}: {
+  open: boolean;
+  snapshot: ProjectSnapshotDto | null;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const { push } = useToast();
+  const [confirmation, setConfirmation] = useState('');
+  const removeSnapshot = useMutation({
+    mutationFn: () =>
+      projectsApi.deleteSnapshot(snapshot!.id, PROJECT_SNAPSHOT_DELETE_CONFIRMATION),
+    onSuccess: () => {
+      push('success', '结项快照已删除');
+      setConfirmation('');
+      onDeleted();
+    },
+    onError: (err) => push('error', friendlyMessage(err)),
+  });
+
+  useEffect(() => {
+    if (!open) setConfirmation('');
+  }, [open]);
+
+  if (!snapshot) return null;
+  const confirmed = confirmation === PROJECT_SNAPSHOT_DELETE_CONFIRMATION;
+
+  return (
+    <Modal
+      open={open}
+      width="max-w-lg"
+      title="删除结项快照"
+      desc="这是不可撤销操作，删除后无法恢复结项时点的项目信息"
+      onClose={onClose}
+      footer={
+        <>
+          <ModalCancelButton onClick={onClose}>取消</ModalCancelButton>
+          <Button
+            variant="danger"
+            disabled={!confirmed || removeSnapshot.isPending}
+            onClick={() => removeSnapshot.mutate()}
+          >
+            {removeSnapshot.isPending ? '删除中…' : '确认删除快照'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-800">
+          快照包含项目、环境、槽位和资源的历史信息。删除后项目仍保持结项状态，但无法再查看这份最终档案。
+        </div>
+        <p className="text-sm text-slate-700">请输入下面的确认语句后删除：</p>
+        <code className="block rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900">
+          {PROJECT_SNAPSHOT_DELETE_CONFIRMATION}
+        </code>
+        <Field label="确认语句" required>
+          <Input
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            placeholder={PROJECT_SNAPSHOT_DELETE_CONFIRMATION}
+            autoComplete="off"
+          />
+        </Field>
+      </div>
+    </Modal>
   );
 }
 

@@ -541,6 +541,8 @@ export const projectSchema = z.object({
   description: z.string().nullable(),
   owner: z.string().nullable(),
   status: z.enum(PROJECT_STATUSES),
+  /** 结项时间；非空表示项目已结项，不再接受新的建设操作 */
+  closedAt: z.string().nullable(),
   envCount: z.number().int(),
   resourceCount: z.number().int(),
   createdBy: z.string().nullable(),
@@ -886,6 +888,57 @@ export const projectDetailSchema = projectSchema.extend({
   overdueCount: z.number().int().default(0),
 });
 export type ProjectDetail = z.infer<typeof projectDetailSchema>;
+
+/** 删除结项快照时必须原样输入这句话 */
+export const PROJECT_SNAPSHOT_DELETE_CONFIRMATION = '确认删除结项快照';
+
+export const projectSnapshotPayloadSchema = z.object({
+  project: projectDetailSchema,
+  environments: z.array(projectEnvDetailSchema),
+  resources: z.array(resourceSchema),
+});
+export type ProjectSnapshotPayload = z.infer<typeof projectSnapshotPayloadSchema>;
+
+export const projectSnapshotSchema = z.object({
+  id: z.number().int(),
+  projectId: z.number().int(),
+  projectCode: z.string(),
+  projectName: z.string(),
+  closedAt: z.string(),
+  createdBy: z.string().nullable(),
+  createdAt: z.string(),
+  payload: projectSnapshotPayloadSchema,
+});
+export type ProjectSnapshotDto = z.infer<typeof projectSnapshotSchema>;
+
+export const projectCloseResultSchema = z.object({
+  project: projectSchema,
+  snapshot: projectSnapshotSchema,
+});
+export type ProjectCloseResult = z.infer<typeof projectCloseResultSchema>;
+
+export const projectSnapshotDeleteSchema = z.object({
+  confirmation: z.literal(PROJECT_SNAPSHOT_DELETE_CONFIRMATION),
+});
+export type ProjectSnapshotDeleteInput = z.infer<typeof projectSnapshotDeleteSchema>;
+
+export const projectReleaseResourcesResultSchema = z.object({
+  projectId: z.number().int(),
+  released: z.number().int(),
+  releasedAt: z.string(),
+  slots: z.array(
+    z.object({
+      slotId: z.number().int(),
+      envId: z.number().int(),
+      envName: z.string(),
+      slotRole: z.string(),
+      resourceCode: z.string().nullable(),
+      resourceName: z.string().nullable(),
+      endAt: z.string(),
+    }),
+  ),
+});
+export type ProjectReleaseResourcesResult = z.infer<typeof projectReleaseResourcesResultSchema>;
 
 /** 把资源从项目中移出：includeSlots=true 时一并解除该项目下所有槽位引用 */
 export const projectDetachSchema = z.object({

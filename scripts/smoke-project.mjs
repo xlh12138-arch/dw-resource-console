@@ -363,7 +363,68 @@ check(
     ),
 );
 
-console.log('\n[9] 删除保护与清理');
+console.log('\n[9] 项目结项、快照与资源释放');
+const releaseBeforeClose = await req(`/projects/${prjId}/release-resources`, {
+  method: 'POST',
+  token: A,
+});
+check('未结项项目不能释放结项资源', releaseBeforeClose.status === 409);
+
+const closed = await req(`/projects/${prjId}/close`, { method: 'POST', token: A });
+check(
+  '项目结项并生成快照',
+  closed.status === 200 &&
+    Boolean(closed.json.project?.closedAt) &&
+    closed.json.snapshot?.payload?.environments?.length >= 1,
+  JSON.stringify(closed.json?.project),
+);
+const closeSnapshotId = closed.json.snapshot?.id;
+
+const snapshotDetail = await req(`/projects/${prjId}/snapshot`, { token: A });
+check(
+  '可读取结项快照',
+  snapshotDetail.status === 200 &&
+    snapshotDetail.json.id === closeSnapshotId &&
+    Array.isArray(snapshotDetail.json.payload.resources),
+);
+
+const releaseAfterClose = await req(`/projects/${prjId}/release-resources`, {
+  method: 'POST',
+  token: A,
+});
+check(
+  '结项后一键释放资源',
+  releaseAfterClose.status === 200 && releaseAfterClose.json.released >= 1,
+  JSON.stringify(releaseAfterClose.json),
+);
+const releasedSlot = releaseAfterClose.json.slots?.[0];
+check(
+  '释放后的槽位结束时间为当天',
+  Boolean(releasedSlot?.endAt) &&
+    new Date(releasedSlot.endAt).toDateString() === new Date().toDateString(),
+  releasedSlot?.endAt,
+);
+
+const wrongDelete = await req(`/project-snapshots/${closeSnapshotId}`, {
+  method: 'DELETE',
+  token: A,
+  body: { confirmation: '删除' },
+});
+check('快照删除必须输入完整确认语句', [400, 422].includes(wrongDelete.status));
+
+const deletedSnapshot = await req(`/project-snapshots/${closeSnapshotId}`, {
+  method: 'DELETE',
+  token: A,
+  body: { confirmation: '确认删除结项快照' },
+});
+check('输入确认语句后可删除快照', deletedSnapshot.status === 200);
+const snapshotAfterDelete = await req(`/projects/${prjId}/snapshot`, { token: A });
+check(
+  '删除后快照不可再读取',
+  snapshotAfterDelete.status === 200 && snapshotAfterDelete.json === null,
+);
+
+console.log('\n[10] 删除保护与清理');
 const delTplUsed = await req(`/env-templates/${tpl.id}`, { method: 'DELETE', token: A });
 check('被引用的模板禁止删除（409）', delTplUsed.status === 409, `status=${delTplUsed.status}`);
 const delPrj = await req(`/projects/${prjId}`, { method: 'DELETE', token: A });
