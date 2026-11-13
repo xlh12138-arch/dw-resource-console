@@ -9,6 +9,7 @@ import {
   Link2,
   ListTree,
   FileText,
+  Network,
   Pencil,
   Plus,
   RefreshCw,
@@ -41,6 +42,7 @@ import { envApi, projectsApi, resourcesApi, templatesApi } from '../lib/endpoint
 import { ApiError, friendlyMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useToast } from '../components/toast';
+import { ProjectTopologyModal } from '../components/project-topology';
 import { ResourceDetailModal } from '../components/resource-detail';
 import { ResourceFormModal } from '../components/resource-form';
 import {
@@ -127,6 +129,7 @@ export function ProjectDetailPage() {
   const [releaseResourcesOpen, setReleaseResourcesOpen] = useState(false);
   const [snapshotOpen, setSnapshotOpen] = useState(false);
   const [deleteSnapshotOpen, setDeleteSnapshotOpen] = useState(false);
+  const [topologyOpen, setTopologyOpen] = useState(false);
   const overdueSort = useTableSort<
     'resource' | 'environment' | 'slotRole' | 'endAt' | 'overdueDays'
   >('overdueDays', 'desc', ['overdueDays']);
@@ -333,6 +336,12 @@ export function ProjectDetailPage() {
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {data.resourceCount > 0 && (
+              <Button variant="outline" onClick={() => setTopologyOpen(true)}>
+                <Network size={14} />
+                资源拓扑
+              </Button>
+            )}
             {canWrite && !data.closedAt && data.status === 'ACTIVE' && (
               <Button onClick={() => setCreateOpen(true)}>
                 <Plus size={14} />
@@ -1085,6 +1094,13 @@ export function ProjectDetailPage() {
           setSnapshotOpen(false);
           invalidateAll();
         }}
+      />
+
+      <ProjectTopologyModal
+        open={topologyOpen}
+        project={data}
+        onClose={() => setTopologyOpen(false)}
+        onOpenResource={openResourceDetail}
       />
 
       <ResourceDetailModal
