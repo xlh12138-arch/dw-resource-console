@@ -35,8 +35,6 @@ interface Props {
 
 type Errors = Record<string, string>;
 
-const IP_KEYS = ['ip', 'mgmtIp'];
-
 function attrsWithDefaults(
   fields: AttrFieldDef[],
   attrs: Record<string, unknown>,
@@ -172,19 +170,23 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
     queryFn: () => projectsApi.options(),
   });
 
-  const ipValue = useMemo(() => {
-    for (const key of IP_KEYS) {
-      const v = attrs[key];
-      if (typeof v === 'string' && /^\d{1,3}(\.\d{1,3}){3}$/.test(v)) return v;
+  const ipCheckTarget = useMemo(() => {
+    for (const field of fields) {
+      if (!field.isIp) continue;
+      const value = attrs[field.key];
+      if (typeof value === 'string' && /^\d{1,3}(\.\d{1,3}){3}$/.test(value)) {
+        return { field: field.key, value };
+      }
     }
-    return '';
-  }, [attrs]);
+    return null;
+  }, [attrs, fields]);
+  const ipValue = ipCheckTarget?.value ?? '';
 
   // IP 占用预检：写入前提示冲突，避免提交后才报错
   const ipCheck = useQuery({
     queryKey: ['ip-check', ipValue],
     queryFn: () => resourcesApi.checkIp(ipValue),
-    enabled: Boolean(ipValue),
+    enabled: Boolean(ipCheckTarget),
     staleTime: 5_000,
   });
   const ipConflicts = (ipCheck.data?.conflicts ?? []).filter((c) => c.code !== initial?.code);
@@ -300,7 +302,9 @@ export function ResourceFormModal({ open, initial, defaultType, onClose, onSaved
     <Modal
       open={open}
       title={isEdit ? `编辑资源 · ${initial?.code}` : '新增资源'}
-      desc={isEdit ? '修改后将记录到变更审计' : '按资源类型填写专属属性，保存时自动校验 IP 占用'}
+      desc={
+        isEdit ? '修改后将记录到变更审计' : '按资源类型填写专属属性，保存时按字典配置校验 IP 占用'
+      }
       onClose={onClose}
       onSave={submit}
       dirtyHint="保存后才会写入资源台账并生成审计记录"

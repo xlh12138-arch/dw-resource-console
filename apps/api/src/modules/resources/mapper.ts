@@ -163,7 +163,7 @@ export function extractIps(
     );
 }
 
-/** 取某类型的 IP 字段（字典 meta.ipFields 已含 isIp 与 fieldType=IP 两种写法） */
+/** 取某类型参与 IP 占用检测的字段（仅 isIp=true；fieldType=IP 只负责格式校验） */
 export async function ipFieldsOf(type: string): Promise<string[]> {
   const meta = await getTypeMeta(type);
   if (!meta.exists) return ipFieldFallbackOf(type);

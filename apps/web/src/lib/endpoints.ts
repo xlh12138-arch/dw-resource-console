@@ -321,6 +321,7 @@ export const metaApi = {
           key: string;
           label: string;
           kind: string;
+          isIp?: boolean;
           required?: boolean;
           defaultValue?: string;
           unit?: string;

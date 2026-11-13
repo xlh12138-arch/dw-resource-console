@@ -224,7 +224,7 @@ export async function seedDemoDict(): Promise<void> {
             defaultValue: f.defaultValue ?? null,
             placeholder: null,
             unit: null,
-            isIp: false,
+            isIp: f.fieldType === 'IP',
             sortOrder: i + 1,
           })),
         );

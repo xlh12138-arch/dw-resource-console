@@ -289,7 +289,8 @@ function FieldEditor({
               />
               <Switch
                 checked={f.isIp}
-                label="IP 字段（参与占用检测）"
+                label="参与 IP 占用检测"
+                hint={f.isIp ? '已开启' : '仅校验格式'}
                 onChange={(v) => patch(f.uid, 'isIp', v)}
               />
               <Switch

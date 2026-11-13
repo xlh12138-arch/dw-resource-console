@@ -135,10 +135,8 @@ export async function getTypeMeta(code: string): Promise<TypeMeta> {
     ipUniqueByPort: row?.ipUniqueByPort ?? ipUniqueByPortFallbackOf(code),
     listColumns: row?.listColumns ?? [],
     fields,
-    // IP 字段：字典里标记 isIp 的字段，或字段类型直接就是 IP（生产字典的 IP 字段属于后者）
-    ipFields: row
-      ? fields.filter((f) => f.isIp || f.fieldType === 'IP').map((f) => f.key)
-      : ipFieldFallbackOf(code),
+    // IP 占用检测只由 isIp 开关决定；fieldType=IP 仅负责地址格式校验
+    ipFields: row ? fields.filter((f) => f.isIp).map((f) => f.key) : ipFieldFallbackOf(code),
     schema,
   };
   cache.set(code, meta);
@@ -158,6 +156,7 @@ export function toAttrFieldDefs(fields: RuntimeField[]): AttrFieldDef[] {
     key: f.key,
     label: f.label,
     kind: kindOf(f.fieldType),
+    isIp: f.isIp,
     required: f.required,
     defaultValue: f.defaultValue ?? undefined,
     placeholder: f.placeholder ?? undefined,

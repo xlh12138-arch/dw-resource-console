@@ -1169,6 +1169,8 @@ export type AttrFieldDef = {
   key: string;
   label: string;
   kind: 'text' | 'textarea' | 'number' | 'select' | 'switch';
+  /** 是否参与 IP 占用检测；字段类型为 IP 只负责格式校验 */
+  isIp?: boolean;
   required?: boolean;
   defaultValue?: string;
   placeholder?: string;
@@ -1265,7 +1267,7 @@ export const resourceTypeFieldInputSchema = z.object({
   defaultValue: z.string().trim().max(64).optional(),
   placeholder: z.string().trim().max(64).optional(),
   unit: z.string().trim().max(16).optional(),
-  /** 标记为 IP 字段后，该资源会参与 IP 占用检测与冲突校验 */
+  /** 是否参与 IP 占用检测与冲突校验；fieldType=IP 仅表示地址格式 */
   isIp: z.coerce.boolean().default(false),
   sortOrder: z.coerce.number().int().min(0).max(999).default(0),
 });

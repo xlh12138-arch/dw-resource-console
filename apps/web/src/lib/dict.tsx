@@ -53,6 +53,7 @@ const fallback: DictValue = {
 };
 
 const DictContext = createContext<DictValue>(fallback);
+const EMPTY_ATTR_FIELDS: AttrFieldDef[] = [];
 
 const TONE_MAP: Record<string, BadgeTone> = {
   gray: 'gray',
@@ -142,7 +143,7 @@ export function DictProvider({ children }: { children: ReactNode }) {
       envLabel: (code) => envList.find((e) => e.code === code)?.label ?? code,
       envTone: (code) => TONE_MAP[envToneMap.get(code) ?? 'gray'] ?? 'gray',
       envColor: (code) => envColorMap.get(code) ?? null,
-      attrFields: (code) => attrMap[code] ?? [],
+      attrFields: (code) => attrMap[code] ?? EMPTY_ATTR_FIELDS,
       typeColumns: (code) => columnMap[code] ?? [],
       typeOptions: ({ includeDisabled = true } = {}) =>
         typeList
