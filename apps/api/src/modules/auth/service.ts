@@ -95,6 +95,11 @@ export const authService = {
       .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
   },
 
+  /** 删除用户前清理刷新令牌，等价于原外键的 ON DELETE CASCADE */
+  async deleteAllRefreshTokens(userId: number): Promise<void> {
+    await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+  },
+
   async login(
     username: string,
     password: string,

@@ -46,6 +46,17 @@ DB_CREATE_SCHEMA=true
 建议先在 DWS 测试库和独立测试 schema 中开启 `DB_CREATE_TABLES=true` 验证一次建表，
 再迁移正式环境。
 
+华为 DWS 需要同时设置：
+
+```env
+DB_COMPAT_MODE=dws
+```
+
+该模式会跳过外键约束，移除迁移中的 `USING btree`，并把字典、模板以及
+带二级唯一约束的小表创建为 `DISTRIBUTE BY REPLICATION` 复制表。
+复制表建议控制在 100 万行以内；审计日志和槽位表仍使用普通分布。
+标准 PostgreSQL 使用默认值 `DB_COMPAT_MODE=postgres`。
+
 ### 3.2 三个部署开关
 
 `db-init` 容器在 API 启动前执行一次，由以下配置决定行为：

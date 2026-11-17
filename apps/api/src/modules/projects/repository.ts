@@ -215,6 +215,15 @@ export const slotRepository = {
     await db.delete(envSlots).where(eq(envSlots.environmentId, envId));
   },
 
+  /** 资源删除前解除槽位引用，等价于原外键的 ON DELETE SET NULL */
+  async clearResourceRefs(resourceIds: number[]): Promise<void> {
+    if (resourceIds.length === 0) return;
+    await db
+      .update(envSlots)
+      .set({ resourceId: null })
+      .where(inArray(envSlots.resourceId, resourceIds));
+  },
+
   /** 环境已绑定的资源 id 列表（用于「按项目查看」的共享引用并集） */
   async resourceIdsByEnv(envId: number): Promise<number[]> {
     const rows = await db

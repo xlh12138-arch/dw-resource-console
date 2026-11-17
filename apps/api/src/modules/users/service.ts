@@ -90,8 +90,8 @@ export const userService = {
       throw conflict('该用户仍处于启用状态，请先停用后再删除');
     }
 
-    // 删除用户后刷新令牌会随用户记录级联清除；这里显式吊销，便于在事务内表达会话回收意图。
-    await authService.revokeAllRefreshTokens(id);
+    // DWS 不使用外键级联，删除用户前显式清理刷新令牌。
+    await authService.deleteAllRefreshTokens(id);
     if (!(await userRepository.removeDisabled(id))) {
       throw conflict('用户状态已发生变化，请刷新后重试');
     }

@@ -102,6 +102,7 @@ DATABASE_URL=./data/dw-console.db
 
 ```env
 DB_DRIVER=postgres
+DB_COMPAT_MODE=dws
 DATABASE_URL=postgres://user:password@127.0.0.1:5432/dw
 DB_SCHEMA=public
 DB_CREATE_SCHEMA=true
@@ -112,6 +113,11 @@ DB_POOL_MAX=10
 `DB_SCHEMA` 控制业务表、外键、索引和原生查询使用的 PostgreSQL schema。
 仅允许小写字母、数字和下划线；如果 schema 由 DBA 预建，可设置
 `DB_CREATE_SCHEMA=false`。
+
+华为 DWS 请设置 `DB_COMPAT_MODE=dws`。该模式会跳过 DWS 不支持的外键约束，
+移除迁移中的 `USING btree`，并把字典、模板及带二级唯一约束的小表建成
+`DISTRIBUTE BY REPLICATION` 复制表，避免主键/唯一索引的分布列限制。
+标准 PostgreSQL 使用默认值 `postgres`。
 
 如果密码包含 `@`、`#`、`/`、`:` 等 URL 保留字符，必须先进行 URL 编码。例如 `@` 应写成 `%40`。
 
@@ -350,6 +356,7 @@ npm run ui:check
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `DB_DRIVER` | `sqlite` | `sqlite` 或 `postgres` |
+| `DB_COMPAT_MODE` | `postgres` | `postgres` 或 `dws` |
 | `DATABASE_URL` | `./data/dw-console.db` | SQLite 文件路径或 PostgreSQL 连接串 |
 | `DB_SCHEMA` | `public` | PostgreSQL/DWS 业务表所在 schema，仅允许小写标识符 |
 | `DB_CREATE_SCHEMA` | `true` | schema 不存在时是否允许应用创建 |

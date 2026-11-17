@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { config } from '../config/env.js';
 import { getPostgresPool } from './index.js';
+import { sanitizeImportSql } from './dws-compat.js';
 
 function quoteIdentifier(value: string): string {
   if (!/^[a-z_][a-z0-9_]{0,62}$/.test(value)) throw new Error(`非法 schema 名称：${value}`);
@@ -33,7 +34,8 @@ async function main(): Promise<void> {
   const content = readFileSync(file, 'utf8');
   const hash = createHash('sha256').update(content).digest('hex');
   const fileName = file.split(/[\\/]/).pop() || 'data.sql';
-  const rewritten = rewriteSchema(content, sourceSchema, schema.slice(1, -1));
+  const importSql = sanitizeImportSql(content, config.db.compatMode);
+  const rewritten = rewriteSchema(importSql, sourceSchema, schema.slice(1, -1));
   const client = await getPostgresPool().connect();
 
   try {
@@ -58,11 +60,19 @@ async function main(): Promise<void> {
 
     await client.query(`SET LOCAL search_path TO ${schema}`);
     await client.query(rewritten);
-    await client.query(
-      `INSERT INTO ${schema}.${quoteIdentifier('__dw_data_imports')} (file_hash, file_name) ` +
-        'VALUES ($1, $2) ON CONFLICT (file_hash) DO UPDATE SET file_name = EXCLUDED.file_name, imported_at = now()',
-      [hash, fileName],
-    );
+    if (existing.rowCount) {
+      await client.query(
+        `UPDATE ${schema}.${quoteIdentifier('__dw_data_imports')} ` +
+          'SET file_name = $2, imported_at = now() WHERE file_hash = $1',
+        [hash, fileName],
+      );
+    } else {
+      await client.query(
+        `INSERT INTO ${schema}.${quoteIdentifier('__dw_data_imports')} (file_hash, file_name) ` +
+          'VALUES ($1, $2)',
+        [hash, fileName],
+      );
+    }
     await client.query('COMMIT');
     console.log(`[db-import] 数据导入完成：${fileName}`);
   } catch (error) {

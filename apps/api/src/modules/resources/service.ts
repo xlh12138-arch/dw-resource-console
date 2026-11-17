@@ -1166,6 +1166,7 @@ export const resourceService = {
         },
       );
     }
+    await slotRepository.clearResourceRefs([id]);
     await resourceRepository.remove(id);
     await auditRepository.record({
       actorId: actor.id,
@@ -1216,6 +1217,7 @@ export const resourceService = {
     }
     if (rows.length === 0) return { deleted: 0, ids: [] as number[] };
 
+    await slotRepository.clearResourceRefs(rows.map((row) => row.id));
     await resourceRepository.removeMany(rows.map((row) => row.id));
     await auditRepository.record({
       actorId: actor.id,

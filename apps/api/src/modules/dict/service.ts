@@ -528,6 +528,7 @@ export const resourceTypeService = {
       if (!target) throw notFound(`待迁移的资源类型 ${migrateTo} 不存在`);
       result = await this.syncCode(code, migrateTo);
     }
+    await resourceTypeFieldRepository.replaceAll(code, []);
     await resourceTypeRepository.remove(code);
     invalidateDictCache();
     await auditRepository.record({

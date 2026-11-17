@@ -40,6 +40,8 @@ const envSchema = z.object({
   TRUST_PROXY: z.string().default('false'),
 
   DB_DRIVER: z.enum(['sqlite', 'postgres']).default('sqlite'),
+  /** postgres = 标准 PostgreSQL；dws = 华为 DWS 兼容模式（跳过外键等不兼容 DDL） */
+  DB_COMPAT_MODE: z.enum(['postgres', 'dws']).default('postgres'),
   DATABASE_URL: z.string().min(1).default('./data/dw-console.db'),
   DB_SCHEMA: z
     .string()
@@ -110,6 +112,7 @@ export const config = {
   },
   db: {
     driver: raw.DB_DRIVER,
+    compatMode: raw.DB_COMPAT_MODE,
     url: raw.DATABASE_URL,
     schema: raw.DB_SCHEMA,
     createSchema: bool(raw.DB_CREATE_SCHEMA, true),

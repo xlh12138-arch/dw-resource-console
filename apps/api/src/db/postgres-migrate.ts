@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { sql, type SQL } from 'drizzle-orm';
 import { config } from '../config/env.js';
 import { db, withTransaction } from './index.js';
+import { dwsObjectCheck, transformMigrationStatement } from './dws-compat.js';
 
 const MIGRATION_TABLE = '__dw_schema_migrations';
 
@@ -35,6 +36,7 @@ function quoteIdentifier(value: string): string {
  * PostgreSQL / DWS 迁移：
  * - 表建立在 DB_SCHEMA 指定的 schema；
  * - 兼容旧迁移文件中写死的 public 外键引用；
+ * - DWS 兼容模式跳过外键并转换不兼容的 DDL；
  * - 使用项目自己的迁移记录表，重复启动不会重复建表。
  */
 export async function runPostgresMigrations(migrationsFolder: string): Promise<void> {
@@ -72,7 +74,48 @@ export async function runPostgresMigrations(migrationsFolder: string): Promise<v
 
       for (const statement of statements) {
         // Drizzle 旧迁移文件把外键目标固定写成 public，这里统一切换到配置 schema。
-        const schemaAware = statement.split('"public".').join(`${schema}.`);
+        const transformed = transformMigrationStatement(statement, config.db.compatMode);
+        if (!transformed.sql) {
+          console.warn(`[db] DWS 兼容模式已跳过不支持的语句：${transformed.skipped}`);
+          continue;
+        }
+        if (config.db.compatMode === 'dws') {
+          const objectCheck = dwsObjectCheck(transformed.sql);
+          if (objectCheck?.kind === 'index') {
+            const [exists] = await executeRows<{ exists: boolean }>(
+              sql`select exists (
+                select 1
+                  from pg_class c
+                  join pg_namespace n on n.oid = c.relnamespace
+                 where n.nspname = ${config.db.schema}
+                   and c.relname = ${objectCheck.name}
+                   and c.relkind = 'i'
+              ) as exists`,
+            );
+            if (exists?.exists) {
+              console.warn(`[db] DWS 兼容模式已跳过已存在索引：${objectCheck.name}`);
+              continue;
+            }
+          }
+          if (objectCheck?.kind === 'column') {
+            const [exists] = await executeRows<{ exists: boolean }>(
+              sql`select exists (
+                select 1
+                  from information_schema.columns
+                 where table_schema = ${config.db.schema}
+                   and table_name = ${objectCheck.table}
+                   and column_name = ${objectCheck.name}
+              ) as exists`,
+            );
+            if (exists?.exists) {
+              console.warn(
+                `[db] DWS 兼容模式已跳过已存在列：${objectCheck.table}.${objectCheck.name}`,
+              );
+              continue;
+            }
+          }
+        }
+        const schemaAware = transformed.sql.split('"public".').join(`${schema}.`);
         await execute(sql.raw(schemaAware));
       }
 

@@ -879,6 +879,7 @@ export const projectEnvService = {
     const before = await projectEnvRepository.findById(envId);
     if (!before) throw notFound(`项目环境 ${envId} 不存在`);
     await resourceProjectRepository.clearEnvRefs(envId);
+    await slotRepository.removeByEnv(envId);
     await projectEnvRepository.remove(envId);
     await auditRepository.record({
       actorId: actor.id,
@@ -1848,6 +1849,7 @@ export const templateService = {
     if (usage > 0) {
       throw conflict(`模板「${before.name}」已被 ${usage} 个项目环境引用，请先解除引用再删除`);
     }
+    await templateRepository.replaceItems(id, []);
     await templateRepository.remove(id);
     await auditRepository.record({
       actorId: actor.id,
