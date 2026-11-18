@@ -5,10 +5,18 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
-import { api, clearTokens, restoreSession, setSessionExpiredHandler, setTokens } from './api';
+import {
+  api,
+  clearTokens,
+  restoreSession,
+  setSessionExpiredHandler,
+  setSessionIdleDeadline,
+  setTokens,
+} from './api';
 
 interface AuthState {
   user: UserDto | null;
@@ -19,20 +27,31 @@ interface AuthState {
 }
 
 const AuthContext = createContext<AuthState | null>(null);
+const DEFAULT_IDLE_TIMEOUT_SECONDS = 30 * 60;
+const ACTIVITY_THROTTLE_MS = 5_000;
+const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'scroll'] as const;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserDto | null>(null);
   const [ready, setReady] = useState(false);
+  const [idleTimeoutSeconds, setIdleTimeoutSeconds] = useState(DEFAULT_IDLE_TIMEOUT_SECONDS);
+  const lastActivityAt = useRef(Date.now());
 
   // 刷新令牌由服务端以 httpOnly Cookie 下发，这里凭 Cookie 静默续期恢复登录态：
   // 刷新页面 / 新开标签页都不必重新登录，且令牌本身不落 localStorage。
   useEffect(() => {
-    setSessionExpiredHandler(() => setUser(null));
+    setSessionExpiredHandler(() => {
+      setSessionIdleDeadline(null);
+      setUser(null);
+    });
     let cancelled = false;
     void (async () => {
       try {
         const restored = await restoreSession();
-        if (!cancelled && restored) setUser(restored);
+        if (!cancelled && restored) {
+          setIdleTimeoutSeconds(restored.idleTimeoutSeconds);
+          setUser(restored.user);
+        }
       } catch {
         /* Cookie 不存在或已过期：保持未登录，展示登录页 */
       }
@@ -44,11 +63,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
-    const result = await api.post<{ accessToken: string; user: UserDto }>('/auth/login', {
+    const result = await api.post<{
+      accessToken: string;
+      idleTimeoutSeconds: number;
+      user: UserDto;
+    }>('/auth/login', {
       username,
       password,
     });
     setTokens({ accessToken: result.accessToken });
+    setIdleTimeoutSeconds(result.idleTimeoutSeconds);
+    lastActivityAt.current = Date.now();
     setUser(result.user);
   }, []);
 
@@ -61,6 +86,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearTokens();
     setUser(null);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const timeoutMs = idleTimeoutSeconds * 1000;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let expiring = false;
+
+    const clearTimer = () => {
+      if (timer) clearTimeout(timer);
+      timer = undefined;
+    };
+    const expire = () => {
+      if (expiring) return;
+      expiring = true;
+      clearTimer();
+      void logout();
+    };
+    const arm = (delay = timeoutMs) => {
+      clearTimer();
+      timer = setTimeout(expire, Math.max(0, delay));
+    };
+    const refreshDeadline = () => {
+      const deadline = lastActivityAt.current + timeoutMs;
+      setSessionIdleDeadline(deadline);
+      arm(deadline - Date.now());
+    };
+    const onActivity = () => {
+      if (expiring) return;
+      const now = Date.now();
+      if (now - lastActivityAt.current < ACTIVITY_THROTTLE_MS) return;
+      lastActivityAt.current = now;
+      refreshDeadline();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() >= lastActivityAt.current + timeoutMs) {
+        expire();
+      } else {
+        refreshDeadline();
+      }
+    };
+
+    lastActivityAt.current = Date.now();
+    refreshDeadline();
+    for (const eventName of ACTIVITY_EVENTS) {
+      window.addEventListener(eventName, onActivity, { passive: true });
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearTimer();
+      for (const eventName of ACTIVITY_EVENTS) {
+        window.removeEventListener(eventName, onActivity);
+      }
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [idleTimeoutSeconds, logout, user]);
 
   const value = useMemo<AuthState>(
     () => ({

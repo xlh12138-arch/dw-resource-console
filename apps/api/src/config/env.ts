@@ -55,6 +55,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16, 'JWT_SECRET 长度至少 16 位，请使用 openssl rand -hex 48 生成'),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_TTL: z.string().default('7d'),
+  IDLE_TIMEOUT: z.string().default('30m'),
 
   BOOTSTRAP_ADMIN_USERNAME: z.string().default('admin'),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().min(8).default('Admin@12345'),
@@ -94,6 +95,11 @@ function parseTtl(input: string): number {
   return value * factor;
 }
 
+const idleTimeoutSeconds = parseTtl(raw.IDLE_TIMEOUT);
+if (idleTimeoutSeconds < 1) {
+  throw new Error('IDLE_TIMEOUT 必须大于 0 秒');
+}
+
 export const config = {
   env: raw.NODE_ENV,
   isProd: raw.NODE_ENV === 'production',
@@ -123,6 +129,7 @@ export const config = {
     jwtSecret: raw.JWT_SECRET,
     accessTokenTtlSeconds: parseTtl(raw.ACCESS_TOKEN_TTL),
     refreshTokenTtlSeconds: parseTtl(raw.REFRESH_TOKEN_TTL),
+    idleTimeoutSeconds,
     bootstrapAdmin: {
       username: raw.BOOTSTRAP_ADMIN_USERNAME,
       password: raw.BOOTSTRAP_ADMIN_PASSWORD,

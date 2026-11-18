@@ -12,6 +12,7 @@ export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+  idleTimeoutSeconds: number;
 }
 
 export type TokenSigner = (user: Pick<UserRow, 'id' | 'username' | 'role'>) => string;
@@ -132,6 +133,7 @@ export const authService = {
         accessToken,
         refreshToken,
         expiresIn: config.auth.accessTokenTtlSeconds,
+        idleTimeoutSeconds: config.auth.idleTimeoutSeconds,
         user: toUserDto(user),
       };
     });
@@ -171,12 +173,13 @@ export const authService = {
         accessToken: ctx.signAccessToken(user),
         refreshToken,
         expiresIn: config.auth.accessTokenTtlSeconds,
+        idleTimeoutSeconds: config.auth.idleTimeoutSeconds,
         user: toUserDto(user),
       };
     });
   },
 
-  async logout(token: string | undefined, actor: { id: number | null; username: string }) {
+  async logout(token: string | undefined) {
     return withTransaction(async () => {
       if (!token) return { success: true };
       const [row] = await db
@@ -184,18 +187,21 @@ export const authService = {
         .from(refreshTokens)
         .where(eq(refreshTokens.tokenHash, sha256(token)));
       if (row) {
+        const user = await userRepository.findById(row.userId);
         await db
           .update(refreshTokens)
           .set({ revokedAt: new Date() })
           .where(eq(refreshTokens.id, row.id));
+        if (user) {
+          await auditRepository.record({
+            actorId: user.id,
+            actorName: user.username,
+            action: 'LOGOUT',
+            targetType: 'AUTH',
+            targetName: user.username,
+          });
+        }
       }
-      await auditRepository.record({
-        actorId: actor.id,
-        actorName: actor.username,
-        action: 'LOGOUT',
-        targetType: 'AUTH',
-        targetName: actor.username,
-      });
       return { success: true };
     });
   },

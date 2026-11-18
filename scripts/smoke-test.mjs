@@ -22,11 +22,13 @@ function check(name, cond, extra = '') {
   }
 }
 
-function refreshCookieFrom(res) {
+function refreshSetCookieFrom(res) {
   const values = res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie')].filter(Boolean);
-  return values
-    .map((value) => value.split(';', 1)[0])
-    .find((value) => value.startsWith('dw_refresh='));
+  return values.find((value) => value.startsWith('dw_refresh='));
+}
+
+function refreshCookieFrom(res) {
+  return refreshSetCookieFrom(res)?.split(';', 1)[0];
 }
 
 async function req(path, { method = 'GET', token, body, cookie } = {}) {
@@ -46,7 +48,13 @@ async function req(path, { method = 'GET', token, body, cookie } = {}) {
   } catch {
     json = text;
   }
-  return { status: res.status, json, text, cookie: refreshCookieFrom(res) };
+  return {
+    status: res.status,
+    json,
+    text,
+    cookie: refreshCookieFrom(res),
+    setCookie: refreshSetCookieFrom(res),
+  };
 }
 
 const login = async (username, password) =>
@@ -66,6 +74,14 @@ check('管理员登录成功', admin.status === 200 && !!admin.json.accessToken)
 check(
   '刷新令牌不出现在响应体，仅通过 HttpOnly Cookie 下发',
   !('refreshToken' in (admin.json ?? {})) && !!admin.cookie,
+);
+check(
+  '登录结果下发无操作自动退出时间',
+  Number.isInteger(admin.json.idleTimeoutSeconds) && admin.json.idleTimeoutSeconds > 0,
+);
+check(
+  '刷新 Cookie 为浏览器会话 Cookie，不含 Max-Age/Expires',
+  !!admin.setCookie && !/max-age=/i.test(admin.setCookie) && !/expires=/i.test(admin.setCookie),
 );
 const A = admin.json.accessToken;
 const badLogin = await login('admin', 'wrong-password');

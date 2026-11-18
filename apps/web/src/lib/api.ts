@@ -22,9 +22,19 @@ let accessToken: string | null = null;
 let onSessionExpired: (() => void) | null = null;
 /** 并发请求同时 401 时只发一次续期请求 */
 let refreshInFlight: Promise<AuthResult | null> | null = null;
+/** 前端活动计时截止时间；超时后禁止静默续期 */
+let idleDeadlineAt: number | null = null;
 
 export function setSessionExpiredHandler(fn: () => void): void {
   onSessionExpired = fn;
+}
+
+export function setSessionIdleDeadline(deadline: number | null): void {
+  idleDeadlineAt = deadline;
+}
+
+function isIdleExpired(): boolean {
+  return idleDeadlineAt !== null && Date.now() >= idleDeadlineAt;
 }
 
 export function getTokens() {
@@ -37,6 +47,7 @@ export function setTokens(tokens: { accessToken: string }): void {
 
 export function clearTokens(): void {
   accessToken = null;
+  idleDeadlineAt = null;
 }
 
 export class ApiError extends Error {
@@ -117,6 +128,10 @@ export function friendlyMessage(error: unknown): string {
  * 成功时同时拿到新的访问令牌与用户信息（用户的登录态据此恢复）。
  */
 async function doRefresh(): Promise<AuthResult | null> {
+  if (isIdleExpired()) {
+    clearTokens();
+    return null;
+  }
   try {
     const res = await fetch(`${API}/auth/refresh`, {
       method: 'POST',
@@ -146,14 +161,24 @@ export function refreshSession(): Promise<AuthResult | null> {
  * 应用启动时尝试凭 Cookie 恢复登录态：
  * 无需把任何令牌写进 localStorage，刷新页面也能保持登录。
  */
-export async function restoreSession(): Promise<UserDto | null> {
-  const result = await refreshSession();
-  return result?.user ?? null;
+export async function restoreSession(): Promise<AuthResult | null> {
+  return refreshSession();
 }
 
 type Options = Omit<RequestInit, 'body'> & { body?: unknown; retries?: number };
 
 async function request<T>(path: string, options: Options = {}, attempt = 0): Promise<T> {
+  if (path !== '/auth/login' && path !== '/auth/logout' && isIdleExpired()) {
+    try {
+      await fetch(`${API}/auth/logout`, { method: 'POST', credentials: 'include' });
+    } catch {
+      /* 网络不可用时也要清理本地登录态 */
+    }
+    clearTokens();
+    onSessionExpired?.();
+    throw new ApiError('长时间未操作，请重新登录', 'UNAUTHORIZED', 401);
+  }
+
   const { body, retries = 0, headers, ...rest } = options;
   const init: RequestInit = {
     ...rest,

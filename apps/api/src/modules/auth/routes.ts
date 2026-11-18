@@ -2,7 +2,6 @@ import { authResultSchema, loginSchema, userSchema } from '@dw/shared';
 import { config } from '../../config/env.js';
 import { z } from 'zod';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
-import { actorOf } from '../../lib/actor.js';
 import { withTransaction } from '../../db/index.js';
 import { notFound, unauthorized } from '../../lib/errors.js';
 import { authService, toUserDto } from './service.js';
@@ -29,7 +28,7 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
         }),
       );
       // 刷新令牌同时写入 httpOnly Cookie：刷新页面后可静默续期
-      setRefreshCookie(reply, result.refreshToken);
+      setRefreshCookie(reply, request, result.refreshToken);
       const { refreshToken: _refreshToken, ...response } = result;
       return response;
     },
@@ -50,7 +49,7 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
           userAgent: request.headers['user-agent'],
         }),
       );
-      setRefreshCookie(reply, result.refreshToken);
+      setRefreshCookie(reply, request, result.refreshToken);
       const { refreshToken: _refreshToken, ...response } = result;
       return response;
     },
@@ -59,14 +58,11 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
   app.post(
     '/auth/logout',
     {
-      preHandler: app.authenticate,
       schema: { response: { 200: z.object({ success: z.boolean() }) } },
     },
     async (request, reply) => {
-      const result = await withTransaction(() =>
-        authService.logout(refreshTokenFrom(request), actorOf(request)),
-      );
-      clearRefreshCookie(reply);
+      const result = await withTransaction(() => authService.logout(refreshTokenFrom(request)));
+      clearRefreshCookie(reply, request);
       return result;
     },
   );

@@ -433,6 +433,8 @@ export type UserDto = z.infer<typeof userSchema>;
 export const authResultSchema = z.object({
   accessToken: z.string(),
   expiresIn: z.number().int(),
+  /** 前端无操作自动退出时间，单位秒 */
+  idleTimeoutSeconds: z.number().int().positive(),
   user: userSchema,
 });
 export type AuthResult = z.infer<typeof authResultSchema>;
