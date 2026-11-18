@@ -218,6 +218,10 @@ export const refreshTokens = appTable(
     tokenHash: text('token_hash').notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
     revokedAt: timestamp('revoked_at', { withTimezone: true, mode: 'date' }),
+    /** 最近一次使用（签发即算一次）：服务端据此判定空闲超时 */
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
     userAgent: text('user_agent'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },

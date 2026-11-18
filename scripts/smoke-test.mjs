@@ -299,6 +299,45 @@ for (const uid of [createdNormal.json?.id, createdRo.json?.id]) {
   if (uid) await req(`/users/${uid}`, { method: 'PATCH', token: A, body: { status: 'DISABLED' } });
 }
 
+// 删除用户时的刷新令牌清理只靠应用层补偿（DWS 没有外键级联）。
+// 这里先给待删除用户签发一枚刷新令牌，删除后必须立即失效，否则会留下孤儿令牌。
+const cascadePassword = `Smoke#${Date.now().toString(36)}`;
+const cascadeUser = await req('/users', {
+  method: 'POST',
+  token: A,
+  body: {
+    username: `smoke_cascade_${Date.now().toString(36)}`,
+    password: cascadePassword,
+    displayName: '孤儿令牌校验',
+    role: 'READONLY',
+  },
+});
+check('创建孤儿令牌校验用户', cascadeUser.status === 201, cascadeUser.text);
+const cascadeLogin = await login(cascadeUser.json.username, cascadePassword);
+check('孤儿令牌校验：删除前可登录', cascadeLogin.status === 200 && !!cascadeLogin.cookie);
+const cascadeToken = await req('/auth/refresh', {
+  method: 'POST',
+  cookie: cascadeLogin.cookie,
+});
+check(
+  '孤儿令牌校验：删除前刷新令牌有效',
+  cascadeToken.status === 200 && cascadeToken.json.user?.role === 'READONLY',
+  `status=${cascadeToken.status}`,
+);
+await req(`/users/${cascadeUser.json.id}`, {
+  method: 'PATCH',
+  token: A,
+  body: { status: 'DISABLED' },
+});
+const cascadeDelete = await req(`/users/${cascadeUser.json.id}`, { method: 'DELETE', token: A });
+check('删除已停用用户', cascadeDelete.status === 200, cascadeDelete.text);
+const cascadeAfter = await req('/auth/refresh', { method: 'POST', cookie: cascadeToken.cookie });
+check(
+  '用户删除后刷新令牌同步清理，不再可续期（DWS 无外键时同样成立）',
+  cascadeAfter.status === 401,
+  `status=${cascadeAfter.status}`,
+);
+
 console.log('\n[8] 批量导入 / 导出');
 const csv = [
   'name,environment,status,owner,IP,USER_NAME,OS',
@@ -367,6 +406,32 @@ const logout = await req('/auth/logout', {
   cookie: refreshed.cookie,
 });
 check('登出成功', logout.status === 200);
+check(
+  '登出清除刷新 Cookie（下发同名过期 Cookie）',
+  !!logout.setCookie && /^dw_refresh=;/.test(logout.setCookie),
+  logout.setCookie ?? 'no set-cookie',
+);
+const refreshAfterLogout = await req('/auth/refresh', { method: 'POST', cookie: refreshed.cookie });
+check('登出后刷新令牌立即失效，/auth/refresh 返回 401', refreshAfterLogout.status === 401);
+
+// 空闲超时或访问令牌过期时前端只剩 Cookie，登出不能要求访问令牌
+const cookieOnly = await login(ADMIN_USERNAME, ADMIN_PASSWORD);
+check('为「仅凭 Cookie 登出」再次登录', cookieOnly.status === 200 && !!cookieOnly.cookie);
+const logoutNoToken = await req('/auth/logout', { method: 'POST', cookie: cookieOnly.cookie });
+check(
+  '不带访问令牌也能登出，且不落系统错误',
+  logoutNoToken.status === 200 && logoutNoToken.json?.success === true,
+  `status=${logoutNoToken.status}`,
+);
+const refreshAfterCookieLogout = await req('/auth/refresh', {
+  method: 'POST',
+  cookie: cookieOnly.cookie,
+});
+check(
+  '仅凭 Cookie 登出后，该刷新令牌同样失效',
+  refreshAfterCookieLogout.status === 401,
+  `status=${refreshAfterCookieLogout.status}`,
+);
 
 const disabledNormal = await req(`/users/${createdNormal.json.id}`, {
   method: 'PATCH',

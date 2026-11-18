@@ -15,6 +15,13 @@
       "when": 1794367202887,
       "tag": "0001_uneven_garia",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795000000000,
+      "tag": "0002_refresh_active",
+      "breakpoints": true
     }
   ]
 }

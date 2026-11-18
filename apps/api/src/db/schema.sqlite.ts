@@ -245,6 +245,10 @@ export const refreshTokens = sqliteTable(
     tokenHash: text('token_hash').notNull(),
     expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
     revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+    /** 最近一次使用（签发即算一次）：服务端据此判定空闲超时 */
+    lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
     userAgent: text('user_agent'),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
       .notNull()

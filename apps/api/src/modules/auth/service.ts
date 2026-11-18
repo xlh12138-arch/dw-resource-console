@@ -141,10 +141,13 @@ export const authService = {
 
   async issueRefreshToken(userId: number, userAgent?: string): Promise<string> {
     const token = randomToken(48);
+    const now = new Date();
     await db.insert(refreshTokens).values({
       userId,
       tokenHash: sha256(token),
-      expiresAt: new Date(Date.now() + config.auth.refreshTokenTtlSeconds * 1000),
+      expiresAt: new Date(now.getTime() + config.auth.refreshTokenTtlSeconds * 1000),
+      // 签发即算一次使用，空闲计时从登录/续期时刻开始
+      lastUsedAt: now,
       userAgent: userAgent ?? null,
     });
     return token;
@@ -158,14 +161,25 @@ export const authService = {
         .from(refreshTokens)
         .where(and(eq(refreshTokens.tokenHash, sha256(token)), isNull(refreshTokens.revokedAt)));
       if (!row) throw unauthorized('刷新令牌无效，请重新登录');
-      if (row.expiresAt.getTime() < Date.now()) throw unauthorized('刷新令牌已过期，请重新登录');
+      const now = Date.now();
+      // 服务端空闲兜底：前端计时器只是体验层，服务端按 last_used_at 独立判定，
+      // 避免前端被绕过（休眠、改系统时间、直接调接口）时刷新令牌无限续期。
+      const idleMs = config.auth.idleTimeoutSeconds * 1000;
+      if (now - row.lastUsedAt.getTime() > idleMs) {
+        await db
+          .update(refreshTokens)
+          .set({ revokedAt: new Date(now) })
+          .where(eq(refreshTokens.id, row.id));
+        throw unauthorized('登录状态已超时，请重新登录');
+      }
+      if (row.expiresAt.getTime() < now) throw unauthorized('刷新令牌已过期，请重新登录');
 
       const user = await userRepository.findById(row.userId);
       if (!user || user.status !== 'ACTIVE') throw unauthorized('账号不可用，请重新登录');
 
       await db
         .update(refreshTokens)
-        .set({ revokedAt: new Date() })
+        .set({ revokedAt: new Date(now) })
         .where(eq(refreshTokens.id, row.id));
 
       const refreshToken = await this.issueRefreshToken(user.id, ctx.userAgent);

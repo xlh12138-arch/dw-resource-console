@@ -412,6 +412,16 @@ const wrongDelete = await req(`/project-snapshots/${closeSnapshotId}`, {
 });
 check('快照删除必须输入完整确认语句', [400, 422].includes(wrongDelete.status));
 
+// DWS 模式没有外键，删除路径只能靠应用层补偿；这里断言槽位解绑确实落库，
+// 而不是被数据库级联「兜底」掩盖——否则切换 DWS 后同一路径会留下悬空引用。
+const slotAfterRelease = await req(`/project-environments/${envId}`, { token: A });
+check(
+  '释放资源后槽位不再是可用占用（DWS 无外键时同样成立）',
+  slotAfterRelease.status === 200 &&
+    slotAfterRelease.json.slots.every((s) => !s.endAt || new Date(s.endAt) <= new Date()),
+  JSON.stringify(slotAfterRelease.json?.slots?.map((s) => ({ id: s.id, endAt: s.endAt }))),
+);
+
 const deletedSnapshot = await req(`/project-snapshots/${closeSnapshotId}`, {
   method: 'DELETE',
   token: A,
@@ -432,6 +442,57 @@ check('有环境的项目禁止删除（409）', delPrj.status === 409, `status=
 
 await req(`/project-environments/${envId}`, { method: 'DELETE', token: A });
 check('删除环境成功', (await req(`/project-environments/${envId}`, { token: A })).status === 404);
+
+// 场景：资源已被槽位引用时删除资源。PostgreSQL 靠 ON DELETE SET NULL，DWS 没有外键，
+// 一旦 clearResourceRefs 回归，槽位会留下指向已删除资源的悬空 id，且不会有任何报错。
+const wsName = `冒烟孤儿行-${Date.now().toString(36)}`;
+const wsCreated = await req('/resources', {
+  method: 'POST',
+  token: A,
+  body: {
+    name: wsName,
+    type: 'ETL_SERVER',
+    environment: 'PT',
+    status: 'IDLE',
+    attrs: { IP: '10.96.7.7', USER_NAME: 'smoke', OS: 'Linux' },
+  },
+});
+const wsId = wsCreated.json?.id;
+check('创建用于孤儿行校验的资源', wsCreated.status === 201 && Boolean(wsId), wsCreated.text);
+// 主项目在本段前面已经结项，结项后不能再开环境；这里单独建一个临时项目承载槽位。
+const wsPrj = await req('/projects', {
+  method: 'POST',
+  token: A,
+  body: { name: `冒烟孤儿行项目-${Date.now().toString(36)}`, owner: '测试' },
+});
+check('创建孤儿行校验用项目', wsPrj.status === 201, wsPrj.text);
+const wsPrjId = wsPrj.json?.id;
+const wsEnv = await req(`/projects/${wsPrjId}/environments`, {
+  method: 'POST',
+  token: A,
+  body: { name: '孤儿行校验环境', environment: 'PT', templateId: tplId },
+});
+const wsEnvId = wsEnv.json?.id;
+const wsSlotId = wsEnv.json?.slots?.[0]?.id;
+check('为孤儿行校验创建环境', wsEnv.status === 201 && Boolean(wsSlotId), wsEnv.text);
+const wsAssign = await req(`/project-environments/${wsEnvId}/slots/${wsSlotId}/assign`, {
+  method: 'POST',
+  token: A,
+  body: { resourceId: wsId, amount: null, acknowledge: true },
+});
+check('槽位引用待删除资源', wsAssign.status === 200, wsAssign.text);
+const wsDelete = await req(`/resources/${wsId}`, { method: 'DELETE', token: A });
+check('删除被槽位引用的资源', wsDelete.status === 200, wsDelete.text);
+const wsEnvAfter = await req(`/project-environments/${wsEnvId}`, { token: A });
+const danglingSlots = (wsEnvAfter.json?.slots ?? []).filter((s) => s.resourceId === wsId);
+check(
+  '删除资源后槽位引用被应用层清零（DWS 无外键也不会留悬空 id）',
+  wsEnvAfter.status === 200 && danglingSlots.length === 0,
+  `dangling=${danglingSlots.length}`,
+);
+await req(`/project-environments/${wsEnvId}`, { method: 'DELETE', token: A });
+if (wsPrjId) await req(`/projects/${wsPrjId}`, { method: 'DELETE', token: A });
+
 const delPrj2 = await req(`/projects/${prjId}`, { method: 'DELETE', token: A });
 check('环境清空后项目可删除', delPrj2.status === 200, `status=${delPrj2.status}`);
 await req(`/env-templates/${cloned.json.id}`, { method: 'DELETE', token: A });
