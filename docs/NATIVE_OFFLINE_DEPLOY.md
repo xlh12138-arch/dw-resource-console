@@ -24,6 +24,39 @@ IDLE_TIMEOUT=30m
 支持 `30m`、`1h`、`3600` 等写法，修改后重启 API。
 刷新令牌 Cookie 不设置 `Max-Age` 或 `Expires`，属于浏览器会话 Cookie。
 
+空闲退出由前后端各自校验，不依赖浏览器计时器是否准确：
+
+- 前端计时器在无操作时到点退出，只负责即时提示；
+- 服务端在每次 `/auth/refresh` 校验 `refresh_tokens.last_used_at`，空闲超过 `IDLE_TIMEOUT`
+  直接返回 401「登录状态已超时」，并吊销该刷新令牌。因此休眠、改系统时间或绕过前端直接
+  调接口，都无法让会话无限续期。
+- 升级到带 `last_used_at` 的版本时，必须先执行迁移（`node apps/api/dist/db/migrate.js`），
+  否则 `/auth/refresh` 会因缺列报错；旧令牌在迁移时统一按迁移时刻作为最后一次使用时间。
+
+### 协议判定与代理信任
+
+刷新 Cookie 的 `Secure` 由 `request.protocol === 'https'` 决定，因此 API 必须能拿到真实协议：
+
+- Nginx 的 `/api/`、`/health`、`/ready`、`/docs` 每段都要转发
+  `proxy_set_header X-Forwarded-Proto $scheme;`，`deploy/native/nginx.conf` 已包含。
+- `.env` 的 `TRUST_PROXY` 必须包含 Nginx 的来源地址。同一台机器部署时填 `127.0.0.1`
+  （Nginx 与 API 都在本机）；多台机器部署时填 Nginx 所在主机 IP 或所在网段 CIDR，
+  多个值用英文逗号分隔。
+- `TRUST_PROXY` 不匹配时 API 会忽略 `X-Forwarded-Proto`，`request.protocol` 恒为 `http`，
+  HTTPS 下 Cookie 也不会带 `Secure`；反过来，把 `TRUST_PROXY` 设成 `true` 会让任何
+  能直连 8787 的来源伪造协议头。生产环境优先写具体地址或网段。
+- API 只监听 `127.0.0.1:8787`，所以浏览器无论如何都访问不到 API，只能经由 Nginx。
+
+验证方式：登录后查看响应头。
+
+```sh
+curl -i -X POST http://127.0.0.1:8080/api/v1/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"username":"admin","password":"<管理员口令>"}' | grep -i '^set-cookie'
+```
+
+HTTP 部署应看到 `dw_refresh=...; HttpOnly; SameSite=Lax`；HTTPS 部署应额外包含 `Secure`。
+
 ## 全量生产包
 
 在仓库根目录执行：

@@ -287,7 +287,9 @@ npm run db:reset
 - 刷新令牌只通过 `httpOnly + SameSite=Lax` Cookie 传输，不进入 JSON 响应体；
   该 Cookie 是浏览器会话 Cookie，关闭浏览器后需要重新登录；`Secure` 属性按实际请求
   协议启用，兼容内网 HTTP，HTTPS 环境仍会自动加固。
-- 用户无操作超过 `IDLE_TIMEOUT` 后自动退出，默认 `30m`。
+- 用户无操作超过 `IDLE_TIMEOUT` 后自动退出，默认 `30m`。前端计时器负责即时提示，
+  服务端按刷新令牌的 `last_used_at` 独立判定：空闲超时后 `/auth/refresh` 返回 401
+  并吊销该令牌，浏览器休眠或绕过前端调用都无法续期。
 - 刷新令牌在数据库中以 SHA-256 摘要保存，并支持轮换与吊销。
 - 密码使用 Node `crypto.scrypt` 加盐哈希。
 - Helmet 安全头、显式 CORS 来源和接口限流默认启用。
@@ -372,7 +374,7 @@ npm run ui:check
 | `JWT_SECRET` | — | JWT 签名密钥，生产必须替换 |
 | `ACCESS_TOKEN_TTL` | `15m` | 访问令牌有效期 |
 | `REFRESH_TOKEN_TTL` | `7d` | 刷新令牌有效期 |
-| `IDLE_TIMEOUT` | `30m` | 用户无操作自动退出时间，支持 `30m`、`1h` 等写法 |
+| `IDLE_TIMEOUT` | `30m` | 用户无操作自动退出时间，支持 `30m`、`1h` 等写法；前端计时 + 服务端按刷新令牌 `last_used_at` 双重判定 |
 | `CORS_ORIGIN` | 本地前端地址 | 允许的前端来源，多个用逗号分隔 |
 | `TRUST_PROXY` | `false` | 可信反向代理地址或 CIDR |
 | `RATE_LIMIT_MAX` | `300` | 单 IP 每分钟接口请求上限 |

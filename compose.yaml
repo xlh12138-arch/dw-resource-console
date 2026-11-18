@@ -34,7 +34,8 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 8787
       DATABASE_URL: ${DOCKER_DATABASE_URL:-${DATABASE_URL}}
-      TRUST_PROXY: "true"
+      # 只信任 Compose 网络内的 nginx 容器，不放开到任意内网来源
+      TRUST_PROXY: ${DOCKER_SUBNET:-172.28.0.0/24}
       AUTO_MIGRATE: ${AUTO_MIGRATE:-false}
     extra_hosts:
       - "host.docker.internal:host-gateway"

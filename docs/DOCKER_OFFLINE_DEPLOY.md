@@ -362,6 +362,9 @@ docker compose logs --tail=200 api
 - 浏览器必须访问同一个地址，例如始终使用服务器 IP，不要混合 IP 和主机名。
 - 确认 `CORS_ORIGIN` 与实际访问地址一致。
 - 确认 Nginx 转发时保留 Cookie。
+- 确认 `TRUST_PROXY` 覆盖 nginx 容器所在网段（默认 `${DOCKER_SUBNET}`）；不匹配时 API
+  看不到 `X-Forwarded-Proto`，`request.protocol` 恒为 `http`，HTTPS 部署下刷新 Cookie
+  不带 `Secure`，浏览器会拒收。
 
 ### 服务器是 ARM 架构
 
