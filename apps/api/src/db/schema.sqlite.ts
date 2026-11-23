@@ -378,7 +378,7 @@ export const auditLogs = sqliteTable(
     actorId: integer('actor_id'),
     actorName: text('actor_name').notNull(),
     action: text('action', {
-      enum: ['CREATE', 'UPDATE', 'DELETE', 'IMPORT', 'LOGIN', 'LOGOUT'],
+      enum: ['CREATE', 'UPDATE', 'DELETE', 'IMPORT', 'LOGIN', 'LOGOUT', 'ENABLE', 'DISABLE'],
     }).notNull(),
     targetType: text('target_type', {
       enum: [

@@ -338,7 +338,224 @@ check(
   `status=${cascadeAfter.status}`,
 );
 
-console.log('\n[8] 批量导入 / 导出');
+console.log('\n[8] 用户批量操作与批量导入（整批回滚）');
+
+const unique = () => Date.now().toString(36);
+const mkUsers = async (count, prefix) => {
+  const users = [];
+  for (let i = 0; i < count; i += 1) {
+    const password = `Bulk#${unique()}${i}`;
+    const created = await req('/users', {
+      method: 'POST',
+      token: A,
+      body: {
+        username: `${prefix}_${unique()}${i}`.slice(0, 32),
+        password,
+        displayName: `批量校验${i}`,
+        role: 'READONLY',
+      },
+    });
+    users.push({ id: created.json?.id, username: created.json?.username, password });
+  }
+  return users;
+};
+
+// 1) 批量停用：两个账号都应变为 DISABLED，且各自的刷新令牌立即失效
+const stopUsers = await mkUsers(2, 'smoke_bulk_stop');
+const stopCookies = [];
+for (const user of stopUsers) {
+  const res = await login(user.username, user.password);
+  stopCookies.push(res.cookie);
+}
+const stopRes = await req('/users/bulk/status', {
+  method: 'POST',
+  token: A,
+  body: { ids: stopUsers.map((u) => u.id), status: 'DISABLED' },
+});
+check(
+  '批量停用：一次请求更新全部账号',
+  stopRes.status === 200 && stopRes.json.updated === 2,
+  stopRes.text,
+);
+const stopAfterRefresh = await Promise.all(
+  stopCookies.map((cookie) => req('/auth/refresh', { method: 'POST', cookie })),
+);
+check(
+  '批量停用：被停用账号的会话同步失效',
+  stopAfterRefresh.every((res) => res.status === 401),
+  stopAfterRefresh.map((res) => res.status).join(','),
+);
+
+// 2) 批量启用：已停用的账号恢复 ACTIVE，不应恢复历史会话
+const startRes = await req('/users/bulk/status', {
+  method: 'POST',
+  token: A,
+  body: { ids: stopUsers.map((u) => u.id), status: 'ACTIVE' },
+});
+check(
+  '批量启用：更新全部账号',
+  startRes.status === 200 && startRes.json.updated === 2,
+  startRes.text,
+);
+const startAgain = await req('/users/bulk/status', {
+  method: 'POST',
+  token: A,
+  body: { ids: stopUsers.map((u) => u.id), status: 'ACTIVE' },
+});
+check(
+  '批量启用：已是目标状态的账号被跳过，不重复写审计',
+  startAgain.status === 200 && startAgain.json.updated === 0,
+  startAgain.text,
+);
+const reopened = await req('/auth/refresh', { method: 'POST', cookie: stopCookies[0] });
+check('批量启用后旧会话不恢复，需要重新登录', reopened.status === 401, `status=${reopened.status}`);
+
+// 3) 批量重置密码：返回每个账号的新密码，旧密码失效
+const resetUsers = await mkUsers(2, 'smoke_bulk_reset');
+const resetRes = await req('/users/bulk/reset-password', {
+  method: 'POST',
+  token: A,
+  body: { ids: resetUsers.map((u) => u.id) },
+});
+check(
+  '批量重置密码：按提交顺序返回每个账号的新密码',
+  resetRes.status === 200 &&
+    resetRes.json.updated === 2 &&
+    resetRes.json.users.map((u) => u.id).join(',') === resetUsers.map((u) => u.id).join(','),
+  resetRes.text,
+);
+const oldLogin = await login(resetUsers[0].username, resetUsers[0].password);
+check('批量重置密码后原密码失效', oldLogin.status === 401, `status=${oldLogin.status}`);
+const newLogin = await login(resetUsers[0].username, resetRes.json.users[0].password);
+check('批量重置密码后新密码可登录', newLogin.status === 200, `status=${newLogin.status}`);
+
+// 4) 回滚：混入一个未停用账号，批量删除必须整体失败且不留下任何删除痕迹
+const rollbackActive = (await mkUsers(1, 'smoke_bulk_live'))[0];
+const rollbackDisabled = (await mkUsers(1, 'smoke_bulk_off'))[0];
+await req(`/users/${rollbackDisabled.id}`, {
+  method: 'PATCH',
+  token: A,
+  body: { status: 'DISABLED' },
+});
+const rollbackRes = await req('/users/bulk/delete', {
+  method: 'POST',
+  token: A,
+  body: { ids: [rollbackDisabled.id, rollbackActive.id] },
+});
+check(
+  '批量删除：混入未停用账号时整批失败',
+  rollbackRes.status === 409,
+  `status=${rollbackRes.status}`,
+);
+const stillThere = await req('/users', { token: A });
+const stillIds = new Set((stillThere.json.items ?? []).map((u) => u.id));
+check(
+  '批量删除失败后，同批中满足条件的账号也没有被删（事务整体回滚）',
+  stillIds.has(rollbackDisabled.id) && stillIds.has(rollbackActive.id),
+  `disabled=${stillIds.has(rollbackDisabled.id)} active=${stillIds.has(rollbackActive.id)}`,
+);
+
+// 同样的回滚要求也适用于批量停用：包含自己（当前登录账号）时整批不生效
+const holder = (await mkUsers(1, 'smoke_bulk_holder'))[0];
+const selfRes = await req('/users/bulk/status', {
+  method: 'POST',
+  token: A,
+  body: { ids: [holder.id, admin.json.user.id], status: 'DISABLED' },
+});
+const holderAfter = await req('/users', { token: A });
+const holderRow = (holderAfter.json.items ?? []).find((u) => u.id === holder.id);
+check(
+  '批量停用包含当前登录账号时整批失败，其他账号状态未变',
+  selfRes.status === 409 && holderRow?.status === 'ACTIVE',
+  `status=${selfRes.status} holder=${holderRow?.status}`,
+);
+
+// 5) 批量删除：全部满足条件时成功
+await req(`/users/${rollbackDisabled.id}`, {
+  method: 'PATCH',
+  token: A,
+  body: { status: 'DISABLED' },
+});
+const deleteOk = await req('/users/bulk/delete', {
+  method: 'POST',
+  token: A,
+  body: { ids: [rollbackDisabled.id] },
+});
+check(
+  '批量删除：全部满足条件时成功',
+  deleteOk.status === 200 && deleteOk.json.deleted === 1,
+  deleteOk.text,
+);
+
+// 6) 批量导入：重复用户名导致整批不写入
+const importPrefix = `smoke_imp_${unique()}`;
+const dupImport = await req('/users/import', {
+  method: 'POST',
+  token: A,
+  body: {
+    rows: [
+      { row: 2, username: `${importPrefix}a`, displayName: '导入A', role: '普通用户' },
+      { row: 3, username: `${importPrefix}a`, displayName: '导入B', role: 'USER' },
+    ],
+  },
+});
+check('批量导入：表内用户名重复时整批拒绝', dupImport.status === 422, `status=${dupImport.status}`);
+const afterDup = await req(`/users?q=${importPrefix}a`, { token: A });
+check(
+  '批量导入失败后没有写入任何账号',
+  !(afterDup.json.items ?? []).some((u) => u.username === `${importPrefix}a`),
+  afterDup.text,
+);
+
+// 7) 批量导入：合法数据全部创建，并返回一次性初始密码
+const okImport = await req('/users/import', {
+  method: 'POST',
+  token: A,
+  body: {
+    rows: [
+      { row: 2, username: `${importPrefix}b`, displayName: '导入B', role: '只读用户' },
+      {
+        row: 3,
+        username: `${importPrefix}c`,
+        displayName: '导入C',
+        role: 'USER',
+        password: `Init#${unique()}`,
+      },
+    ],
+  },
+});
+check(
+  '批量导入：合法数据全部创建并返回初始密码',
+  okImport.status === 200 &&
+    okImport.json.created === 2 &&
+    okImport.json.users.every((u) => typeof u.password === 'string' && u.password.length >= 8),
+  okImport.text,
+);
+check(
+  '批量导入：留空密码自动生成，角色按中文写法识别',
+  okImport.json.users?.[0]?.role === 'READONLY',
+  okImport.text,
+);
+
+// 清理批量用例创建的账号：先停用再删除（与业务规则一致）
+const toCleanup = [
+  ...stopUsers,
+  ...resetUsers,
+  rollbackActive,
+  holder,
+  ...(okImport.json.users ?? []).map((u) => ({ id: u.id })),
+];
+for (const user of toCleanup) {
+  await req(`/users/${user.id}`, { method: 'PATCH', token: A, body: { status: 'DISABLED' } });
+}
+const cleanupBulk = await req('/users/bulk/delete', {
+  method: 'POST',
+  token: A,
+  body: { ids: toCleanup.map((u) => u.id) },
+});
+check('清理批量用例账号', cleanupBulk.status === 200, cleanupBulk.text);
+
+console.log('\n[9] 资源批量导入 / 导出');
 const csv = [
   'name,environment,status,owner,IP,USER_NAME,OS',
   '导入服务器-A,PT,IN_USE,张三,10.77.1.1,etladmin,Linux',
@@ -375,7 +592,7 @@ check(
   csvText.startsWith('code,name,type') && csvText.includes('NAS-') && csvText.includes('NAS_URL'),
 );
 
-console.log('\n[9] 审计日志');
+console.log('\n[10] 审计日志');
 const audit = await req('/audit-logs?pageSize=5', { token: A });
 check(
   '审计日志有记录',
@@ -389,7 +606,7 @@ check(
   `count=${resAudit.json?.length}`,
 );
 
-console.log('\n[10] 刷新令牌与登出');
+console.log('\n[11] 刷新令牌与登出');
 const refreshed = await req('/auth/refresh', { method: 'POST', cookie: admin.cookie });
 check('刷新令牌换取新访问令牌', refreshed.status === 200 && !!refreshed.json.accessToken);
 check(
@@ -443,7 +660,7 @@ check(
   disabledNormal.status === 200 && disabledNormal.json.status === 'DISABLED',
 );
 
-console.log('\n[11] 清理');
+console.log('\n[12] 清理');
 const del = await req(`/resources/${id}`, { method: 'DELETE', token: A });
 check('删除冒烟资源', del.status === 200);
 const cleanup = await req('/resources?type=ETL_SERVER&q=导入服务器', { token: A });

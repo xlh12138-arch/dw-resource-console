@@ -1,4 +1,5 @@
 import type {
+  BulkResetPasswordResult,
   DictReferences,
   DictSyncResult,
   EnvSlotDto,
@@ -21,6 +22,8 @@ import type {
   ResourceTypeDto,
   SlotAssignWarning,
   SlotCandidates,
+  UserImportResult,
+  UserImportRow,
 } from '@dw/shared';
 import { api, type AuditLogDto, type StatsOverview, type UserDto } from './api';
 
@@ -306,6 +309,21 @@ export const usersApi = {
   /** 应由管理员调用；返回重置后的明文密码，仅本次可见 */
   resetPassword: (id: number) =>
     api.post<{ user: UserDto; password: string }>(`/users/${id}/reset-password`, undefined),
+  /*
+   * 批量接口：服务端在一个事务里处理，任一用户失败即整体回滚，
+   * 前端拿到的是 409/422 错误，而不是「部分成功」的结果。
+   */
+  bulkSetStatus: (ids: number[], status: string) =>
+    api.post<{ status: string; updated: number; ids: number[] }>('/users/bulk/status', {
+      ids,
+      status,
+    }),
+  bulkResetPassword: (ids: number[]) =>
+    api.post<BulkResetPasswordResult>('/users/bulk/reset-password', { ids }),
+  bulkRemove: (ids: number[]) =>
+    api.post<{ deleted: number; ids: number[] }>('/users/bulk/delete', { ids }),
+  /** 导入前已在前端逐行校验；服务端会再校验一次，任一行失败则整批不落库 */
+  importUsers: (rows: UserImportRow[]) => api.post<UserImportResult>('/users/import', { rows }),
 };
 
 export const metaApi = {

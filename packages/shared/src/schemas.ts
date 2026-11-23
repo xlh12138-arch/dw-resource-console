@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  AUDIT_ACTIONS,
   AUDIT_TARGET_TYPES,
   ENV_RUN_STATUSES,
   PROJECT_STATUSES,
@@ -460,6 +461,74 @@ export const resetPasswordResultSchema = z.object({
 });
 export type ResetPasswordResult = z.infer<typeof resetPasswordResultSchema>;
 
+/**
+ * 批量操作用户：全部成功或全部回滚。
+ * 服务端在一次事务内逐个处理，任一用户失败即抛错并整体回滚，不会出现部分生效。
+ */
+export const userIdsSchema = z.object({
+  ids: z
+    .array(z.coerce.number().int().positive())
+    .min(1)
+    .max(200)
+    .transform((ids) => [...new Set(ids)]),
+});
+export type UserIdsInput = z.infer<typeof userIdsSchema>;
+
+export const bulkUserStatusResultSchema = z.object({
+  status: z.enum(['ACTIVE', 'DISABLED']),
+  updated: z.number().int(),
+  ids: z.array(z.number().int()),
+});
+export type BulkUserStatusResult = z.infer<typeof bulkUserStatusResultSchema>;
+
+export const bulkResetPasswordResultSchema = z.object({
+  updated: z.number().int(),
+  /** 重置后的明文密码，仅本次响应返回，不落库、不写日志；顺序与 ids 一致 */
+  users: z.array(z.object({ id: z.number().int(), username: z.string(), password: z.string() })),
+});
+export type BulkResetPasswordResult = z.infer<typeof bulkResetPasswordResultSchema>;
+
+export const bulkDeleteUserResultSchema = z.object({
+  deleted: z.number().int(),
+  ids: z.array(z.number().int()),
+});
+export type BulkDeleteUserResult = z.infer<typeof bulkDeleteUserResultSchema>;
+
+/**
+ * 用户批量导入。前端解析 Excel 后把行数据与「原始 Excel 行号」一起提交，
+ * 服务端逐行校验，全部通过才在一个事务内写入，任一行不合法则整体不落库。
+ */
+export const userImportRowSchema = z.object({
+  /** 原始 Excel 行号，用于逐行提示 */
+  row: z.number().int().min(1),
+  username: z.string(),
+  displayName: z.string(),
+  role: z.string(),
+  /** 留空表示由服务端生成随机初始口令 */
+  password: z.string().optional(),
+});
+export type UserImportRow = z.infer<typeof userImportRowSchema>;
+
+export const userImportSchema = z.object({
+  rows: z.array(userImportRowSchema).min(1).max(500),
+});
+export type UserImportInput = z.infer<typeof userImportSchema>;
+
+export const userImportResultSchema = z.object({
+  created: z.number().int(),
+  /** 本次导入生成的账号与初始口令，仅本次响应返回 */
+  users: z.array(
+    z.object({
+      id: z.number().int(),
+      username: z.string(),
+      displayName: z.string(),
+      role: z.enum(['ADMIN', 'USER', 'READONLY']),
+      password: z.string(),
+    }),
+  ),
+});
+export type UserImportResult = z.infer<typeof userImportResultSchema>;
+
 /* ------------------------------------------------------------------ *
  * 审计日志
  * ------------------------------------------------------------------ */
@@ -475,7 +544,7 @@ export const auditLogSchema = z.object({
   id: z.number().int(),
   actorId: z.number().int().nullable(),
   actorName: z.string(),
-  action: z.enum(['CREATE', 'UPDATE', 'DELETE', 'IMPORT', 'LOGIN', 'LOGOUT']),
+  action: z.enum(AUDIT_ACTIONS),
   targetType: z.enum(AUDIT_TARGET_TYPES),
   targetId: z.string().nullable(),
   targetName: z.string().nullable(),
@@ -489,7 +558,7 @@ export const auditQuerySchema = z.object({
   targetType: z.enum(AUDIT_TARGET_TYPES).optional(),
   targetId: z.string().optional(),
   actor: z.string().optional(),
-  action: z.enum(['CREATE', 'UPDATE', 'DELETE', 'IMPORT', 'LOGIN', 'LOGOUT']).optional(),
+  action: z.enum(AUDIT_ACTIONS).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(20),
   sortBy: z

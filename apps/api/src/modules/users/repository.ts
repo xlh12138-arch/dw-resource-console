@@ -1,5 +1,5 @@
 import type { Role, UserStatus } from '@dw/shared';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db, firstRow } from '../../db/index.js';
 import { users, type UserRow } from '../../db/schema.js';
 
@@ -14,6 +14,17 @@ export const userRepository = {
 
   list(): Promise<UserRow[]> {
     return db.select().from(users).orderBy(asc(users.id));
+  },
+
+  findByIds(ids: number[]): Promise<UserRow[]> {
+    if (ids.length === 0) return Promise.resolve([]);
+    return db.select().from(users).where(inArray(users.id, ids));
+  },
+
+  /** 批量改状态；调用方负责事务，返回值不参与业务判断 */
+  async updateStatusMany(ids: number[], status: UserStatus): Promise<void> {
+    if (ids.length === 0) return;
+    await db.update(users).set({ status, updatedAt: new Date() }).where(inArray(users.id, ids));
   },
 
   async create(values: {

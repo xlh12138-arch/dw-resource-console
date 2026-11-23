@@ -1,8 +1,14 @@
 import {
+  bulkDeleteUserResultSchema,
+  bulkResetPasswordResultSchema,
+  bulkUserStatusResultSchema,
   createUserSchema,
   pagedSchema,
   resetPasswordResultSchema,
   updateUserSchema,
+  userIdsSchema,
+  userImportResultSchema,
+  userImportSchema,
   userSchema,
 } from '@dw/shared';
 import { z } from 'zod';
@@ -70,6 +76,66 @@ export const userRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) =>
       withTransaction(() =>
         userService.resetPassword(request.params.id, actorOf(request), request.id),
+      ),
+  );
+
+  /*
+   * 批量接口：全部成功或全部回滚。
+   * 一次事务内逐条处理，任意一条失败即抛错，withTransaction 回滚此前所有写入
+   * （含审计日志），前端只会看到「本次操作未生效」。
+   */
+
+  app.post(
+    '/users/bulk/status',
+    {
+      ...adminGuard,
+      schema: {
+        body: userIdsSchema.extend({ status: z.enum(['ACTIVE', 'DISABLED']) }),
+        response: { 200: bulkUserStatusResultSchema },
+      },
+    },
+    async (request) =>
+      withTransaction(() =>
+        userService.bulkSetStatus(
+          request.body.ids,
+          request.body.status,
+          actorOf(request),
+          request.id,
+        ),
+      ),
+  );
+
+  app.post(
+    '/users/bulk/reset-password',
+    {
+      ...adminGuard,
+      schema: { body: userIdsSchema, response: { 200: bulkResetPasswordResultSchema } },
+    },
+    async (request) =>
+      withTransaction(() =>
+        userService.bulkResetPassword(request.body.ids, actorOf(request), request.id),
+      ),
+  );
+
+  app.post(
+    '/users/bulk/delete',
+    {
+      ...adminGuard,
+      schema: { body: userIdsSchema, response: { 200: bulkDeleteUserResultSchema } },
+    },
+    async (request) =>
+      withTransaction(() => userService.bulkRemove(request.body.ids, actorOf(request), request.id)),
+  );
+
+  app.post(
+    '/users/import',
+    {
+      ...adminGuard,
+      schema: { body: userImportSchema, response: { 200: userImportResultSchema } },
+    },
+    async (request) =>
+      withTransaction(() =>
+        userService.importUsers(request.body.rows, actorOf(request), request.id),
       ),
   );
 };

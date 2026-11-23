@@ -226,7 +226,16 @@ export function can(role: Role, permission: string): boolean {
   return ROLE_PERMISSIONS[role].includes(permission);
 }
 
-export const AUDIT_ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'IMPORT', 'LOGIN', 'LOGOUT'] as const;
+export const AUDIT_ACTIONS = [
+  'CREATE',
+  'UPDATE',
+  'DELETE',
+  'IMPORT',
+  'LOGIN',
+  'LOGOUT',
+  'ENABLE',
+  'DISABLE',
+] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   CREATE: '新增',
@@ -235,6 +244,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   IMPORT: '批量导入',
   LOGIN: '登录',
   LOGOUT: '登出',
+  ENABLE: '启用',
+  DISABLE: '停用',
 };
 
 export const AUDIT_TARGET_TYPES = [
