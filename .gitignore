@@ -36,3 +36,6 @@ artifacts/
 # Docker 部署时的真实数据导入文件（仅保留说明）
 import/*
 !import/README.md
+
+# 构建临时目录（vite/esbuild、离线打包脚本在工作区内的临时文件）
+.tmp/

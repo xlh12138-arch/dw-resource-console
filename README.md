@@ -155,6 +155,11 @@ npm run build
 npm start
 ```
 
+`npm run build` 会把 `TMP`/`TEMP` 指向仓库内的 `.tmp/vite-tmp`（已加入 `.gitignore`）。
+原因：esbuild 启动服务时会把平台可执行文件复制到系统临时目录再执行，部分 Windows
+环境（Node 22）下这一步会失败并报 `[vite:esbuild-transpile] remove ...: Access is denied`，
+把临时目录留在工作区内可以稳定构建。
+
 生产环境建议显式执行迁移并关闭启动时自动迁移：
 
 ```env

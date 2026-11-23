@@ -38,7 +38,7 @@ New-Item -ItemType Directory -Path $bundleRoot -Force | Out-Null
 Push-Location $repoRoot
 try {
   if (-not $SkipBuild) {
-    $tempRoot = Join-Path $stagingRoot ".temp"
+    $tempRoot = Join-Path $repoRoot ".tmp/incremental-build-$Version"
     New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
     $oldTemp = $env:TEMP
     $oldTmp = $env:TMP
@@ -123,5 +123,8 @@ try {
   Pop-Location
   if (-not $KeepStaging -and (Test-Path -LiteralPath $stagingRoot)) {
     Remove-Item -LiteralPath $stagingRoot -Recurse -Force
+  }
+  if (-not $SkipBuild -and $tempRoot -and (Test-Path -LiteralPath $tempRoot)) {
+    Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
   }
 }

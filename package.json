@@ -15,7 +15,7 @@
     "dev": "npm run build -w @dw/shared && concurrently -k -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "npm run build -w @dw/shared && npm run dev -w @dw/api",
     "dev:web": "npm run dev -w @dw/web",
-    "build": "npm run build -w @dw/shared && npm run build -w @dw/api && npm run build -w @dw/web",
+    "build": "npm run build -w @dw/shared && npm run build -w @dw/api && cross-env TMP=./.tmp/vite-tmp TEMP=./.tmp/vite-tmp npm run build -w @dw/web",
     "start": "npm run start -w @dw/api",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "smoke": "node scripts/smoke-test.mjs && node scripts/smoke-project.mjs && node scripts/smoke-dict.mjs && node scripts/smoke-slot-capacity.mjs && node scripts/smoke-capacity-period.mjs && node scripts/smoke-hierarchy-period.mjs && node scripts/smoke-user.mjs",
@@ -43,6 +43,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "eslint": "10.14.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react-hooks": "7.1.1",

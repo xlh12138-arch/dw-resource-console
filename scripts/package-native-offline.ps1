@@ -32,16 +32,19 @@ if (Test-Path -LiteralPath $stagingRoot) {
 }
 New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
 
-$tempRoot = Join-Path $stagingRoot ".temp"
+$tempRoot = Join-Path $repoRoot ".tmp/native-build-$Version"
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 
 Push-Location $repoRoot
 try {
   if (-not $SkipBuild) {
+    # esbuild 会把自带的可执行文件复制到临时目录再 spawn，在部分 Windows 环境里
+    # 这会让 vite 构建报 `remove ...: Access is denied`。这里把 TEMP/TMP 指到仓库内目录。
     $oldTemp = $env:TEMP
     $oldTmp = $env:TMP
     $env:TEMP = $tempRoot
     $env:TMP = $tempRoot
+    New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
     try {
       Write-Host "[1/5] Building shared, API and Web"
       & $npm run build
