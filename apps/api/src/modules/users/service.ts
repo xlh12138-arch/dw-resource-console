@@ -1,4 +1,11 @@
-import type { Role, UserImportResult, UserImportRow, UserStatus } from '@dw/shared';
+import type {
+  Role,
+  UserImportErrorDetails,
+  UserImportIssueDto,
+  UserImportResult,
+  UserImportRow,
+  UserStatus,
+} from '@dw/shared';
 import type { UserRow } from '../../db/schema.js';
 import { conflict, notFound, validationError } from '../../lib/errors.js';
 import { generatePassword, hashPassword } from '../../lib/password.js';
@@ -258,8 +265,9 @@ export const userService = {
     requestId?: string,
   ): Promise<UserImportResult> {
     if (rows.length === 0) throw validationError('导入内容为空');
-    const errors: { row: number; username: string; message: string }[] = [];
+    const errors: UserImportIssueDto[] = [];
     const seen = new Map<string, number>();
+    // 每次导入都重新读库，避免页面停留期间新建的账号漏检
     const existing = new Set((await userRepository.list()).map((u) => u.username));
 
     for (const input of rows) {
@@ -300,20 +308,36 @@ export const userService = {
       }
     }
 
-    if (errors.length > 0) {
-      throw validationError(`有 ${errors.length} 处内容需要修正，本次未写入任何用户`, { errors });
-    }
+    if (errors.length > 0) throw importInvalid(errors);
 
     const created: UserImportResult['users'] = [];
+    // 事务内再查一次已存在账号：同一时刻另一个导入或手工建号可能刚好占用了用户名。
+    // 这里抛出同样结构的逐行错误，调用方的事务整体回滚，不会留下半批账号。
+    const taken = new Set((await userRepository.list()).map((u) => u.username));
     for (const input of rows) {
       const username = input.username.trim();
+      if (taken.has(username)) {
+        throw importInvalid([
+          { row: input.row, username, message: `用户名 ${username} 已被占用，请更换后重试` },
+        ]);
+      }
+      taken.add(username);
       const plain = (input.password ?? '').trim() || generatePassword(12);
-      const user = await userRepository.create({
-        username,
-        displayName: input.displayName.trim(),
-        passwordHash: await hashPassword(plain),
-        role: resolveRole(input.role.trim())!,
-      });
+      let user;
+      try {
+        user = await userRepository.create({
+          username,
+          displayName: input.displayName.trim(),
+          passwordHash: await hashPassword(plain),
+          role: resolveRole(input.role.trim())!,
+        });
+      } catch (err) {
+        // 并发写入撞上唯一索引时也给出可读原因，而不是 500
+        if (isUniqueViolation(err)) {
+          throw importInvalid([{ row: input.row, username, message: `用户名 ${username} 已存在` }]);
+        }
+        throw err;
+      }
       created.push({
         id: user.id,
         username: user.username,
@@ -358,6 +382,24 @@ async function loadAll(ids: number[]): Promise<UserRow[]> {
 
 function failed(row: UserRow, message: string): { reason: 'BULK_PRECHECK'; user: BulkFailure } {
   return { reason: 'BULK_PRECHECK', user: { userId: row.id, username: row.username, message } };
+}
+
+/** 导入校验失败：details 带上每一行的问题，前端直接展开到对应 Excel 行 */
+function importInvalid(errors: UserImportIssueDto[]) {
+  const details: UserImportErrorDetails = { reason: 'IMPORT_INVALID', errors };
+  return validationError(`有 ${errors.length} 处内容需要修正，本次未写入任何用户`, details);
+}
+
+/**
+ * 唯一索引冲突：PostgreSQL/DWS 报 23505（constraint），SQLite 报 UNIQUE constraint failed。
+ * 并发导入同一个用户名时靠它把 500 变成「同名账号已存在」。
+ */
+function isUniqueViolation(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const record = err as { code?: unknown; cause?: unknown; message?: unknown };
+  if (record.code === '23505') return true;
+  if (isUniqueViolation(record.cause)) return true;
+  return typeof record.message === 'string' && /UNIQUE constraint failed/i.test(record.message);
 }
 
 async function recordPasswordReset(user: UserRow, actor: Actor, requestId?: string) {

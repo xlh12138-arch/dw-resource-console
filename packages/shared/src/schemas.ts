@@ -529,6 +529,20 @@ export const userImportResultSchema = z.object({
 });
 export type UserImportResult = z.infer<typeof userImportResultSchema>;
 
+/** 导入时逐行返回的问题，前端据此把展开到对应 Excel 行上 */
+export const userImportIssueSchema = z.object({
+  row: z.number().int(),
+  username: z.string(),
+  message: z.string(),
+});
+export type UserImportIssueDto = z.infer<typeof userImportIssueSchema>;
+
+export const userImportErrorDetailsSchema = z.object({
+  reason: z.literal('IMPORT_INVALID'),
+  errors: z.array(userImportIssueSchema),
+});
+export type UserImportErrorDetails = z.infer<typeof userImportErrorDetailsSchema>;
+
 /* ------------------------------------------------------------------ *
  * 审计日志
  * ------------------------------------------------------------------ */

@@ -90,6 +90,35 @@ const BULK_META: Record<
   },
 };
 
+/**
+ * 导入被后端拒绝时取出逐行原因（用户名已存在、角色无法识别等）。
+ * 服务端返回的是「哪一行、什么问题」，直接展开到对应 Excel 行，
+ * 而不是只给一句「有 N 处需要修正」。
+ */
+function importServerIssues(
+  error: unknown,
+): { row: number; username: string; messages: string[] }[] {
+  if (!(error instanceof ApiError) || !error.details || typeof error.details !== 'object') {
+    return [];
+  }
+  const errors = (error.details as { errors?: unknown }).errors;
+  if (!Array.isArray(errors)) return [];
+  const grouped = new Map<number, { row: number; username: string; messages: string[] }>();
+  for (const item of errors) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as { row?: unknown; username?: unknown; message?: unknown };
+    if (typeof rec.row !== 'number' || typeof rec.message !== 'string') continue;
+    const hit = grouped.get(rec.row) ?? {
+      row: rec.row,
+      username: typeof rec.username === 'string' ? rec.username : '',
+      messages: [],
+    };
+    hit.messages.push(rec.message);
+    grouped.set(rec.row, hit);
+  }
+  return [...grouped.values()].sort((a, b) => a.row - b.row);
+}
+
 /** 批量接口失败时从 details 里取出「哪条用户卡住了」，用于回滚提示 */
 function bulkBlocker(error: unknown): { username: string; message: string } | null {
   if (!(error instanceof ApiError) || !error.details || typeof error.details !== 'object') {
@@ -142,6 +171,10 @@ export function UsersPage() {
   const [parseError, setParseError] = useState('');
   const [parsing, setParsing] = useState(false);
   const [imported, setImported] = useState<{ username: string; password: string }[] | null>(null);
+  /** 后端拒绝时的逐行原因，按 Excel 行号展示在导入弹窗里 */
+  const [serverIssues, setServerIssues] = useState<
+    { row: number; username: string; messages: string[] }[]
+  >([]);
 
   const query = useQuery({ queryKey: ['users'], queryFn: usersApi.list });
 
@@ -241,12 +274,17 @@ export function UsersPage() {
     mutationFn: (rows: ParsedUserImport['rows']) => usersApi.importUsers(rows),
     onSuccess: (result) => {
       setImported(result.users.map((u) => ({ username: u.username, password: u.password })));
+      setServerIssues([]);
       setParsed(null);
       setImportOpen(false);
       push('success', `已导入 ${result.created} 个账号`);
       void queryClient.invalidateQueries({ queryKey: ['users'] });
     },
-    onError: (err) => push('error', friendlyMessage(err)),
+    onError: (err) => {
+      // 服务端逐行原因比一句汇总更有用，留在弹窗里让用户照着改表
+      setServerIssues(importServerIssues(err));
+      push('error', friendlyMessage(err));
+    },
   });
 
   const users = useMemo(() => query.data?.items ?? [], [query.data]);
@@ -304,6 +342,7 @@ export function UsersPage() {
     if (!file) return;
     setParsed(null);
     setParseError('');
+    setServerIssues([]);
     if (!/\.xlsx$/i.test(file.name)) {
       setParseError('请上传 .xlsx 文件；如果是 .xls，请先在 Excel 中另存为 .xlsx');
       return;
@@ -335,6 +374,7 @@ export function UsersPage() {
     setImportOpen(false);
     setParsed(null);
     setParseError('');
+    setServerIssues([]);
   };
 
   return (
@@ -959,7 +999,7 @@ export function UsersPage() {
                 <FileSpreadsheet size={14} className="text-brand-600" />第 1 步 · 下载 Excel 模板
               </p>
               <p className="mt-0.5 text-[11px] text-slate-500">
-                列：用户名、姓名、角色、初始密码；初始密码留空则自动生成
+                列：用户名、姓名、角色、初始密码；角色列为下拉选择，初始密码留空则自动生成
               </p>
             </div>
             <Button
@@ -1026,8 +1066,40 @@ export function UsersPage() {
                           {issue.username || '—'}
                         </td>
                         <td className="px-3 py-1.5 text-rose-700">
-                          {issue.fields.map((f) => `${f.label}：${f.message}`).join('；')}
+                          {issue.fields
+                            .map((f) => `${f.label}${f.cell ? `（${f.cell}）` : ''}：${f.message}`)
+                            .join('；')}
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {serverIssues.length > 0 && (
+            <div className="rounded-lg border border-amber-200">
+              <p className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                系统未写入任何账号：以下内容需要修正后重新上传
+              </p>
+              <div className="max-h-56 overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th className="w-20 px-3 py-1.5 font-medium">Excel 行</th>
+                      <th className="px-3 py-1.5 font-medium">用户名</th>
+                      <th className="px-3 py-1.5 font-medium">原因</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {serverIssues.map((issue) => (
+                      <tr key={issue.row}>
+                        <td className="px-3 py-1.5 text-slate-500">第 {issue.row} 行</td>
+                        <td className="px-3 py-1.5 font-medium text-slate-800">
+                          {issue.username || '—'}
+                        </td>
+                        <td className="px-3 py-1.5 text-amber-800">{issue.messages.join('；')}</td>
                       </tr>
                     ))}
                   </tbody>

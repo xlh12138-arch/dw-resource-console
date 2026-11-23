@@ -1,3 +1,4 @@
+import { ROLES, ROLE_LABELS } from '@dw/shared';
 import type { Role, UserImportRow } from '@dw/shared';
 
 /**
@@ -10,11 +11,22 @@ export const USER_IMPORT_SHEET = '用户数据';
 export const USER_IMPORT_HEADERS = ['用户名', '姓名', '角色', '初始密码'] as const;
 export const USER_IMPORT_MAX_ROWS = 500;
 
+/** 某一列的问题；headers 是该列在表头里的位置，前端据此高亮到对应单元格 */
+export type UserImportFieldIssue = {
+  field: string;
+  label: string;
+  message: string;
+  /** 表头列："用户名" / "姓名" / "角色" / "初始密码" */
+  column?: string;
+  /** 单元格地址，如 C3 */
+  cell?: string;
+};
+
 export type UserImportIssue = {
   /** 原始 Excel 行号 */
   row: number;
   username: string;
-  fields: { field: string; label: string; message: string }[];
+  fields: UserImportFieldIssue[];
 };
 
 export type ParsedUserImport = {
@@ -24,11 +36,21 @@ export type ParsedUserImport = {
   issues: UserImportIssue[];
 };
 
-const ROLE_ALIASES: { role: Role; texts: string[] }[] = [
-  { role: 'ADMIN', texts: ['ADMIN', '管理员'] },
-  { role: 'USER', texts: ['USER', '普通用户'] },
-  { role: 'READONLY', texts: ['READONLY', '只读用户', '只读'] },
-];
+const ROLE_ALIASES: { role: Role; texts: string[] }[] = ROLES.map((role) => ({
+  role,
+  texts: role === 'READONLY' ? [role, ROLE_LABELS[role], '只读'] : [role, ROLE_LABELS[role]],
+}));
+
+/**
+ * 模板里「角色」列的下拉选项。取系统当前可设置的角色（共享枚举 ROLES + 中文名），
+ * 以后新增角色时模板、校验、提示会一起跟着变，不需要另改一份文案。
+ */
+export const USER_IMPORT_ROLES: { value: Role; text: string }[] = ROLES.map((role) => ({
+  value: role,
+  text: ROLE_LABELS[role],
+}));
+
+const ROLE_OPTION_TEXT = USER_IMPORT_ROLES.map((item) => item.text).join(' / ');
 
 /** 把「管理员 / ADMIN」之类的写法统一成角色编码；无法识别返回 null */
 export function parseRoleText(text: string): Role | null {
@@ -55,15 +77,38 @@ export async function downloadUserImportTemplate(): Promise<void> {
   sheet.getRow(1).font = { bold: true };
   sheet.addRow(['zhangsan', '张三', '普通用户', '']).font = { italic: true };
 
+  /*
+   * 「角色」列做成下拉，避免手写错别字导致整批导入失败。
+   * 范围覆盖到单次导入上限再多留一些空行；不再整列铺到 1048576 行，
+   * 那会把模板从几 KB 撑到 2MB 以上。
+   * 选项里不要出现英文逗号，Excel 会把 list 公式的逗号当分隔符。
+   */
+  const roleColumn = columnLetter(USER_IMPORT_HEADERS.indexOf('角色') + 1);
+  for (let row = 2; row <= USER_IMPORT_MAX_ROWS + 8; row += 1) {
+    sheet.getCell(`${roleColumn}${row}`).dataValidation = {
+      type: 'list',
+      allowBlank: false,
+      formulae: [`"${USER_IMPORT_ROLES.map((item) => item.text).join(',')}"`],
+      showInputMessage: true,
+      promptTitle: '角色',
+      prompt: `请从下拉中选择：${ROLE_OPTION_TEXT}`,
+      showErrorMessage: true,
+      errorStyle: 'stop',
+      errorTitle: '角色不正确',
+      error: `请从下拉中选择：${ROLE_OPTION_TEXT}`,
+    };
+  }
+
   const notes = [
     '',
     '填写说明：',
     `1. 每行一个账号，单次最多 ${USER_IMPORT_MAX_ROWS} 行；请删除第 2 行示例后再填写。`,
     '2. 用户名 3～32 个字符，不能与系统已有账号或本表内其他行重复。',
-    '3. 角色可填：管理员 / 普通用户 / 只读用户（也可以填 ADMIN / USER / READONLY）。',
+    `3. 角色请从下拉中选择：${ROLE_OPTION_TEXT}（也接受 ADMIN / USER / READONLY）。`,
     '4. 初始密码留空则自动生成随机密码；填了则需 8～128 位。',
     '5. 导入前系统会先校验，逐行提示有问题的字段；全部通过才写入，任一行失败则整批不生效。',
-    '6. 导入成功后请及时把初始密码转告用户，关闭结果弹窗后无法再次查看。',
+    '6. 用户名与系统里已有账号重复时会提示具体行号与已存在的账号，不会写入任何数据。',
+    '7. 导入成功后请及时把初始密码转告用户，关闭结果弹窗后无法再次查看。',
   ];
   for (const line of notes) sheet.addRow([line]).font = { color: { argb: 'FF64748B' } };
 
@@ -143,22 +188,40 @@ export async function parseUserImportFile(file: File): Promise<ParsedUserImport>
     }
 
     const fields: UserImportIssue['fields'] = [];
+    const at = (header: string) => {
+      const col = columnOf.get(header);
+      return { column: header, cell: col ? `${columnLetter(col)}${r}` : undefined };
+    };
     if (username.length < 3 || username.length > 32) {
-      fields.push({ field: 'username', label: '用户名', message: '需为 3～32 个字符' });
+      fields.push({
+        ...at('用户名'),
+        field: 'username',
+        label: '用户名',
+        message: '需为 3～32 个字符',
+      });
     }
     if (displayName.length < 1 || displayName.length > 32) {
-      fields.push({ field: 'displayName', label: '姓名', message: '必填，1～32 个字符' });
+      fields.push({
+        ...at('姓名'),
+        field: 'displayName',
+        label: '姓名',
+        message: '必填，1～32 个字符',
+      });
     }
     const role = parseRoleText(roleText);
     if (!role) {
       fields.push({
+        ...at('角色'),
         field: 'role',
         label: '角色',
-        message: roleText ? `无法识别「${roleText}」` : '必填：管理员 / 普通用户 / 只读用户',
+        message: roleText
+          ? `无法识别「${roleText}」，请从下拉中选择${ROLE_OPTION_TEXT}`
+          : `必填，请从下拉中选择${ROLE_OPTION_TEXT}`,
       });
     }
     if (password && (password.length < 8 || password.length > 128)) {
       fields.push({
+        ...at('初始密码'),
         field: 'password',
         label: '初始密码',
         message: '留空自动生成，或填 8～128 位',
@@ -181,6 +244,10 @@ export async function parseUserImportFile(file: File): Promise<ParsedUserImport>
         username: row.username,
         fields: [
           {
+            column: '用户名',
+            cell: columnOf.get('用户名')
+              ? `${columnLetter(columnOf.get('用户名')!)}${row.row}`
+              : undefined,
             field: 'username',
             label: '用户名',
             message: `与第 ${prev} 行重复，同一份导入里用户名不能重复`,
@@ -192,7 +259,26 @@ export async function parseUserImportFile(file: File): Promise<ParsedUserImport>
     }
   }
 
+  // 在问题单元格上加批注并标红，用户回去改表时一眼能看到是哪一格
+  for (const issue of issues) {
+    for (const field of issue.fields) {
+      if (!field.cell) continue;
+      const cell = sheet.getCell(field.cell);
+      cell.note = { texts: [{ text: `${field.label}：${field.message}` }] };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFEE2E2' },
+      };
+    }
+  }
+
   return { fileName: file.name, rows, issues };
+}
+
+/** 1 → A、3 → C；模板只在 26 列以内使用，够用即可 */
+function columnLetter(index: number): string {
+  return String.fromCharCode(64 + index);
 }
 
 /** 校验通过的行转成 CSV，用于「导出本次校验通过的数据」或手工核对 */

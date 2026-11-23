@@ -506,6 +506,19 @@ check(
   !(afterDup.json.items ?? []).some((u) => u.username === `${importPrefix}a`),
   afterDup.text,
 );
+// 前端要把服务端原因逐行展示，所以 details 必须是 [{row, username, message}]
+// 错误响应体统一包在 error 下：{ error: { code, message, details, requestId } }
+const dupDetails = dupImport.json?.error?.details;
+check(
+  '批量导入失败时按行返回原因（row / username / message）',
+  dupDetails?.reason === 'IMPORT_INVALID' &&
+    Array.isArray(dupDetails.errors) &&
+    dupDetails.errors.length === 1 &&
+    dupDetails.errors[0].row === 3 &&
+    typeof dupDetails.errors[0].username === 'string' &&
+    /重复/.test(dupDetails.errors[0].message),
+  JSON.stringify(dupDetails),
+);
 
 // 7) 批量导入：合法数据全部创建，并返回一次性初始密码
 const okImport = await req('/users/import', {
@@ -531,6 +544,31 @@ check(
     okImport.json.users.every((u) => typeof u.password === 'string' && u.password.length >= 8),
   okImport.text,
 );
+// 6.5) 与系统里已有账号同名：必须明确告知「已存在」及所在行，不能只给一句汇总
+const existImport = await req('/users/import', {
+  method: 'POST',
+  token: A,
+  body: {
+    rows: [
+      { row: 2, username: `${importPrefix}d`, displayName: '导入D', role: '普通用户' },
+      { row: 3, username: ADMIN_USERNAME, displayName: '重名', role: '普通用户' },
+    ],
+  },
+});
+const existErrors = existImport.json?.error?.details?.errors ?? [];
+check(
+  '批量导入：与已有账号同名时，逐行提示该用户名已存在',
+  existImport.status === 422 &&
+    existErrors.some((e) => e.row === 3 && e.message.includes('已存在')),
+  existImport.text,
+);
+const afterExist = await req(`/users?q=${importPrefix}d`, { token: A });
+check(
+  '批量导入因重名失败时整批不写入（同批其他新账号也不落库）',
+  !(afterExist.json.items ?? []).some((u) => u.username === `${importPrefix}d`),
+  afterExist.text,
+);
+
 check(
   '批量导入：留空密码自动生成，角色按中文写法识别',
   okImport.json.users?.[0]?.role === 'READONLY',
