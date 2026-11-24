@@ -3,7 +3,8 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { config } from '../../config/env.js';
 import { db, execSql, withTransaction } from '../../db/index.js';
 import { refreshTokens, type UserRow } from '../../db/schema.js';
-import { forbidden, unauthorized } from '../../lib/errors.js';
+import { checkPasswordStrength, type ChangePasswordInput } from '@dw/shared';
+import { forbidden, unauthorized, validationError } from '../../lib/errors.js';
 import { hashPassword, randomToken, verifyPassword } from '../../lib/password.js';
 import { auditRepository } from '../audit/repository.js';
 import { userRepository } from '../users/repository.js';
@@ -26,6 +27,7 @@ export function toUserDto(user: UserRow) {
     status: user.status,
     lastLoginAt: user.lastLoginAt ? new Date(user.lastLoginAt).toISOString() : null,
     createdAt: new Date(user.createdAt).toISOString(),
+    mustChangePassword: user.mustChangePassword === true,
   };
 }
 
@@ -69,18 +71,21 @@ export const authService = {
         displayName: '系统管理员',
         passwordHash,
         role: 'ADMIN',
+        mustChangePassword: true,
       });
       await userRepository.create({
         username: 'user',
         displayName: '普通用户',
         passwordHash: demoPasswordHash,
         role: 'USER',
+        mustChangePassword: true,
       });
       await userRepository.create({
         username: 'readonly',
         displayName: '只读用户',
         passwordHash: readonlyPasswordHash,
         role: 'READONLY',
+        mustChangePassword: true,
       });
     });
     console.log(
@@ -137,6 +142,64 @@ export const authService = {
         user: toUserDto(user),
       };
     });
+  },
+
+  /**
+   * 自助修改密码：先校验当前密码，再按共享的复杂度规则校验新密码，
+   * 成功后清除「必须改密」标记并吊销其他会话的刷新令牌。
+   */
+  async changePassword(
+    user: UserRow,
+    input: ChangePasswordInput,
+    ctx: { requestId?: string } = {},
+  ) {
+    const ok = await verifyPassword(input.currentPassword, user.passwordHash);
+    if (!ok) throw validationError('当前密码不正确', { reason: 'WRONG_CURRENT_PASSWORD' });
+    if (input.currentPassword === input.newPassword) {
+      throw validationError('新密码不能与当前密码相同', { reason: 'PASSWORD_POLICY' });
+    }
+
+    const issues = checkPasswordStrength(
+      input.newPassword,
+      { username: user.username, displayName: user.displayName },
+      { oldPassword: input.currentPassword },
+    );
+    if (issues.length > 0) {
+      throw validationError(`新密码不符合要求：${issues.map((i) => i.message).join('；')}`, {
+        reason: 'PASSWORD_POLICY',
+        issues,
+      });
+    }
+
+    const passwordHash = await hashPassword(input.newPassword);
+    const updated = await userRepository.updatePassword(user.id, passwordHash);
+    await auditRepository.record({
+      actorId: user.id,
+      actorName: user.displayName,
+      action: 'UPDATE',
+      targetType: 'USER',
+      targetId: String(user.id),
+      targetName: user.username,
+      changes: [{ field: 'password', label: '密码', from: null, to: '已修改' }],
+      requestId: ctx.requestId ?? null,
+    });
+    return updated;
+  },
+
+  /**
+   * 为本人签发一套新令牌并吊销旧令牌（含当前浏览器手上的那个）。
+   * 改密后调用：本端拿到新令牌继续用，其他设备上的会话全部作废。
+   */
+  async rotateOwnSession(user: UserRow, ctx: { signAccessToken: TokenSigner; userAgent?: string }) {
+    await this.revokeAllRefreshTokens(user.id);
+    const refreshToken = await this.issueRefreshToken(user.id, ctx.userAgent);
+    return {
+      accessToken: ctx.signAccessToken(user),
+      refreshToken,
+      expiresIn: config.auth.accessTokenTtlSeconds,
+      idleTimeoutSeconds: config.auth.idleTimeoutSeconds,
+      user: toUserDto(user),
+    };
   },
 
   async issueRefreshToken(userId: number, userAgent?: string): Promise<string> {

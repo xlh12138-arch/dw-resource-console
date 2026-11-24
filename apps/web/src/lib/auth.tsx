@@ -24,6 +24,10 @@ interface AuthState {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   can: (permission: string) => boolean;
+  /** 自助修改姓名（所有登录用户） */
+  updateProfile: (displayName: string) => Promise<void>;
+  /** 自助修改密码：成功后服务端会换发新令牌，这里同步本地登录态 */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -71,6 +75,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username,
       password,
     });
+    setTokens({ accessToken: result.accessToken });
+    setIdleTimeoutSeconds(result.idleTimeoutSeconds);
+    lastActivityAt.current = Date.now();
+    setUser(result.user);
+  }, []);
+
+  const updateProfile = useCallback(async (displayName: string) => {
+    const updated = await api.patch<UserDto>('/auth/profile', { displayName });
+    setUser(updated);
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    // 服务端校验通过后会轮换令牌：旧的刷新令牌全部作废，用返回的新令牌继续本端会话
+    const result = await api.post<{
+      accessToken: string;
+      idleTimeoutSeconds: number;
+      user: UserDto;
+    }>('/auth/password', { currentPassword, newPassword });
     setTokens({ accessToken: result.accessToken });
     setIdleTimeoutSeconds(result.idleTimeoutSeconds);
     lastActivityAt.current = Date.now();
@@ -151,8 +173,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       can: (permission: string) => (user ? can(user.role as Role, permission) : false),
+      updateProfile,
+      changePassword,
     }),
-    [user, ready, login, logout],
+    [user, ready, login, logout, updateProfile, changePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

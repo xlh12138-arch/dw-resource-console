@@ -526,6 +526,8 @@ export function Modal({
   dirtyHint,
   /** 该值变化时视为「已保存」，清除未保存标记：保存成功后不应再弹未保存提示 */
   dirtyResetKey,
+  /** 强制停留模式：隐藏关闭按钮、禁止 ESC 与点遮罩关闭（用于首次登录必须改密） */
+  dismissible = true,
 }: {
   open: boolean;
   title: string;
@@ -542,6 +544,8 @@ export function Modal({
   dirtyHint?: string;
   /** 该值变化时视为「已保存」，清除未保存标记：保存成功后不应再弹未保存提示 */
   dirtyResetKey?: number;
+  /** 强制停留模式：隐藏关闭按钮、禁止 ESC 与点遮罩关闭（用于首次登录必须改密） */
+  dismissible?: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
   /** 表单是否发生过修改（输入 / 选择 / 开关），由容器上的捕获事件统一感知 */
@@ -606,7 +610,7 @@ export function Modal({
   }, [touched, onClose]);
 
   useEffect(() => {
-    if (!open || !closeOnEsc) return;
+    if (!open || !closeOnEsc || !dismissible) return;
     const handler = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       // 只有最上层的弹窗消费 ESC：栈里还有更晚打开的弹窗时直接放行
@@ -620,7 +624,7 @@ export function Modal({
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [open, closeOnEsc, confirming, requestClose, modalId]);
+  }, [open, closeOnEsc, dismissible, confirming, requestClose, modalId]);
 
   // Tab 只在最上层弹窗内循环；未保存确认框打开时只在其按钮之间循环。
   useEffect(() => {
@@ -682,6 +686,10 @@ export function Modal({
     <div
       ref={layerRef}
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-[#07160f]/70 p-4 backdrop-blur-[2px] sm:p-8"
+      // 强制停留模式下点遮罩不会关闭弹窗
+      onMouseDown={(event) => {
+        if (dismissible && event.target === event.currentTarget) requestClose();
+      }}
     >
       <ModalGuardContext.Provider value={guard}>
         <div
@@ -714,15 +722,17 @@ export function Modal({
                 </p>
               )}
             </div>
-            <button
-              type="button"
-              onClick={requestClose}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
-              aria-label="关闭"
-              title="关闭（ESC）"
-            >
-              ✕
-            </button>
+            {dismissible ? (
+              <button
+                type="button"
+                onClick={requestClose}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+                aria-label="关闭"
+                title="关闭（ESC）"
+              >
+                ✕
+              </button>
+            ) : null}
           </header>
           <div className="px-5 py-4">{children}</div>
           {footer && (

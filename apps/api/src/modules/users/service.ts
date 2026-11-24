@@ -1,3 +1,4 @@
+import { PASSWORD_MIN_LENGTH } from '@dw/shared';
 import type {
   Role,
   UserImportErrorDetails,
@@ -53,6 +54,8 @@ export const userService = {
       displayName: input.displayName,
       passwordHash,
       role: input.role,
+      // 管理员设置的初始口令，用户首次登录必须自行修改
+      mustChangePassword: true,
     });
     await auditRepository.record({
       actorId: actor.id,
@@ -148,11 +151,14 @@ export const userService = {
     if (!before) throw notFound('用户不存在');
 
     const password = generatePassword(12);
-    const user = await userRepository.updatePassword(id, await hashPassword(password));
+    // updatePassword 会把 must_change_password 复位，这里重新置为 true，
+    // 返回的 DTO 必须带上这个标记，前端才知道「重置后要强制改密」
+    await userRepository.updatePassword(id, await hashPassword(password));
+    const flagged = await userRepository.update(id, { mustChangePassword: true });
     await authService.revokeAllRefreshTokens(id);
-    await recordPasswordReset(user, actor, requestId);
+    await recordPasswordReset(flagged, actor, requestId);
 
-    return { user: toUserDto(user), password };
+    return { user: toUserDto(flagged), password };
   },
 
   /**
@@ -204,8 +210,9 @@ export const userService = {
     for (const row of rows) {
       const password = generatePassword(12);
       const user = await userRepository.updatePassword(row.id, await hashPassword(password));
+      const flagged = await userRepository.update(row.id, { mustChangePassword: true });
       await authService.revokeAllRefreshTokens(row.id);
-      await recordPasswordReset(user, actor, requestId);
+      await recordPasswordReset(flagged, actor, requestId);
       results.push({ id: user.id, username: user.username, password });
     }
     return { updated: results.length, users: results };
@@ -303,8 +310,12 @@ export const userService = {
         });
       }
 
-      if (password && (password.length < 8 || password.length > 128)) {
-        errors.push({ row: input.row, username, message: '初始密码留空自动生成，或填 8～128 位' });
+      if (password && (password.length < PASSWORD_MIN_LENGTH || password.length > 128)) {
+        errors.push({
+          row: input.row,
+          username,
+          message: `初始密码留空自动生成，或填 ${PASSWORD_MIN_LENGTH}～128 位`,
+        });
       }
     }
 
@@ -330,6 +341,7 @@ export const userService = {
           displayName: input.displayName.trim(),
           passwordHash: await hashPassword(plain),
           role: resolveRole(input.role.trim())!,
+          mustChangePassword: true,
         });
       } catch (err) {
         // 并发写入撞上唯一索引时也给出可读原因，而不是 500

@@ -202,6 +202,8 @@ export const users = appTable(
       .notNull()
       .default('ACTIVE'),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true, mode: 'date' }),
+    /** 首次登录 / 管理员重置 / 导入默认口令后为 true，改密后置 false */
+    mustChangePassword: boolean('must_change_password').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },

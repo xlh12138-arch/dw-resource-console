@@ -224,6 +224,10 @@ export const users = sqliteTable(
       .notNull()
       .default('ACTIVE'),
     lastLoginAt: integer('last_login_at', { mode: 'timestamp_ms' }),
+    /** 首次登录 / 管理员重置 / 导入默认口令后为 1，改密后置 0 */
+    mustChangePassword: integer('must_change_password', { mode: 'boolean' })
+      .notNull()
+      .default(false),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

@@ -295,7 +295,8 @@ check(
 );
 check('管理员可以访问变更审计', (await req('/audit-logs?pageSize=1', { token: A })).status === 200);
 
-for (const uid of [createdNormal.json?.id, createdRo.json?.id]) {
+// createdNormal 保持启用：后面的个人资料与改密用例要用它的登录态
+for (const uid of [createdRo.json?.id]) {
   if (uid) await req(`/users/${uid}`, { method: 'PATCH', token: A, body: { status: 'DISABLED' } });
 }
 
@@ -688,6 +689,123 @@ check(
   `status=${refreshAfterCookieLogout.status}`,
 );
 
+console.log('\n[12] 个人资料与密码策略（改姓名 / 改密码 / 首登强制改密）');
+check(
+  '管理员新建账号带首登改密标记',
+  createdNormal.json?.mustChangePassword === true,
+  `mustChangePassword=${createdNormal.json?.mustChangePassword}`,
+);
+const selfProfile = await req('/auth/profile', {
+  method: 'PATCH',
+  token: U,
+  body: { displayName: '冒烟普通用户-已改名' },
+});
+check(
+  '普通用户可以修改自己的姓名',
+  selfProfile.status === 200 && selfProfile.json?.displayName === '冒烟普通用户-已改名',
+  selfProfile.text,
+);
+const selfMe = await req('/auth/me', { token: U });
+check('改名后 /auth/me 返回新姓名', selfMe.json?.displayName === '冒烟普通用户-已改名');
+const emptyName = await req('/auth/profile', {
+  method: 'PATCH',
+  token: U,
+  body: { displayName: '   ' },
+});
+check(
+  '姓名为空被拒绝 400/422',
+  [400, 422].includes(emptyName.status),
+  `status=${emptyName.status}`,
+);
+
+const wrongOld = await req('/auth/password', {
+  method: 'POST',
+  token: U,
+  body: { currentPassword: 'Wrong#000000', newPassword: 'Str0ng-An0ther-Pass' },
+});
+check(
+  '改密码时当前密码错误被拒绝',
+  wrongOld.status === 422 && wrongOld.json?.error?.details?.reason === 'WRONG_CURRENT_PASSWORD',
+  wrongOld.text,
+);
+const weakNew = await req('/auth/password', {
+  method: 'POST',
+  token: U,
+  body: { currentPassword: normalPwd, newPassword: 'admin123456' },
+});
+check(
+  '弱口令被密码策略拒绝并给出原因',
+  weakNew.status === 422 &&
+    weakNew.json?.error?.details?.reason === 'PASSWORD_POLICY' &&
+    (weakNew.json?.error?.details?.issues ?? []).length > 0,
+  weakNew.text,
+);
+const shortNew = await req('/auth/password', {
+  method: 'POST',
+  token: U,
+  body: { currentPassword: normalPwd, newPassword: 'Ab1#xy' },
+});
+check('不足 10 位的新密码被契约拦截', shortNew.status === 400 || shortNew.status === 422);
+
+const changedPwd = `Moved#${Date.now().toString(36)}`;
+const changed = await req('/auth/password', {
+  method: 'POST',
+  token: U,
+  body: { currentPassword: normalPwd, newPassword: changedPwd },
+});
+check(
+  '修改密码成功并返回新的访问令牌',
+  changed.status === 200 && !!changed.json?.accessToken && !!changed.cookie,
+  changed.text,
+);
+check(
+  '改密后首登改密标记清除',
+  changed.json?.user?.mustChangePassword === false,
+  `mustChangePassword=${changed.json?.user?.mustChangePassword}`,
+);
+const oldPwdLogin = await login(normalName, normalPwd);
+check('改密后旧密码无法登录', oldPwdLogin.status === 401);
+const newPwdLogin = await login(normalName, changedPwd);
+check('改密后新密码可以登录', newPwdLogin.status === 200 && !!newPwdLogin.json?.accessToken);
+check(
+  '改密后旧刷新令牌已失效',
+  (await req('/auth/refresh', { method: 'POST', cookie: normal.cookie })).status === 401,
+);
+check(
+  '改密后新令牌可正常访问（会话无缝续接）',
+  (await req('/auth/me', { token: newPwdLogin.json.accessToken })).status === 200,
+);
+
+// 管理员重置口令后，该账号需要重新走一次首登改密
+const adminReset = await req(`/users/${createdNormal.json.id}/reset-password`, {
+  method: 'POST',
+  token: A,
+});
+check(
+  '管理员重置口令后响应即带首登改密标记',
+  adminReset.status === 200 && adminReset.json?.user?.mustChangePassword === true,
+  adminReset.text,
+);
+const afterResetLogin = await login(normalName, adminReset.json?.password ?? '');
+check(
+  '重置后可登录，且再次要求首登改密',
+  afterResetLogin.status === 200 && afterResetLogin.json?.user?.mustChangePassword === true,
+  `mustChangePassword=${afterResetLogin.json?.user?.mustChangePassword}`,
+);
+check(
+  '重置后的账号仍可访问 /auth/me，且带着首登改密标记',
+  (await req('/auth/me', { token: afterResetLogin.json?.accessToken })).json?.mustChangePassword ===
+    true,
+);
+const auditSelf = await req(
+  `/audit-logs?pageSize=50&action=UPDATE&actor=${encodeURIComponent('冒烟普通用户-已改名')}`,
+  { token: A },
+);
+const selfAudit = (auditSelf.json?.items ?? []).filter(
+  (item) => item.targetName === normalName || item.targetName === '冒烟普通用户-已改名',
+);
+check('改姓名与改密码都落审计', selfAudit.length >= 2, `count=${selfAudit.length}`);
+
 const disabledNormal = await req(`/users/${createdNormal.json.id}`, {
   method: 'PATCH',
   token: A,
@@ -698,7 +816,7 @@ check(
   disabledNormal.status === 200 && disabledNormal.json.status === 'DISABLED',
 );
 
-console.log('\n[12] 清理');
+console.log('\n[13] 清理');
 const del = await req(`/resources/${id}`, { method: 'DELETE', token: A });
 check('删除冒烟资源', del.status === 200);
 const cleanup = await req('/resources?type=ETL_SERVER&q=导入服务器', { token: A });

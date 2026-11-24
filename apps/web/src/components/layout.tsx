@@ -7,6 +7,7 @@ import {
   LogOut,
   Menu,
   Settings2,
+  UserRound,
   Users,
   X,
 } from 'lucide-react';
@@ -14,6 +15,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { ROLE_LABELS, type Role } from '@dw/shared';
 import { useAuth } from '../lib/auth';
+import { AccountSettingsModal, ForcePasswordChangeModal } from './account-settings';
 import { cn } from './ui';
 
 const NAV = [
@@ -58,6 +60,7 @@ export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const mobilePanelRef = useRef<HTMLElement | null>(null);
   const mobileCloseRef = useRef<HTMLButtonElement | null>(null);
 
@@ -166,7 +169,13 @@ export function Layout() {
           </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-            <div className="hidden items-center gap-2.5 md:flex">
+            <button
+              type="button"
+              className="hidden items-center gap-2.5 rounded-[8px] px-1.5 py-1 transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400 md:flex"
+              aria-label="个人设置"
+              title="个人设置"
+              onClick={() => setAccountOpen(true)}
+            >
               <div className="text-right">
                 <p className="max-w-28 truncate text-[13px] font-medium leading-tight text-white">
                   {user?.displayName}
@@ -178,7 +187,7 @@ export function Layout() {
               <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-xs font-medium text-white">
                 {user?.displayName?.slice(0, 1) ?? 'U'}
               </div>
-            </div>
+            </button>
             <button
               type="button"
               className="flex h-9 w-9 items-center justify-center rounded-[8px] text-white/55 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
@@ -213,6 +222,10 @@ export function Layout() {
         </div>
       </main>
 
+      <AccountSettingsModal open={accountOpen} onClose={() => setAccountOpen(false)} />
+      {/* 首次登录 / 口令被重置后必须先改密，改完才进入正常界面 */}
+      <ForcePasswordChangeModal open={user?.mustChangePassword === true} />
+
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 xl:hidden">
           <aside
@@ -246,14 +259,27 @@ export function Layout() {
               <p className="mt-1 text-xs text-white/45">
                 {user?.username} · {ROLE_LABELS[(user?.role ?? 'USER') as Role]}
               </p>
-              <button
-                type="button"
-                onClick={() => void signOut()}
-                className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-white/20 text-sm font-medium text-white transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
-              >
-                <LogOut size={15} />
-                退出登录
-              </button>
+              <div className="mt-5 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    setAccountOpen(true);
+                  }}
+                  className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[8px] border border-white/20 text-sm font-medium text-white transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+                >
+                  <UserRound size={15} />
+                  个人设置
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void signOut()}
+                  className="flex h-11 flex-1 items-center justify-center gap-2 rounded-[8px] border border-white/20 text-sm font-medium text-white transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-400"
+                >
+                  <LogOut size={15} />
+                  退出登录
+                </button>
+              </div>
             </div>
           </aside>
         </div>

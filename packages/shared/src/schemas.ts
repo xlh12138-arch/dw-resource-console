@@ -420,6 +420,210 @@ export const loginSchema = z.object({
   password: z.string().min(8).max(128),
 });
 
+/* -------------------------- 密码复杂度 -------------------------- */
+
+/**
+ * 密码策略。对齐 NIST SP 800-63B 与等保 2.0 三级对「身份鉴别信息」的常见要求：
+ * 长度优先、不设强制定期更换，但限制常见弱口令、重复字符、连续字面与个人信息。
+ *
+ * 前端据此实时提示，服务端在执行同一份规则（不要只在前端校验）。
+ */
+export const PASSWORD_MIN_LENGTH = 10;
+export const PASSWORD_MAX_LENGTH = 128;
+
+/** 常见的弱口令与口令片段（不区分大小写匹配） */
+export const WEAK_PASSWORDS = [
+  'password',
+  'passw0rd',
+  'p@ssw0rd',
+  'passport',
+  'qwerty',
+  'qwertyuiop',
+  'asdfgh',
+  'asdfghjkl',
+  'zxcvbn',
+  'zxcvbnm',
+  '1qaz2wsx',
+  '1q2w3e4r',
+  'qazwsx',
+  'abc123',
+  'abcd1234',
+  'a1234567',
+  'a123456789',
+  'admin',
+  'administrator',
+  'root',
+  'letmein',
+  'welcome',
+  'iloveyou',
+  'monkey',
+  'dragon',
+  'sunshine',
+  'princess',
+  'football',
+  'superman',
+  'trustno1',
+  'master',
+  'shadow',
+  'changeme',
+  'default',
+  'test1234',
+  'test@1234',
+  '1234567890',
+  '12345678910',
+  '1111111111',
+  '0000000000',
+  '8888888888',
+  'weblogic',
+  'druid',
+  'zabbix',
+  'oracle',
+  'mysql',
+  'postgres',
+  'hadoop',
+  'hive',
+  'spark',
+  'kylin',
+  'gaussdb',
+  'dws',
+  'etl',
+  'bigdata',
+] as const;
+
+/** 键盘 / 字母 / 数字上长度 ≥ 3 的连续序列，用于识别「abcdef」「654321」这类连续字面 */
+const ASCENDING_SEQUENCES = [
+  'abcdefghijklmnopqrstuvwxyz',
+  '01234567890',
+  'qwertyuiop',
+  'asdfghjkl',
+  'zxcvbnm',
+] as const;
+
+const REVERSED_SEQUENCES = ASCENDING_SEQUENCES.map((seq) => [...seq].reverse().join(''));
+
+const PERSONAL_WORDS = ['admin', 'administrator', 'user', 'guest', 'test', 'readonly'] as const;
+
+function hasRunOfSameChar(value: string, run = 3): boolean {
+  return new RegExp(`(.)\\1{${run - 1},}`).test(value);
+}
+
+function hasSequence(value: string, length = 3): boolean {
+  const text = value.toLowerCase();
+  for (const seq of [...ASCENDING_SEQUENCES, ...REVERSED_SEQUENCES]) {
+    for (let i = 0; i + length <= seq.length; i += 1) {
+      if (text.includes(seq.slice(i, i + length))) return true;
+    }
+  }
+  return false;
+}
+
+function containsWeakFragment(value: string): boolean {
+  const text = value.toLowerCase();
+  return WEAK_PASSWORDS.some((word) => text.includes(word));
+}
+
+export interface PasswordContext {
+  /** 当前登录用户名：口令里不允许直接包含 */
+  username?: string;
+  /** 用户姓名：口令里不允许直接包含 */
+  displayName?: string;
+}
+
+export interface PasswordIssue {
+  /** 稳定的问题代码，前端按此归纳提示 */
+  code:
+    | 'TOO_SHORT'
+    | 'TOO_LONG'
+    | 'NO_LETTER'
+    | 'NO_DIGIT'
+    | 'CHARSET'
+    | 'WEAK'
+    | 'REPEAT'
+    | 'SEQUENCE'
+    | 'PERSONAL'
+    | 'SAME_AS_OLD';
+  message: string;
+}
+
+/**
+ * 校验密码复杂度，返回全部未满足项（空数组表示通过）。
+ * 前后端共用这一份实现，避免提示与服务端判定不一致。
+ */
+export function checkPasswordStrength(
+  password: string,
+  ctx: PasswordContext = {},
+  options: { oldPassword?: string } = {},
+): PasswordIssue[] {
+  const issues: PasswordIssue[] = [];
+  const value = password ?? '';
+
+  if (value.length < PASSWORD_MIN_LENGTH) {
+    issues.push({ code: 'TOO_SHORT', message: `至少 ${PASSWORD_MIN_LENGTH} 个字符` });
+  }
+  if (value.length > PASSWORD_MAX_LENGTH) {
+    issues.push({ code: 'TOO_LONG', message: `最多 ${PASSWORD_MAX_LENGTH} 个字符` });
+  }
+  if (value && !/[A-Za-z]/.test(value)) {
+    issues.push({ code: 'NO_LETTER', message: '至少包含 1 个英文字母' });
+  }
+  if (value && !/\d/.test(value)) {
+    issues.push({ code: 'NO_DIGIT', message: '至少包含 1 个数字' });
+  }
+  if (/[^\x20-\x7E]/.test(value)) {
+    issues.push({ code: 'CHARSET', message: '只能使用英文字母、数字与键盘符号' });
+  }
+  if (value && /\s/.test(value)) {
+    issues.push({ code: 'CHARSET', message: '不能包含空格' });
+  }
+  if (value.length >= 4 && containsWeakFragment(value)) {
+    issues.push({ code: 'WEAK', message: '不能是常见弱口令或包含常见口令片段' });
+  }
+  if (hasRunOfSameChar(value)) {
+    issues.push({ code: 'REPEAT', message: '不能包含 3 个及以上连续相同字符' });
+  }
+  if (hasSequence(value)) {
+    issues.push({ code: 'SEQUENCE', message: '不能包含 3 个及以上的连续字符，如 abc、123' });
+  }
+
+  const personal = [ctx.username, ctx.displayName].filter(
+    (item): item is string => typeof item === 'string' && item.trim().length >= 3,
+  );
+  const lower = value.toLowerCase();
+  if (personal.some((item) => lower.includes(item.trim().toLowerCase()))) {
+    issues.push({ code: 'PERSONAL', message: '不能包含用户名或姓名' });
+  }
+  // 用户名里常见的无意义片段也算个人信息，例如 admin 账号不能用含有 admin 的口令
+  if (personal.length === 0 && PERSONAL_WORDS.some((word) => lower.includes(word))) {
+    issues.push({ code: 'PERSONAL', message: '不能包含角色类通用词，如 admin、test' });
+  }
+
+  if (options.oldPassword && value && value === options.oldPassword) {
+    issues.push({ code: 'SAME_AS_OLD', message: '新密码不能与当前密码相同' });
+  }
+
+  return issues;
+}
+
+/** 供人不易混淆的随机初始口令：排除 0/O/1/l/I，并保证同时在字母/数字上达标 */
+export function generateStrongPassword(length = 14): string {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const symbols = '!@#$%^&*-_=+';
+  const all = upper + lower + digits + symbols;
+  const pick = (alphabet: string, index: number) =>
+    alphabet[(Math.random() * alphabet.length + index * 7) % alphabet.length]!;
+  const chars = [pick(upper, 1), pick(lower, 2), pick(digits, 3), pick(symbols, 4)];
+  while (chars.length < length) chars.push(all[Math.floor(Math.random() * all.length)]!);
+  // Fisher-Yates 打乱，避免固定位置分布暴露字符类别
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j]!, chars[i]!];
+  }
+  return chars.join('');
+}
+
+/** 强制改密的标记：首次登录、管理员重置口令、批量重置、导入默认口令后都为 true */
 export const userSchema = z.object({
   id: z.number().int(),
   username: z.string(),
@@ -428,8 +632,23 @@ export const userSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']),
   lastLoginAt: z.string().nullable(),
   createdAt: z.string(),
+  /** true 表示必须修改密码后才能继续使用（前端据此强制弹窗） */
+  mustChangePassword: z.boolean().default(false),
 });
 export type UserDto = z.infer<typeof userSchema>;
+
+/** 自助修改资料：所有登录用户都可以改自己的姓名 */
+export const updateProfileSchema = z.object({
+  displayName: z.string().trim().min(1).max(32).describe('姓名'),
+});
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/** 自助修改密码：必须提供当前密码，新密码按 checkPasswordStrength 校验 */
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, '请输入当前密码').max(128),
+  newPassword: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 export const authResultSchema = z.object({
   accessToken: z.string(),

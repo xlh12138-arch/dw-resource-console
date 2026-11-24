@@ -33,6 +33,8 @@ export const userRepository = {
     passwordHash: string;
     role: Role;
     status?: UserStatus;
+    /** 新建账号（管理员创建 / 导入 / 初始化）一律要求首次登录改密 */
+    mustChangePassword?: boolean;
   }): Promise<UserRow> {
     const rows = await db.insert(users).values(values).returning();
     return rows[0]!;
@@ -40,7 +42,13 @@ export const userRepository = {
 
   async update(
     id: number,
-    values: Partial<{ displayName: string; role: Role; status: UserStatus; lastLoginAt: Date }>,
+    values: Partial<{
+      displayName: string;
+      role: Role;
+      status: UserStatus;
+      lastLoginAt: Date;
+      mustChangePassword: boolean;
+    }>,
   ): Promise<UserRow> {
     const rows = await db
       .update(users)
@@ -67,7 +75,7 @@ export const userRepository = {
   async updatePassword(id: number, passwordHash: string): Promise<UserRow> {
     const rows = await db
       .update(users)
-      .set({ passwordHash, updatedAt: new Date() })
+      .set({ passwordHash, mustChangePassword: false, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
     if (!rows[0]) throw new Error('用户不存在');

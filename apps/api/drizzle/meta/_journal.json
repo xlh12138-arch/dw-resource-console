@@ -57,6 +57,13 @@
       "when": 1795000000000,
       "tag": "0007_refresh_active",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1795600000000,
+      "tag": "0008_user_password_policy",
+      "breakpoints": true
     }
   ]
 }
