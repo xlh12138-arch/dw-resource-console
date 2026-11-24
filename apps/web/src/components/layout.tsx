@@ -46,7 +46,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
       </div>
       <div className={cn('min-w-0', compact && 'block')}>
         <p className="truncate text-[14px] font-medium leading-tight text-white">
-          数据仓库资源控制台
+          数据仓库资源管理平台
         </p>
       </div>
     </div>

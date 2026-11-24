@@ -65,7 +65,7 @@ export function parseRoleText(text: string): Role | null {
 export async function downloadUserImportTemplate(): Promise<void> {
   const { Workbook } = await import('exceljs');
   const workbook = new Workbook();
-  workbook.creator = '数据仓库资源控制台';
+  workbook.creator = '数据仓库资源管理平台';
   const sheet = workbook.addWorksheet(USER_IMPORT_SHEET);
 
   sheet.columns = [

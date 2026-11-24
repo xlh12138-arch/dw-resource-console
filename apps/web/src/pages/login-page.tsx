@@ -51,7 +51,7 @@ export function LoginPage() {
             <Database size={19} strokeWidth={2.2} />
           </div>
           <div>
-            <p className="text-sm font-medium leading-tight">数据仓库资源控制台</p>
+            <p className="text-sm font-medium leading-tight">数据仓库资源管理平台</p>
           </div>
         </div>
 
@@ -60,12 +60,12 @@ export function LoginPage() {
           <h1 className="max-w-[620px] text-balance text-[clamp(48px,5.4vw,82px)] font-medium leading-[0.98] tracking-[-0.055em] text-white">
             数据仓库
             <br />
-            资源控制台
+            资源管理平台
           </h1>
         </div>
 
         <div className="relative flex items-end justify-between border-t border-white/15 pt-5 text-[11px] text-white/40">
-          <span className="font-mono">DW / Console</span>
+          <span className="font-mono">DW / Platform</span>
           <span>内部管理系统</span>
         </div>
       </section>
@@ -76,7 +76,7 @@ export function LoginPage() {
             <Database size={17} />
           </div>
           <div>
-            <p className="text-sm font-medium leading-tight text-slate-900">数据仓库资源控制台</p>
+            <p className="text-sm font-medium leading-tight text-slate-900">数据仓库资源管理平台</p>
           </div>
         </div>
 
@@ -150,7 +150,7 @@ export function LoginPage() {
         </div>
 
         <p className="text-center font-mono text-[10px] text-slate-400 lg:text-right">
-          DW / Console
+          DW / Platform
         </p>
       </section>
     </div>

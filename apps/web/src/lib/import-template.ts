@@ -160,7 +160,7 @@ export async function downloadImportTemplate(
 ): Promise<void> {
   const { Workbook } = await import('exceljs');
   const workbook = new Workbook();
-  workbook.creator = '数据仓库资源控制台';
+  workbook.creator = '数据仓库资源管理平台';
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet('资源数据', { views: [{ state: 'frozen', ySplit: 1 }] });
