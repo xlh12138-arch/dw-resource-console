@@ -8,6 +8,8 @@ import type { Role, UserImportRow } from '@dw/shared';
  */
 
 export const USER_IMPORT_SHEET = '用户数据';
+/** 模板第 2 个工作表，只放填写说明；导入时按名字排除，不会被当成数据读取 */
+export const USER_IMPORT_GUIDE_SHEET = '填写说明';
 export const USER_IMPORT_HEADERS = ['用户名', '姓名', '角色', '初始密码'] as const;
 export const USER_IMPORT_MAX_ROWS = 500;
 
@@ -61,7 +63,7 @@ export function parseRoleText(text: string): Role | null {
   return hit?.role ?? null;
 }
 
-/** 下载导入模板：带表头、说明行与一行示例，示例行不会被导入 */
+/** 下载导入模板：第 1 个工作表用于填写数据，第 2 个工作表只放填写说明（导入时不读取） */
 export async function downloadUserImportTemplate(): Promise<void> {
   const { Workbook } = await import('exceljs');
   const workbook = new Workbook();
@@ -75,7 +77,7 @@ export async function downloadUserImportTemplate(): Promise<void> {
     { header: '初始密码', key: 'password', width: 20 },
   ];
   sheet.getRow(1).font = { bold: true };
-  sheet.addRow(['zhangsan', '张三', '普通用户', '']).font = { italic: true };
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
 
   /*
    * 「角色」列做成下拉，避免手写错别字导致整批导入失败。
@@ -100,17 +102,33 @@ export async function downloadUserImportTemplate(): Promise<void> {
   }
 
   const notes = [
-    '',
-    '填写说明：',
-    `1. 每行一个账号，单次最多 ${USER_IMPORT_MAX_ROWS} 行；请删除第 2 行示例后再填写。`,
-    '2. 用户名 3～32 个字符，不能与系统已有账号或本表内其他行重复。',
-    `3. 角色请从下拉中选择：${ROLE_OPTION_TEXT}（也接受 ADMIN / USER / READONLY）。`,
-    '4. 初始密码留空则自动生成随机密码；填了则需 8～128 位。',
-    '5. 导入前系统会先校验，逐行提示有问题的字段；全部通过才写入，任一行失败则整批不生效。',
-    '6. 用户名与系统里已有账号重复时会提示具体行号与已存在的账号，不会写入任何数据。',
-    '7. 导入成功后请及时把初始密码转告用户，关闭结果弹窗后无法再次查看。',
+    [
+      '填写说明',
+      `本说明页只供参考，导入时不会读取；请把账号填写在「${USER_IMPORT_SHEET}」工作表。`,
+    ],
+    [
+      '1',
+      `每行一个账号，单次最多 ${USER_IMPORT_MAX_ROWS} 行；第 1 行是表头，请保留原样、不要改动列名。`,
+    ],
+    ['2', '用户名 3～32 个字符，不能与系统已有账号或本表内其他行重复。'],
+    ['3', `角色请从下拉中选择：${ROLE_OPTION_TEXT}（也接受 ADMIN / USER / READONLY）。`],
+    ['4', '姓名必填，1～32 个字符。'],
+    ['5', '初始密码留空则自动生成随机密码；填了则需 8～128 位。'],
+    ['6', '导入前系统会先校验，逐行提示有问题的字段；全部通过才写入，任一行失败则整批不生效。'],
+    ['7', '用户名与系统里已有账号重复时会提示具体行号与已存在的账号，不会写入任何数据。'],
+    ['8', '导入成功后请及时把初始密码转告用户，关闭结果弹窗后无法再次查看。'],
   ];
-  for (const line of notes) sheet.addRow([line]).font = { color: { argb: 'FF64748B' } };
+  const guide = workbook.addWorksheet(USER_IMPORT_GUIDE_SHEET);
+  guide.columns = [
+    { header: '序号', key: 'seq', width: 8 },
+    { header: '说明', key: 'note', width: 96 },
+  ];
+  guide.getRow(1).font = { bold: true };
+  for (const [seq, note] of notes) {
+    guide.addRow([seq, note]).font = { color: { argb: 'FF334155' } };
+  }
+  guide.getRow(1).alignment = { vertical: 'middle' };
+  guide.getColumn(2).alignment = { wrapText: true, vertical: 'top' };
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
@@ -141,7 +159,7 @@ export async function parseUserImportFile(file: File): Promise<ParsedUserImport>
   const { Workbook } = await import('exceljs');
   const workbook = new Workbook();
   await workbook.xlsx.load(await file.arrayBuffer());
-  const sheet = workbook.getWorksheet(USER_IMPORT_SHEET) ?? workbook.worksheets[0];
+  const sheet = pickDataSheet(workbook);
   if (!sheet) throw new Error('Excel 中没有可读取的工作表');
 
   // 允许用户在表头上方加标题行：在前 6 行里找匹配列数最多的一行
@@ -159,7 +177,9 @@ export async function parseUserImportFile(file: File): Promise<ParsedUserImport>
     }
   }
   if (best === 0) {
-    throw new Error('未识别到表头，请使用下载的模板填写，或检查列名是否被改动');
+    throw new Error(
+      `未在「${sheet.name}」工作表识别到表头，请使用下载的模板填写，或检查列名是否被改动`,
+    );
   }
 
   const columnOf = new Map<string, number>();
@@ -181,8 +201,6 @@ export async function parseUserImportFile(file: File): Promise<ParsedUserImport>
     const roleText = trim(r, '角色');
     const password = trim(r, '初始密码');
     if (!username && !displayName && !roleText && !password) continue;
-    // 说明行以数字序号开头，这里只跳过 Excel 示例/说明区（首行填写说明之后的纯文本行）
-    if (/^[0-9]+[.、]/.test(displayName) || /^[0-9]+[.、]/.test(username)) continue;
     if (rows.length >= USER_IMPORT_MAX_ROWS) {
       throw new Error(`单次最多导入 ${USER_IMPORT_MAX_ROWS} 行，请拆分成多个文件`);
     }
@@ -279,6 +297,17 @@ export async function parseUserImportFile(file: File): Promise<ParsedUserImport>
 /** 1 → A、3 → C；模板只在 26 列以内使用，够用即可 */
 function columnLetter(index: number): string {
   return String.fromCharCode(64 + index);
+}
+
+/**
+ * 选出要读取的工作表：优先按名字找「用户数据」；找不到时取第一个不是说明页的表。
+ * 说明页（填写说明）永远不会被当成数据读取。
+ */
+function pickDataSheet(workbook: import('exceljs').Workbook) {
+  const named = workbook.getWorksheet(USER_IMPORT_SHEET);
+  if (named) return named;
+  const candidates = workbook.worksheets.filter((sheet) => sheet.name !== USER_IMPORT_GUIDE_SHEET);
+  return candidates[0] ?? workbook.worksheets[0];
 }
 
 /** 校验通过的行转成 CSV，用于「导出本次校验通过的数据」或手工核对 */
